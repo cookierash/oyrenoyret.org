@@ -1,0 +1,374 @@
+// Prisma Schema
+// Database schema for the NGO EdTech platform
+// All models use UUID primary keys and include soft-delete support
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  STUDENT
+  PARENT
+  ADMIN
+  TEACHER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ConsentStatus {
+  PENDING
+  GRANTED
+  REVOKED
+  EXPIRED
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  passwordHash String? // Nullable for OAuth users
+  role      UserRole @default(STUDENT)
+  status    UserStatus @default(INACTIVE) // Start as INACTIVE until registration completes
+  dateOfBirth DateTime? // Required for minors, nullable for parents/admins
+  firstName String?
+  lastName  String?
+  grade     String? // Student grade: 5, 6, 7, 8, 9, 10, 11
+  
+  // Registration flow tracking
+  registrationStep Int @default(1) // Track current registration step (1-5)
+  parentEmail      String? // Parent/guardian email (stored but not trusted until verified)
+  parentFirstName  String?
+  parentLastName   String?
+  
+  // Credits (gamified economy)
+  credits          Float             @default(15)
+  creditTransactions CreditTransaction[]
+  materialAccesses MaterialAccess[]
+  
+  // Relations
+  parentalConsents ParentalConsent[]
+  guardianVerifications GuardianVerification[]
+  authSessions     AuthSession[]
+  sessions         Session[]
+  academicRecords  AcademicRecord[]
+  materials        Material[]
+  discussions      Discussion[]
+  discussionReplies DiscussionReply[]
+  discussionVotes  DiscussionVote[]
+  replyVotes       ReplyVote[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime? // Soft delete support
+  
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@index([deletedAt])
+  @@index([parentEmail])
+}
+
+model GuardianVerification {
+  id          String   @id @default(uuid())
+  userId      String
+  parentEmail String
+  code        String   // 6-digit verification code
+  expiresAt   DateTime // Code expiration time
+  verifiedAt  DateTime? // When code was successfully verified
+  attempts    Int      @default(0) // Number of verification attempts
+  used        Boolean  @default(false) // Whether code has been used
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([parentEmail])
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model ParentalConsent {
+  id              String        @id @default(uuid())
+  userId          String
+  parentEmail     String
+  status          ConsentStatus @default(PENDING)
+  consentVersion  String        // Version of consent terms (e.g., "v1.0", "v2.1")
+  grantedAt       DateTime?
+  revokedAt       DateTime?
+  expiresAt       DateTime?    // Optional expiration date
+  
+  // Relations
+  user            User          @relation(fields: [userId], references: [id])
+  
+  // Timestamps
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([userId])
+  @@index([parentEmail])
+  @@index([status])
+  @@index([consentVersion])
+}
+
+model AuthSession {
+  id          String   @id @default(uuid())
+  userId      String
+  token       String   @unique // Session token
+  expiresAt   DateTime
+  ipAddress   String?
+  userAgent   String?
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+model Session {
+  id          String        @id @default(uuid())
+  userId      String
+  status      SessionStatus @default(ACTIVE)
+  startedAt   DateTime      @default(now())
+  completedAt DateTime?
+  
+  // Relations
+  user        User          @relation(fields: [userId], references: [id])
+  
+  // Timestamps
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?     // Soft delete support
+  
+  @@index([userId])
+  @@index([status])
+  @@index([startedAt])
+  @@index([deletedAt])
+}
+
+model AcademicRecord {
+  id          String   @id @default(uuid())
+  userId      String
+  grade       String?
+  subject     String?
+  score       Float?
+  notes       String?  @db.Text
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id])
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete support
+  
+  @@index([userId])
+  @@index([deletedAt])
+}
+
+enum MaterialStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum MaterialType {
+  TEXTUAL
+  PRACTICE_TEST
+}
+
+enum MaterialDifficulty {
+  BASIC
+  INTERMEDIATE
+  ADVANCED
+}
+
+model Material {
+  id             String         @id @default(uuid())
+  userId         String
+  subjectId      String         // e.g. 'mathematics', 'physics'
+  topicId        String         // e.g. 'algebra', 'linear-equations'
+  title          String
+  objectives     String?        @db.Text  // Learning objectives (shown on material page)
+  content        String         @db.Text
+  materialType   MaterialType   @default(TEXTUAL)
+  status        MaterialStatus @default(DRAFT)
+  publishedAt   DateTime?
+  publishCreditsGrantedAt DateTime?  // Set when we grant 0.5 for first publish (idempotency)
+  alignmentScore Float?         // AI rating [0.5, 1.0] for credit formulas; default 0.75
+  difficulty    MaterialDifficulty? // basic=1 bar green, intermediate=2 bars yellow, advanced=3 bars red
+  
+  // Relations
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accesses      MaterialAccess[]
+  
+  // Timestamps
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?      // Soft delete support
+  
+  @@index([userId])
+  @@index([subjectId, topicId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Discussion {
+  id               String    @id @default(uuid())
+  userId           String
+  title            String
+  content          String    @db.Text
+  subjectId        String?
+  topicId          String?
+  lastActivityAt   DateTime  @default(now()) // Updated on reply/vote; used for 24h archive
+  archivedAt       DateTime? // Set when no interaction for 24h
+  acceptedReplyId String?   @unique // Reply marked as helpful by asker → credits to helper
+  
+  // Relations
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acceptedReply    DiscussionReply?  @relation("AcceptedReply", fields: [acceptedReplyId], references: [id], onDelete: SetNull)
+  replies          DiscussionReply[]  @relation("DiscussionReplies")
+  votes            DiscussionVote[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([subjectId, topicId])
+  @@index([archivedAt])
+  @@index([lastActivityAt])
+}
+
+model DiscussionReply {
+  id           String    @id @default(uuid())
+  discussionId String
+  parentReplyId String?   // null = top-level reply
+  userId       String
+  content      String    @db.Text
+  
+  // Relations
+  discussion   Discussion       @relation("DiscussionReplies", fields: [discussionId], references: [id], onDelete: Cascade)
+  discussionAsAccepted Discussion? @relation("AcceptedReply")
+  parentReply  DiscussionReply? @relation("ReplyReplies", fields: [parentReplyId], references: [id], onDelete: Cascade)
+  childReplies DiscussionReply[] @relation("ReplyReplies")
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes        ReplyVote[]
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([discussionId])
+  @@index([parentReplyId])
+  @@index([userId])
+}
+
+model DiscussionVote {
+  id           String @id @default(uuid())
+  discussionId String
+  userId       String
+  value        Int    // 1 or -1
+  
+  // Relations
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@unique([discussionId, userId])
+  @@index([discussionId])
+  @@index([userId])
+}
+
+model ReplyVote {
+  id       String @id @default(uuid())
+  replyId  String
+  userId   String
+  value   Int    // 1 or -1
+  
+  // Relations
+  reply     DiscussionReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@unique([replyId, userId])
+  @@index([replyId])
+  @@index([userId])
+}
+
+enum CreditTransactionType {
+  REGISTRATION
+  MATERIAL_PUBLISH
+  MATERIAL_PASSIVE
+  MATERIAL_UNLOCK
+  DISCUSSION_CREATE
+  DISCUSSION_HELP
+  GROUP_SESSION_PARTICIPATE
+  GROUP_SESSION_FACILITATE
+  SPRINT_ENTRY
+  SPRINT_PAYOUT
+  SPECIAL_EVENT
+}
+
+model CreditTransaction {
+  id           String                @id @default(uuid())
+  userId       String
+  amount       Float                 // Positive = earned, negative = spent
+  balanceAfter Float                 // Snapshot of balance after transaction
+  type         CreditTransactionType
+  referenceId  String?               // For lookups: replyId (DISCUSSION_HELP), materialId, etc.
+  metadata     Json?                 // e.g. { materialId, discussionId, etc. }
+  
+  // Relations
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime              @default(now())
+  
+  @@index([userId])
+  @@index([type])
+  @@index([referenceId])
+  @@index([createdAt])
+}
+
+model MaterialAccess {
+  id         String   @id @default(uuid())
+  userId     String
+  materialId String
+  
+  // Relations
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  
+  createdAt  DateTime @default(now())
+  
+  @@unique([userId, materialId])
+  @@index([userId])
+  @@index([materialId])
+}

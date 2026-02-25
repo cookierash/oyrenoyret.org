@@ -1,0 +1,157 @@
+/**
+ * Step 3: Parent Email Verification
+ * 
+ * Sends and validates a 6-digit verification code to the parent email.
+ */
+
+'use client';
+
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { verificationCodeSchema, type VerificationCodeInput } from '../schemas/registration';
+import {
+  sendParentVerificationCode,
+  verifyParentEmail,
+} from '../actions/registration';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+
+interface Step3Props {
+  userId: string;
+  parentEmail: string;
+  onSuccess: () => void;
+  onPrevious: () => void;
+}
+
+export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }: Step3Props) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingCode, setIsSendingCode] = useState(false);
+
+  const form = useForm<VerificationCodeInput>({
+    resolver: zodResolver(verificationCodeSchema),
+    mode: 'onChange',
+    defaultValues: {
+      code: '',
+    },
+  });
+
+  // Send code on mount
+  useEffect(() => {
+    handleSendCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSendCode = async () => {
+    setIsSendingCode(true);
+    try {
+      const result = await sendParentVerificationCode(userId);
+
+      if (result.success) {
+        toast.success(`Verification code sent to ${parentEmail}`);
+      } else {
+        toast.error(result.error || 'Failed to send verification code');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsSendingCode(false);
+    }
+  };
+
+  const onSubmit = async (data: VerificationCodeInput) => {
+    setIsSubmitting(true);
+    try {
+      const result = await verifyParentEmail(userId, data);
+
+      if (result.success) {
+        toast.success('Email verified successfully');
+        onSuccess();
+      } else {
+        toast.error(result.error || 'Invalid verification code');
+        form.resetField('code');
+      }
+    } catch (error) {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-4">
+          <div className="rounded-md border border-primary/30 bg-primary/10 p-4">
+            <p className="text-sm text-muted-foreground">
+              A 6-digit verification code has been sent to:
+            </p>
+            <p className="font-semibold text-primary mt-2">
+              {parentEmail}
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Please check your email and enter the code below. The code expires in 15 minutes.
+            </p>
+          </div>
+
+          <FormField
+            control={form.control}
+            name="code"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Verification Code</FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    className="text-center text-2xl tracking-widest font-sans tabular-nums"
+                    {...field}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      field.onChange(value);
+                    }}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Didn't receive the code?
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleSendCode}
+              disabled={isSendingCode}
+              className="h-auto p-0 text-primary underline-offset-4 hover:underline bg-transparent shadow-none"
+            >
+              {isSendingCode ? 'Sending...' : 'Resend Code'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button type="button" variant="outline" size="md" onClick={onPrevious} className="flex-1">
+            Previous
+          </Button>
+          <Button type="submit" variant="primary" size="md" className="flex-1" disabled={isSubmitting || !form.formState.isValid}>
+            {isSubmitting ? 'Verifying...' : 'Next: Consent'}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
+}
