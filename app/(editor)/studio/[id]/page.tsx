@@ -27,6 +27,7 @@ export default function EditMaterialPage() {
     content: string;
     materialType?: string;
     difficulty?: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
+    status?: 'DRAFT' | 'PUBLISHED';
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -46,6 +47,7 @@ export default function EditMaterialPage() {
           objectives: m.objectives ?? '',
           content: m.materialType === 'PRACTICE_TEST' ? (m.content || '{"questions":[]}') : (m.content || '<p></p>'),
           materialType: m.materialType,
+          status: m.status,
           difficulty: m.difficulty ?? 'BASIC',
         })
       )
@@ -108,6 +110,7 @@ export default function EditMaterialPage() {
             initialObjectives={material.objectives ?? ''}
             initialContent={material.content}
             initialDifficulty={material.difficulty}
+            initialStatus={material.status}
             onSaved={() => router.refresh()}
           />
         ) : (
@@ -120,6 +123,7 @@ export default function EditMaterialPage() {
             initialObjectives={material.objectives ?? ''}
             initialContent={material.content}
             initialDifficulty={material.difficulty}
+            initialStatus={material.status}
             onSaved={() => router.refresh()}
           />
         )}

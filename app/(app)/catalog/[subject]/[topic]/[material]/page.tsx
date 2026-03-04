@@ -44,7 +44,6 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
       objectives: true,
       content: true,
       materialType: true,
-      alignmentScore: true,
       difficulty: true,
       publishedAt: true,
       user: {
@@ -62,9 +61,9 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
   const [unlocked, balance] = await Promise.all([
     userId
       ? prisma.materialAccess.findUnique({
-          where: { userId_materialId: { userId, materialId } },
-          select: { materialId: true },
-        })
+        where: { userId_materialId: { userId, materialId } },
+        select: { materialId: true },
+      })
       : null,
     userId ? getBalance(userId) : 0,
   ]);
@@ -80,7 +79,6 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
   }
   const estimatedCost = roundCredits(
     calcMaterialUnlockCost({
-      alignmentScore: material.alignmentScore ?? 0.75,
       materialType: material.materialType,
       questionCount,
     })

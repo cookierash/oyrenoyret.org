@@ -11,7 +11,6 @@ export type TopicMaterialWithCost = {
   userId: string;
   title: string;
   materialType: 'TEXTUAL' | 'PRACTICE_TEST';
-  alignmentScore: number | null;
   difficulty: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED' | null;
   publishedAt: Date | null;
   user: { firstName: string | null; lastName: string | null };

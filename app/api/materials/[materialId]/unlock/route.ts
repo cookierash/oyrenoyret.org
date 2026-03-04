@@ -27,7 +27,6 @@ export async function POST(
         id: true,
         userId: true,
         materialType: true,
-        alignmentScore: true,
         content: true,
       },
     });
@@ -64,7 +63,6 @@ export async function POST(
     }
 
     const params_ = {
-      alignmentScore: material.alignmentScore ?? 0.75,
       materialType: material.materialType,
       questionCount,
     };
