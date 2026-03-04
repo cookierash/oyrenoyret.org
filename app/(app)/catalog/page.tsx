@@ -7,7 +7,6 @@
 import Link from 'next/link';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
-import { Badge } from '@/components/ui/badge';
 import { SUBJECTS } from '@/src/config/constants';
 import { SUBJECT_ICONS, SUBJECT_COLORS } from '@/src/config/subject-meta';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
@@ -19,7 +18,6 @@ export default function CatalogPage() {
       <PageHeader
         title="Subject catalog"
         description="Browse all subjects and topics. Pick what you want to learn next."
-        badge={<Badge variant="secondary">Catalog</Badge>}
       />
 
       <main className="space-y-4">

@@ -8,7 +8,6 @@ interface MaterialWithCost {
   userId: string;
   title: string;
   materialType: 'TEXTUAL' | 'PRACTICE_TEST';
-  alignmentScore: number | null;
   difficulty: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED' | null;
   publishedAt: Date | null;
   user: { firstName: string | null; lastName: string | null };
@@ -58,7 +57,6 @@ export function CatalogMaterialsGrid({
             isOwn={isOwn}
             estimatedCost={m.estimatedCost}
             balance={balance}
-            alignmentScore={m.alignmentScore}
             unlockCount={m._count.accesses}
             difficulty={m.difficulty}
             subjectId={subjectId}

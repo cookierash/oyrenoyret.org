@@ -23,6 +23,7 @@ import {
   Redo,
   Highlighter,
   Palette,
+  Eraser,
 } from 'lucide-react';
 
 const TEXT_COLORS = [
@@ -201,24 +202,29 @@ export function DocumentEditor({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-10 flex flex-col gap-0.5"
               onClick={(e) => { e.stopPropagation(); setShowColors((s) => (s === 'text' ? null : 'text')); }}
               title="Text color"
             >
               <Palette className="h-4 w-4" />
+              <div className="h-0.5 w-3 rounded-full" style={{ backgroundColor: editor.getAttributes('textStyle').color || 'currentColor' }} />
             </Button>
             {showColors === 'text' && (
-              <div className="absolute left-0 top-full mt-1 p-2 rounded-md border border-border bg-background z-50 grid grid-cols-4 gap-1">
-                {TEXT_COLORS.map((c) => (
-                  <button
-                    key={c.value || 'default'}
-                    type="button"
-                    className="h-6 w-6 rounded border border-border"
-                    style={c.value ? { backgroundColor: c.value } : undefined}
-                    onClick={() => setColor(c.value)}
-                    title={c.name}
-                  />
-                ))}
+              <div className="absolute left-0 top-full mt-1.5 p-2 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="grid grid-cols-4 gap-1.5 min-w-[120px]">
+                  {TEXT_COLORS.map((c) => (
+                    <button
+                      key={c.value || 'default'}
+                      type="button"
+                      className="h-7 w-7 rounded-sm border border-border transition-transform hover:scale-110 active:scale-95 flex items-center justify-center p-0.5"
+                      style={c.value ? { backgroundColor: c.value } : undefined}
+                      onClick={() => setColor(c.value)}
+                      title={c.name}
+                    >
+                      {!c.value && <Eraser className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -227,25 +233,30 @@ export function DocumentEditor({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-10 flex flex-col gap-0.5"
               onClick={(e) => { e.stopPropagation(); setShowColors((s) => (s === 'highlight' ? null : 'highlight')); }}
               title="Highlight"
               data-active={editor.isActive('highlight')}
             >
               <Highlighter className="h-4 w-4" />
+              <div className="h-0.5 w-3 rounded-full" style={{ backgroundColor: editor.getAttributes('highlight').color || 'transparent', border: !editor.getAttributes('highlight').color ? '1px solid currentColor' : 'none' }} />
             </Button>
             {showColors === 'highlight' && (
-              <div className="absolute left-0 top-full mt-1 p-2 rounded-md border border-border bg-background z-50 grid grid-cols-5 gap-1">
-                {HIGHLIGHT_COLORS.map((c) => (
-                  <button
-                    key={c.value || 'none'}
-                    type="button"
-                    className="h-6 w-6 rounded border border-border"
-                    style={c.value ? { backgroundColor: c.value } : undefined}
-                    onClick={() => setHighlight(c.value)}
-                    title={c.name}
-                  />
-                ))}
+              <div className="absolute left-0 top-full mt-1.5 p-2 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="grid grid-cols-5 gap-1.5 min-w-[150px]">
+                  {HIGHLIGHT_COLORS.map((c) => (
+                    <button
+                      key={c.value || 'none'}
+                      type="button"
+                      className="h-7 w-7 rounded-sm border border-border transition-transform hover:scale-110 active:scale-95 flex items-center justify-center p-0.5"
+                      style={c.value ? { backgroundColor: c.value } : undefined}
+                      onClick={() => setHighlight(c.value)}
+                      title={c.name}
+                    >
+                      {!c.value && <Eraser className="h-3.5 w-3.5 text-muted-foreground" />}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -298,6 +309,7 @@ export function DocumentEditor({
             size="icon"
             className="h-8 w-8"
             onClick={setBulletList}
+            data-active={editor.isActive('bulletList')}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -307,6 +319,7 @@ export function DocumentEditor({
             size="icon"
             className="h-8 w-8"
             onClick={setOrderedList}
+            data-active={editor.isActive('orderedList')}
           >
             <ListOrdered className="h-4 w-4" />
           </Button>

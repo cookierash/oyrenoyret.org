@@ -136,7 +136,6 @@ export async function PATCH(
     let balanceAfter: number | undefined;
     let creditsGranted: number | undefined;
     if (isPublishing) {
-      const alignmentScore = material.alignmentScore ?? 0.75;
       let questionCount = 0;
       if (material.materialType === 'PRACTICE_TEST' && material.content) {
         try {
@@ -149,7 +148,6 @@ export async function PATCH(
       const result = await grantMaterialPublish(
         userId,
         {
-          alignmentScore,
           materialType: material.materialType,
           questionCount,
         },

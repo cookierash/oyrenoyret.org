@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lock, Loader2, Star, Users, ExternalLink, User } from 'lucide-react';
+import { Lock, Loader2, Users, ExternalLink, User } from 'lucide-react';
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { toast } from 'sonner';
 
@@ -18,8 +18,6 @@ interface MaterialCardCompactProps {
   isOwn?: boolean;
   estimatedCost?: number;
   balance?: number;
-  /** AI alignment score 0.5–1.0, displayed as rating */
-  alignmentScore?: number | null;
   /** Number of users who unlocked this material */
   unlockCount: number;
   /** basic=1 green bar, intermediate=2 yellow, advanced=3 red */
@@ -35,12 +33,6 @@ interface MaterialCardCompactProps {
   isUnlockDisabled?: boolean;
 }
 
-function formatRating(score: number | null | undefined): string {
-  if (score == null) return '—';
-  const pct = Math.round(score * 100);
-  return `${pct}%`;
-}
-
 export function MaterialCardCompact({
   id,
   title,
@@ -50,7 +42,6 @@ export function MaterialCardCompact({
   isOwn = false,
   estimatedCost = 2,
   balance,
-  alignmentScore,
   unlockCount,
   difficulty,
   subjectId,
@@ -113,10 +104,6 @@ export function MaterialCardCompact({
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <DifficultyBars difficulty={difficulty ?? 'BASIC'} className="shrink-0" />
-          <span className="flex items-center gap-1">
-            <Star className="h-3 w-3" />
-            {formatRating(alignmentScore)}
-          </span>
           <span className="flex items-center gap-1">
             <Users className="h-3 w-3" />
             {unlockCount} unlocked

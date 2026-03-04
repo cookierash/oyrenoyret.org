@@ -5,10 +5,19 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
+import { cn } from '@/src/lib/utils';
 import { DocumentEditor } from './document-editor';
 import { SUBJECTS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface StudioEditorProps {
   mode: 'create' | 'edit';
@@ -19,6 +28,7 @@ interface StudioEditorProps {
   initialObjectives?: string;
   initialContent?: string;
   initialDifficulty?: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
+  initialStatus?: 'DRAFT' | 'PUBLISHED';
   onSaved?: (newMaterialId?: string) => void;
 }
 
@@ -31,31 +41,42 @@ export function StudioEditor({
   initialObjectives = '',
   initialContent = '',
   initialDifficulty = 'BASIC',
+  initialStatus = 'DRAFT',
   onSaved,
 }: StudioEditorProps) {
   const router = useRouter();
   const [subjectId, setSubjectId] = useState(initialSubjectId);
   const [topicId, setTopicId] = useState(initialTopicId);
   const [title, setTitle] = useState(initialTitle);
-  const [objectives, setObjectives] = useState(initialObjectives);
+  const [objectiveSlots, setObjectiveSlots] = useState<string[]>(() => {
+    const slots = (initialObjectives || '').split('\n').filter(Boolean);
+    while (slots.length < 5) slots.push('');
+    return slots.slice(0, 5);
+  });
   const [content, setContent] = useState(initialContent || '<p></p>');
   const [difficulty, setDifficulty] = useState<'BASIC' | 'INTERMEDIATE' | 'ADVANCED'>(initialDifficulty);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+
+  const isModified =
+    title !== initialTitle ||
+    content !== initialContent ||
+    objectiveSlots.join('\n').trim() !== (initialObjectives || '').trim() ||
+    difficulty !== initialDifficulty;
+
+  const isPublished = initialStatus === 'PUBLISHED';
 
   const topics = subjectId
     ? (CURRICULUM_TOPICS as Record<string, { id: string; name: string }[]>)[subjectId] ?? []
     : [];
 
-  const save = useCallback(async (andPublish = false) => {
+  const save = useCallback(async (andPublish = false, skipRedirect = false): Promise<string | undefined> => {
     if (!subjectId || !topicId || !title.trim()) {
       toast.error('Subject, topic, and title are required');
       return;
     }
-    if (andPublish && !objectives.trim()) {
-      toast.error('Lesson objectives are required to publish');
-      return;
-    }
+    const finalObjectives = objectiveSlots.map(s => s.trim()).filter(Boolean).join('\n');
     const trimmed = content.trim();
     const html = !trimmed || trimmed === '<p></p>' || trimmed === '<p><br></p>' ? '' : content;
     if (!html) {
@@ -69,81 +90,86 @@ export function StudioEditor({
         const res = await fetch('/api/materials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ subjectId, topicId, title: title.trim(), objectives: objectives.trim() || null, content: html }),
+          body: JSON.stringify({ subjectId, topicId, title: title.trim(), objectives: finalObjectives || null, content: html }),
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || 'Failed to create');
         }
         const created = await res.json();
-        if (andPublish && created.id) {
-          const pubRes = await fetch(`/api/materials/${created.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'PUBLISHED', difficulty, objectives: objectives.trim() }),
-          });
-          const pubData = await pubRes.json();
-          if (!pubRes.ok) throw new Error(pubData.error ?? 'Failed to publish');
-          if (typeof pubData.balanceAfter === 'number') {
-            (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(pubData.balanceAfter);
-          }
-          const creditsMsg =
-            typeof pubData.creditsGranted === 'number' && pubData.creditsGranted > 0
-              ? ` +${Number(pubData.creditsGranted).toFixed(2)} credits`
-              : '';
-          toast.success(`Published! Your material is now visible in the catalog.${creditsMsg}`);
+
+        if (!andPublish && !skipRedirect) {
+          toast.success('Draft saved');
           onSaved?.(created.id);
-          router.push('/studio');
-          // Refresh after nav so layout re-fetches credits (sidebar was not mounted during create)
-          setTimeout(() => router.refresh(), 150);
-          return;
+          if (created.id) router.push(`/studio/${created.id}`);
         }
-        toast.success('Draft saved');
-        onSaved?.(created.id);
-        if (created.id) router.push(`/studio/${created.id}`);
-        return;
+        return created.id;
       } else if (materialId) {
         const res = await fetch(`/api/materials/${materialId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: title.trim(), objectives: objectives.trim() || null, content: html }),
+          body: JSON.stringify({
+            title: title.trim(),
+            objectives: finalObjectives || null,
+            content: html,
+          }),
         });
-        if (!res.ok) throw new Error('Failed to save');
-        toast.success('Saved');
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to save');
+        }
+
+        if (!andPublish && !skipRedirect) {
+          toast.success('Saved');
+        }
+        router.refresh();
+        onSaved?.();
+        return materialId;
       }
-      router.refresh();
-      onSaved?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
-  }, [mode, materialId, subjectId, topicId, title, objectives, content, router, onSaved]);
+  }, [mode, materialId, subjectId, topicId, title, objectiveSlots, content, router, onSaved]);
 
-  const publish = useCallback(async () => {
-    if (mode === 'create') {
-      setPublishing(true);
-      try {
-        await save(true);
-      } finally {
-        setPublishing(false);
-      }
+  const publish = useCallback(async (confirmed = false) => {
+    if (!subjectId || !topicId || !title.trim()) {
+      toast.error('Subject, topic, and title are required');
       return;
     }
-    if (!materialId) return;
-    if (!objectives.trim()) {
-      toast.error('Lesson objectives are required to publish');
+
+    if (!confirmed) {
+      setShowPublishDialog(true);
       return;
     }
+
+    const finalObjectives = objectiveSlots.map(s => s.trim()).filter(Boolean).join('\n');
+    if (objectiveSlots.filter(s => s.trim()).length < 2) {
+      toast.error('Please provide at least 2 learning objectives to publish');
+      return;
+    }
+
+    setShowPublishDialog(false);
     setPublishing(true);
+
     try {
-      const res = await fetch(`/api/materials/${materialId}`, {
+      // Step 1: Save draft (and get ID if it's new)
+      const currentId = await save(true, true);
+      if (!currentId) return;
+
+      const res = await fetch(`/api/materials/${currentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'PUBLISHED', difficulty, objectives: objectives.trim() }),
+        body: JSON.stringify({ status: 'PUBLISHED', difficulty, objectives: finalObjectives }),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to publish');
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to publish');
+      }
+
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
@@ -152,6 +178,7 @@ export function StudioEditor({
           ? ` +${Number(data.creditsGranted).toFixed(2)} credits`
           : '';
       toast.success(`Published! Your material is now visible in the catalog.${creditsMsg}`);
+
       router.refresh();
       onSaved?.();
     } catch (err) {
@@ -159,74 +186,79 @@ export function StudioEditor({
     } finally {
       setPublishing(false);
     }
-  }, [mode, materialId, difficulty, objectives, save, router, onSaved]);
+  }, [subjectId, topicId, title, objectiveSlots, mode, materialId, difficulty, save, router, onSaved]);
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex flex-col gap-4 pb-4 border-b border-border mb-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="rounded-lg border border-border bg-card p-6 space-y-4 mb-4 flex-shrink-0">
+        <div className="flex items-end justify-between gap-4">
+          <div className="space-y-2 flex-1 max-w-xl">
+            <label className="text-sm font-medium">Title</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Document title"
-              className="text-lg font-medium max-w-md border-0 shadow-none focus-visible:ring-0 px-0"
+              placeholder="Material title"
             />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-2 mb-0.5">
+            <Button variant="secondary-primary" onClick={() => save(false)} disabled={saving}>
+              {saving ? 'Saving...' : 'Save Draft'}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => publish(false)}
+              disabled={publishing || saving || (isPublished && !isModified)}
+            >
+              {publishing ? 'Yoxlanılır: Uyğunluq, Məqsədlər və Moderasiya...' : (isPublished && isModified) ? 'Publish Changes' : isPublished ? 'Published' : mode === 'create' ? 'Save & Publish' : 'Publish'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Subject</label>
             <Select
               value={subjectId}
               onChange={(e) => {
                 setSubjectId(e.target.value);
                 setTopicId('');
               }}
-              placeholder="Subject"
+              placeholder="Select subject"
               disabled={mode === 'edit'}
             >
               {SUBJECTS.map((s) => (
                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
               ))}
             </Select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Topic</label>
             <Select
               value={topicId}
               onChange={(e) => setTopicId(e.target.value)}
               disabled={!subjectId || mode === 'edit'}
-              placeholder="Topic"
+              placeholder="Select topic"
             >
               {topics.map((t) => (
                 <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
               ))}
             </Select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Difficulty</label>
             <Select
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')}
-              placeholder="Difficulty"
+              placeholder="Select difficulty"
             >
               <SelectItem value="BASIC">Basic</SelectItem>
               <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
               <SelectItem value="ADVANCED">Advanced</SelectItem>
             </Select>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => save(false)} disabled={saving}>
-                {saving ? 'Saving...' : 'Save'}
-              </Button>
-              <Button variant="primary" size="sm" onClick={publish} disabled={publishing || saving}>
-                {publishing ? 'Publishing...' : mode === 'create' ? 'Save & Publish' : 'Publish'}
-              </Button>
-            </div>
           </div>
         </div>
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Objectives (required for publishing)</label>
-          <Input
-            value={objectives}
-            onChange={(e) => setObjectives(e.target.value)}
-            placeholder="What will learners achieve?"
-            className="text-sm"
-          />
-        </div>
       </div>
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-[500px]">
         <DocumentEditor
           content={content}
           onChange={setContent}
@@ -234,6 +266,82 @@ export function StudioEditor({
           editable
         />
       </div>
+
+      <AlertDialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
+        <AlertDialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-none shadow-2xl">
+          <div className="bg-background p-6 pt-8 space-y-6">
+            <header className="space-y-1">
+              <AlertDialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+                Ready to publish?
+              </AlertDialogTitle>
+              <AlertDialogDescription className="text-sm text-muted-foreground">
+                Provide learning objectives to help learners understand what they will achieve.
+              </AlertDialogDescription>
+            </header>
+            <div className="space-y-4">
+              <div className="space-y-2.5">
+                {objectiveSlots.map((slot, idx) => (
+                  <div key={idx} className="group relative">
+                    <Input
+                      value={slot}
+                      onChange={(e) => {
+                        const newSlots = [...objectiveSlots];
+                        newSlots[idx] = e.target.value;
+                        setObjectiveSlots(newSlots);
+                      }}
+                      placeholder={idx < 2 ? `Objective ${idx + 1} (required)` : `Objective ${idx + 1} (optional)`}
+                      className={cn(
+                        "h-10 text-sm transition-all duration-200",
+                        idx < 2 && !slot.trim()
+                          ? "border-primary/20 bg-primary/[0.02] focus:bg-background focus:border-primary"
+                          : "focus:border-primary/50"
+                      )}
+                      autoFocus={idx === 0}
+                    />
+                    {idx < 2 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-opacity group-focus-within:opacity-40">
+                        <span className="text-[10px] font-bold text-primary/40 uppercase tracking-widest">Req</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-1.5 mb-2">
+                <label className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">Difficulty Level</label>
+                <Select
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')}
+                >
+                  <SelectItem value="BASIC">Basic</SelectItem>
+                  <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
+                  <SelectItem value="ADVANCED">Advanced</SelectItem>
+                </Select>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  publish(true);
+                }}
+                disabled={publishing || (isPublished && !isModified) || objectiveSlots.filter(s => s.trim()).length < 2}
+                className="w-full h-11 text-sm font-medium"
+              >
+                {publishing ? 'Publishing...' : (isPublished && isModified) ? 'Publish Changes' : isPublished ? 'Already Published' : 'Save & Publish'}
+              </AlertDialogAction>
+
+              <AlertDialogCancel
+                disabled={publishing}
+                className="w-full h-11 text-sm font-medium"
+              >
+                Cancel
+              </AlertDialogCancel>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

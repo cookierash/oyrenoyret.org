@@ -48,7 +48,6 @@ export default async function TopicPage({ params }: TopicPageProps) {
       title: true,
       content: true,
       materialType: true,
-      alignmentScore: true,
       difficulty: true,
       publishedAt: true,
       user: {
@@ -67,9 +66,9 @@ export default async function TopicPage({ params }: TopicPageProps) {
   const [unlockedForUser, balance] = await Promise.all([
     userId && materialIds.length > 0
       ? prisma.materialAccess.findMany({
-          where: { userId, materialId: { in: materialIds } },
-          select: { materialId: true },
-        })
+        where: { userId, materialId: { in: materialIds } },
+        select: { materialId: true },
+      })
       : Promise.resolve([]),
     userId ? getBalance(userId) : Promise.resolve(0),
   ]);
@@ -126,7 +125,6 @@ export default async function TopicPage({ params }: TopicPageProps) {
                   ...m,
                   estimatedCost: roundCredits(
                     calcMaterialUnlockCost({
-                      alignmentScore: m.alignmentScore ?? 0.75,
                       materialType: m.materialType,
                       questionCount,
                     })

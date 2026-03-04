@@ -15,7 +15,6 @@ export interface CreditResult {
 }
 
 export interface MaterialCreditParams {
-  alignmentScore: number;
   materialType: 'TEXTUAL' | 'PRACTICE_TEST';
   questionCount?: number;
 }
