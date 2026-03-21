@@ -3,6 +3,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 
@@ -20,31 +21,32 @@ export async function POST(
     const body = await request.json();
     const value = body.value === -1 ? -1 : 1;
 
-    const discussion = await prisma.discussion.findFirst({
-      where: { id: discussionId, archivedAt: null },
-    });
-
-    if (!discussion) {
-      return NextResponse.json({ error: 'Discussion not found or archived' }, { status: 404 });
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.discussion.update({
+          where: { id: discussionId, archivedAt: null },
+          data: { lastActivityAt: new Date() },
+        });
+        await tx.discussionVote.upsert({
+          where: {
+            discussionId_userId: { discussionId, userId },
+          },
+          create: { discussionId, userId, value },
+          update: { value },
+        });
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        return NextResponse.json({ error: 'Discussion not found or archived' }, { status: 404 });
+      }
+      throw error;
     }
 
-    await prisma.discussionVote.upsert({
-      where: {
-        discussionId_userId: { discussionId, userId },
-      },
-      create: { discussionId, userId, value },
-      update: { value },
-    });
-
-    await prisma.discussion.update({
-      where: { id: discussionId },
-      data: { lastActivityAt: new Date() },
-    });
-
-    const votes = await prisma.discussionVote.findMany({
+    const scoreResult = await prisma.discussionVote.aggregate({
       where: { discussionId },
+      _sum: { value: true },
     });
-    const score = votes.reduce((s, v) => s + v.value, 0);
+    const score = scoreResult._sum.value ?? 0;
 
     return NextResponse.json({ voteScore: score });
   } catch (error) {

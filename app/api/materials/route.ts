@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
+import { calcMaterialUnlockCost, getBalance, roundCredits } from '@/src/modules/credits';
 import { SUBJECTS, CONTENT_LIMITS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
@@ -17,6 +18,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
+    const includeAccess =
+      searchParams.get('includeAccess') === '1' ||
+      searchParams.get('includeAccess') === 'true' ||
+      searchParams.get('view') === 'catalog';
 
     if (!subjectId || !topicId) {
       return NextResponse.json(
@@ -35,9 +40,11 @@ export async function GET(request: Request) {
       orderBy: { publishedAt: 'desc' },
       select: {
         id: true,
+        userId: true,
         title: true,
         content: true,
         materialType: true,
+        difficulty: true,
         publishedAt: true,
         user: {
           select: {
@@ -45,19 +52,72 @@ export async function GET(request: Request) {
             lastName: true,
           },
         },
+        _count: {
+          select: { accesses: true },
+        },
       },
     });
 
-    return NextResponse.json(
-      materials.map((m) => ({
+    if (!includeAccess) {
+      return NextResponse.json(
+        materials.map((m) => ({
+          id: m.id,
+          title: m.title,
+          content: m.content,
+          materialType: m.materialType,
+          publishedAt: m.publishedAt,
+          authorName: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student',
+        }))
+      );
+    }
+
+    const userId = await getCurrentSession();
+    const materialIds = materials.map((m) => m.id);
+    const [unlockedForUser, balance] = await Promise.all([
+      userId && materialIds.length > 0
+        ? prisma.materialAccess.findMany({
+            where: { userId, materialId: { in: materialIds } },
+            select: { materialId: true },
+          })
+        : Promise.resolve([]),
+      userId ? getBalance(userId) : Promise.resolve(0),
+    ]);
+    const unlockedIds = new Set(unlockedForUser.map((a) => a.materialId));
+
+    const mappedMaterials = materials.map((m) => {
+      let questionCount = 0;
+      if (m.materialType === 'PRACTICE_TEST' && m.content) {
+        try {
+          const parsed = JSON.parse(m.content) as { questions?: unknown[] };
+          questionCount = Array.isArray(parsed?.questions) ? parsed.questions.length : 0;
+        } catch {
+          /* ignore */
+        }
+      }
+      return {
         id: m.id,
+        userId: m.userId,
         title: m.title,
-        content: m.content,
         materialType: m.materialType,
+        difficulty: m.difficulty,
         publishedAt: m.publishedAt,
-        authorName: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student',
-      }))
-    );
+        user: m.user,
+        _count: m._count,
+        estimatedCost: roundCredits(
+          calcMaterialUnlockCost({
+            materialType: m.materialType,
+            questionCount,
+          })
+        ),
+      };
+    });
+
+    return NextResponse.json({
+      materials: mappedMaterials,
+      unlockedIds: Array.from(unlockedIds),
+      balance,
+      userId,
+    });
   } catch (error) {
     console.error('Error fetching materials:', error);
     return NextResponse.json(

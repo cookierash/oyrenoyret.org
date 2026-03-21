@@ -5,7 +5,8 @@ export function SiteFooter() {
     <footer className="border-t border-border/60 bg-background/80">
       <div className="mx-auto flex w-full max-w-[960px] flex-col gap-4 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <p>
-          © {new Date().getFullYear()} Oyrenoyret.org — NGO EdTech for minors
+          © {new Date().getFullYear()}{' '}
+          <span className="font-comfortaa lowercase">oyrenoyret.org</span> — NGO EdTech for minors
         </p>
         <div className="flex gap-6">
           <Link
@@ -25,4 +26,3 @@ export function SiteFooter() {
     </footer>
   );
 }
-

@@ -3,12 +3,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { FileText, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectItem } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from '@/components/ui/alert-dialog';
 import { SUBJECTS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { toast } from 'sonner';
@@ -45,8 +52,17 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('newest');
+  const pageSize = 10;
+  const [page, setPage] = useState(1);
+  const [objectiveDialogOpen, setObjectiveDialogOpen] = useState(false);
+  const [objectiveSlots, setObjectiveSlots] = useState<string[]>(['', '', '', '', '']);
+  const [objectiveTarget, setObjectiveTarget] = useState<{ id: string; title: string } | null>(null);
+  const [objectiveError, setObjectiveError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
 
   const filteredAndSorted = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -85,6 +101,15 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     });
   }, [materials, search, sort]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, sort, materials.length]);
+
+  const visibleMaterials = useMemo(
+    () => filteredAndSorted.slice(0, page * pageSize),
+    [filteredAndSorted, page, pageSize],
+  );
+
   const fetchMaterials = async () => {
     try {
       const res = await fetch('/api/materials/my-drafts', { cache: 'no-store' });
@@ -95,6 +120,24 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       setMaterials([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadObjectives = async (id: string) => {
+    try {
+      const res = await fetch(`/api/materials/${id}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load objectives');
+      const data = await res.json();
+      const existing = (data.objectives ?? '')
+        .split('\n')
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+      const nextSlots = existing.slice(0, 5);
+      while (nextSlots.length < 5) nextSlots.push('');
+      setObjectiveSlots(nextSlots);
+      return;
+    } catch {
+      setObjectiveSlots(['', '', '', '', '']);
     }
   };
 
@@ -111,13 +154,27 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
-  const publish = async (id: string) => {
-    setPublishing(id);
+  const openPublishDialog = async (id: string, title: string) => {
+    setObjectiveTarget({ id, title });
+    setObjectiveError(null);
+    await loadObjectives(id);
+    setObjectiveDialogOpen(true);
+  };
+
+  const publishWithObjectives = async () => {
+    if (!objectiveTarget) return;
+    const cleaned = objectiveSlots.map((s) => s.trim()).filter(Boolean);
+    if (cleaned.length < 2) {
+      setObjectiveError('Please add at least 2 objectives to publish.');
+      return;
+    }
+    setObjectiveError(null);
+    setPublishing(objectiveTarget.id);
     try {
-      const res = await fetch(`/api/materials/${id}`, {
+      const res = await fetch(`/api/materials/${objectiveTarget.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'PUBLISHED' }),
+        body: JSON.stringify({ status: 'PUBLISHED', objectives: cleaned.join('\n') }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to publish');
@@ -129,6 +186,9 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
           ? ` +${Number(data.creditsGranted).toFixed(2)} credits`
           : '';
       toast.success(`Material published! It will appear under the topic in the catalog.${creditsMsg}`);
+      setObjectiveDialogOpen(false);
+      setObjectiveTarget(null);
+      setObjectiveError(null);
       router.refresh();
       fetchMaterials();
       onRefresh?.();
@@ -139,27 +199,83 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     }
   };
 
+  const unpublish = async (id: string) => {
+    setPublishing(id);
+    try {
+      const res = await fetch(`/api/materials/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DRAFT' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to unpublish');
+      toast.success('Material moved back to drafts.');
+      router.refresh();
+      fetchMaterials();
+      onRefresh?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unpublish');
+    } finally {
+      setPublishing(null);
+    }
+  };
+
+  const deleteMaterial = async (id: string) => {
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/materials/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to delete');
+      toast.success('Material deleted.');
+      router.refresh();
+      fetchMaterials();
+      onRefresh?.();
+      setDeleteDialogOpen(false);
+      setDeleteTarget(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const openDeleteDialog = (id: string, title: string) => {
+    setDeleteTarget({ id, title });
+    setDeleteDialogOpen(true);
+  };
+
   if (loading) {
     return (
-      <div className="space-y-2">
-        <div className="h-8 w-48 rounded-md bg-muted animate-pulse" />
-        <div className="h-24 rounded-md bg-muted animate-pulse" />
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+          <div className="flex-1">
+            <Skeleton className="h-9 w-full" />
+          </div>
+          <Skeleton className="h-9 w-48" />
+        </div>
+        <div className="card-frame bg-card overflow-hidden">
+          <div className="divide-y divide-border">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3">
+                <Skeleton className="h-4 w-44" />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="ml-auto h-7 w-24" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-    );
-  }
-
-  if (materials.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        You have not created any materials yet. Click &quot;Create new material&quot; to get started.
-      </p>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-xs">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
@@ -193,60 +309,202 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
         </div>
       </div>
 
-      {filteredAndSorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">
-          No materials match your search.
-        </p>
+      {materials.length === 0 ? (
+        <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
+          <FileText className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground font-medium">
+            No materials created yet.
+          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            Click &quot;Create new material&quot; to get started.
+          </p>
+        </div>
+      ) : filteredAndSorted.length === 0 ? (
+        <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
+          <Search className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground font-medium">
+            No materials match your search.
+          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            Try a different keyword or clear the filters.
+          </p>
+        </div>
       ) : (
-        <div className="space-y-3">
-      {filteredAndSorted.map((m) => (
-        <Card key={m.id}>
-          <CardHeader className="flex flex-row items-start justify-between gap-4 py-3">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base truncate">{m.title}</CardTitle>
-              <CardDescription>
-                {getSubjectName(m.subjectId)} → {getTopicName(m.subjectId, m.topicId)}
-              </CardDescription>
+        <div className="space-y-4">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px] border-collapse">
+              <thead>
+                <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">Title</th>
+                  <th className="py-2 pr-4 font-medium">Subject</th>
+                  <th className="py-2 pr-4 font-medium">Topic</th>
+                  <th className="py-2 pr-4 font-medium">Type</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium">Updated</th>
+                  <th className="py-2 pr-2 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleMaterials.map((m) => (
+                  <tr key={m.id} className="border-b border-border/60 text-sm text-foreground">
+                    <td className="py-3 pr-4 min-w-[220px]">
+                      <div className="font-medium">{m.title}</div>
+                    </td>
+                    <td className="py-3 pr-4 min-w-[160px]">
+                      {getSubjectName(m.subjectId)}
+                    </td>
+                    <td className="py-3 pr-4 min-w-[180px]">
+                      {getTopicName(m.subjectId, m.topicId)}
+                    </td>
+                    <td className="py-3 pr-4 min-w-[140px]">
+                      <Badge variant="outline" className="text-xs">
+                        {m.materialType === 'PRACTICE_TEST' ? 'Practice test' : 'Text'}
+                      </Badge>
+                    </td>
+                    <td className="py-3 pr-4 min-w-[120px]">
+                      <Badge variant={m.status === 'PUBLISHED' ? 'default' : 'secondary'}>
+                        {m.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3 pr-4 min-w-[140px] text-muted-foreground">
+                      {new Date(m.updatedAt).toLocaleDateString()}
+                    </td>
+                    <td className="py-3 pr-2">
+                      <div className="flex justify-start gap-2">
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => openDeleteDialog(m.id, m.title)}
+                          disabled={deleting === m.id}
+                        >
+                          {deleting === m.id ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      {m.status === 'PUBLISHED' ? (
+                        <Button
+                          variant="secondary-primary"
+                          size="sm"
+                          onClick={() => unpublish(m.id)}
+                          disabled={publishing === m.id}
+                        >
+                          {publishing === m.id ? 'Unpublishing...' : 'Unpublish'}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => openPublishDialog(m.id, m.title)}
+                          disabled={publishing === m.id}
+                        >
+                          {publishing === m.id ? 'Publishing...' : 'Publish'}
+                        </Button>
+                      )}
+                        <Button variant="secondary-primary" size="sm" asChild>
+                          <Link href={`/studio/${m.id}`}>Edit</Link>
+                        </Button>
+                        {m.status === 'PUBLISHED' && (
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/catalog/${m.subjectId}/${m.topicId}`}>
+                              View in catalog
+                            </Link>
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {page * pageSize < filteredAndSorted.length ? (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((current) => current + 1)}
+              >
+                Load more items
+              </Button>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                {m.materialType === 'PRACTICE_TEST' ? 'Practice test' : 'Text'}
-              </Badge>
-              <Badge variant={m.status === 'PUBLISHED' ? 'default' : 'secondary'}>
-                {m.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2 pt-0">
-            <Button
-              variant="outline"
-              size="sm"
-              asChild
-            >
-              <Link href={`/studio/${m.id}`}>Edit</Link>
-            </Button>
-            {m.status === 'DRAFT' && (
+          ) : null}
+        </div>
+      )}
+
+      <AlertDialog open={objectiveDialogOpen} onOpenChange={setObjectiveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Set learning objectives</AlertDialogTitle>
+            <AlertDialogDescription>
+              Add learning objectives for {objectiveTarget?.title ? `"${objectiveTarget.title}"` : 'this material'}. Please enter at least two objectives.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            {objectiveSlots.map((slot, idx) => (
+              <Input
+                key={idx}
+                value={slot}
+                onChange={(e) => {
+                  const next = [...objectiveSlots];
+                  next[idx] = e.target.value;
+                  setObjectiveSlots(next);
+                  if (objectiveError) setObjectiveError(null);
+                }}
+                placeholder={`Objective ${idx + 1}`}
+                className="h-9 text-sm"
+                autoFocus={idx === 0}
+              />
+            ))}
+            {objectiveError ? (
+              <p className="text-xs text-destructive">{objectiveError}</p>
+            ) : null}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setObjectiveDialogOpen(false)}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => publish(m.id)}
-                disabled={publishing === m.id}
+                onClick={publishWithObjectives}
+                disabled={publishing === objectiveTarget?.id}
               >
-                {publishing === m.id ? 'Publishing...' : 'Publish'}
+                {publishing === objectiveTarget?.id ? 'Publishing...' : 'Publish'}
               </Button>
-            )}
-            {m.status === 'PUBLISHED' && (
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={`/catalog/${m.subjectId}/${m.topicId}`}>
-                  View in catalog
-                </Link>
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-        </div>
-      )}
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete material?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {deleteTarget?.title ? `"${deleteTarget.title}"` : 'this material'}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={Boolean(deleting)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => deleteTarget && deleteMaterial(deleteTarget.id)}
+              disabled={Boolean(deleting)}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

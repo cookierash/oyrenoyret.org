@@ -12,7 +12,8 @@ import Link from 'next/link';
 import { StudioEditor } from '@/src/modules/materials/studio-editor';
 import { PracticeTestEditor } from '@/src/modules/materials/practice-test-editor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft, FileText, ClipboardList } from 'lucide-react';
 
 export default function EditMaterialPage() {
   const router = useRouter();
@@ -55,18 +56,63 @@ export default function EditMaterialPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const isPracticeTest = material?.materialType === 'PRACTICE_TEST';
+  const HeaderIcon = isPracticeTest ? ClipboardList : FileText;
+  const headerTitle = isPracticeTest ? 'Edit practice test' : 'Edit textual material';
+  const headerDescription = isPracticeTest
+    ? 'Update questions, difficulty, and objectives. Publish changes when ready.'
+    : 'Refine your lesson content, structure, and objectives, then publish updates.';
+
+  const renderHeader = (title: string, description: string) => (
+    <header className="border-b border-border bg-background flex-shrink-0">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1.5">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Studio
+          </div>
+          <div className="flex items-center gap-2">
+            <HeaderIcon className="h-5 w-5 text-primary" />
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              {title}
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {description}
+          </p>
+        </div>
+        <Button variant="secondary-primary" size="sm" asChild>
+          <Link href="/studio">
+            <ArrowLeft className="h-4 w-4" />
+            Back to studio
+          </Link>
+        </Button>
+      </div>
+    </header>
+  );
+
   if (loading) {
     return (
       <div className="flex flex-col h-full">
-        <header className="flex items-center gap-4 px-4 py-3 border-b border-border">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/studio">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
+        <header className="border-b border-border bg-background flex-shrink-0">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="h-6 w-56" />
+              <Skeleton className="h-4 w-72" />
+            </div>
+            <Skeleton className="h-8 w-32" />
+          </div>
         </header>
-        <main className="flex-1 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <main className="flex-1">
+          <div className="mx-auto w-full max-w-4xl px-4 py-6 space-y-4">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-48 w-full" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <Skeleton className="h-64 w-full" />
+          </div>
         </main>
       </div>
     );
@@ -75,13 +121,7 @@ export default function EditMaterialPage() {
   if (error || !material) {
     return (
       <div className="flex flex-col h-full">
-        <header className="flex items-center gap-4 px-4 py-3 border-b border-border">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/studio">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-        </header>
+        {renderHeader('Material not found', 'Return to the studio to view your materials.')}
         <main className="flex-1 flex items-center justify-center">
           <p className="text-muted-foreground">Document not found.</p>
         </main>
@@ -91,14 +131,7 @@ export default function EditMaterialPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center gap-4 px-4 py-3 border-b border-border flex-shrink-0">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/studio">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <span className="text-sm text-muted-foreground">Editing material</span>
-      </header>
+      {renderHeader(headerTitle, headerDescription)}
       <main className="flex-1 overflow-auto px-4 py-6 max-w-4xl mx-auto w-full">
         {material.materialType === 'PRACTICE_TEST' ? (
           <PracticeTestEditor

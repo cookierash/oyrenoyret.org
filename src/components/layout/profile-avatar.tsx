@@ -9,11 +9,11 @@ import { cn } from '@/src/lib/utils';
  * Future: randomly choose one of 5 photos - use same index logic.
  */
 const AVATAR_COLORS = [
-  'bg-blue-500',      // 0
-  'bg-emerald-500',   // 1
-  'bg-violet-500',    // 2
-  'bg-amber-500',     // 3
-  'bg-rose-500',     // 4
+  'bg-blue-400',      // 0
+  'bg-emerald-400',   // 1
+  'bg-violet-400',    // 2
+  'bg-amber-400',     // 3
+  'bg-rose-400',     // 4
 ] as const;
 
 function getAvatarIndex(userId: string): number {
@@ -54,7 +54,7 @@ export function ProfileAvatar({
     <Link
       href="/dashboard"
       className={cn(
-        'flex items-center justify-center rounded-full font-semibold text-white',
+        'flex items-center justify-center rounded-full font-semibold text-white ring-1 ring-black/5',
         colorClass,
         sizeClass,
         'transition-opacity hover:opacity-90',

@@ -1,5 +1,5 @@
 /**
- * Oyrenoyret Studio Page
+ * oyrenoyret studio page
  *
  * Material list. Create new shows options: textual document or practice test.
  */
@@ -29,37 +29,37 @@ export default function StudioPage() {
   const refreshList = () => setRefreshKey((k) => k + 1);
 
   return (
-    <DashboardShell>
-      <div className="flex flex-col h-[calc(100vh-6rem)] min-h-[500px]">
-        <PageHeader
-          title="Oyrenoyret Studio"
-          description="Create and publish learning materials. Materials appear under topics in the catalog."
-          actions={
-            <Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>
-              Create new material
-            </Button>
-          }
-        />
+    <DashboardShell className="min-h-[calc(100vh-6rem)]">
+      <PageHeader
+        title={
+          <span className="lowercase">
+            <span className="font-comfortaa">oyrenoyret</span> studio
+          </span>
+        }
+        description="Create and publish learning materials. Materials appear under topics in the catalog."
+        actions={
+          <Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>
+            Create new material
+          </Button>
+        }
+      />
 
-        <div className="flex-1 overflow-auto pt-4" key={refreshKey}>
-          <MyMaterialsList onRefresh={refreshList} />
-        </div>
-      </div>
+      <main className="flex-1 min-h-0 overflow-auto space-y-4 pt-2" key={refreshKey}>
+        <MyMaterialsList onRefresh={refreshList} />
+      </main>
 
       <AlertDialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <AlertDialogContent className="max-w-md p-0 overflow-hidden">
-          <div className="p-5 pb-2">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-xl">Create new material</AlertDialogTitle>
-              <AlertDialogDescription className="mt-1.5">
-                Choose the type of material you want to create. You can edit and publish it later.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-          </div>
-          <div className="grid grid-cols-2 gap-3 p-5 pt-3">
+        <AlertDialogContent className="overflow-hidden">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create new material</AlertDialogTitle>
+            <AlertDialogDescription>
+              Choose the type of material you want to create. You can edit and publish it later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              className="group flex flex-col items-center gap-3 rounded-lg border-2 border-border bg-muted/30 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              className="group card-frame border bg-muted/30 flex flex-col items-center gap-3 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
               onClick={() => {
                 setShowCreateModal(false);
                 router.push('/studio/new');
@@ -77,7 +77,7 @@ export default function StudioPage() {
             </button>
             <button
               type="button"
-              className="group flex flex-col items-center gap-3 rounded-lg border-2 border-border bg-muted/30 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              className="group card-frame border bg-muted/30 flex flex-col items-center gap-3 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
               onClick={() => {
                 setShowCreateModal(false);
                 router.push('/studio/new/practice-test');

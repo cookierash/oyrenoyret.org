@@ -11,12 +11,17 @@ import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Award, Calendar, CheckCircle } from 'lucide-react';
 
-export default async function CertificatePage({ params }: { params: { id: string } }) {
+interface CertificatePageProps {
+  params: Promise<{ id: string }>;
+}
+
+export default async function CertificatePage({ params }: CertificatePageProps) {
+    const { id } = await params;
     const userId = await getCurrentSession();
     if (!userId) redirect('/login');
 
     const certificate = await prisma.certificate.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: { user: true }
     });
 
@@ -34,7 +39,7 @@ export default async function CertificatePage({ params }: { params: { id: string
                 description="Verify and view your achievement."
             />
 
-            <Card className="mt-8 border-2 border-primary/20 bg-card overflow-hidden relative">
+            <Card className="mt-2 border border-primary/20 bg-card overflow-hidden relative">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-bl-[100%] -z-10" />
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-secondary/10 rounded-tr-[100%] -z-10" />
 
@@ -76,7 +81,9 @@ export default async function CertificatePage({ params }: { params: { id: string
                         </div>
                         <div className="flex items-center gap-2 font-medium">
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
-                            <span className="text-emerald-600 dark:text-emerald-400">Verified by oyrenoyret</span>
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              Verified by <span className="font-comfortaa lowercase">oyrenoyret</span>
+                            </span>
                         </div>
                     </div>
 

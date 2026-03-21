@@ -17,14 +17,32 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
+    const subjectsParam = searchParams.get('subjects');
+    const query = searchParams.get('q');
+    const includeVotes = searchParams.get('includeVotes') === '1';
+    const takeParam = Number(searchParams.get('take') ?? 50);
+    const skipParam = Number(searchParams.get('skip') ?? 0);
+    const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 100) : 50;
+    const skip = Number.isFinite(skipParam) && skipParam > 0 ? skipParam : 0;
+
+    const subjectIds = subjectsParam
+      ? subjectsParam.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
 
     const discussions = await prisma.discussion.findMany({
       where: {
         archivedAt: null,
-        ...(subjectId && { subjectId }),
+        ...(subjectIds.length > 0
+          ? { subjectId: { in: subjectIds } }
+          : subjectId
+            ? { subjectId }
+            : {}),
         ...(topicId && { topicId }),
+        ...(query ? { title: { contains: query, mode: 'insensitive' } } : {}),
       },
       orderBy: { lastActivityAt: 'desc' },
+      take,
+      skip,
       select: {
         id: true,
         title: true,
@@ -50,18 +68,38 @@ export async function GET(request: Request) {
       },
     });
 
-    const voteScores = await prisma.discussionVote.groupBy({
-      by: ['discussionId'],
-      _sum: { value: true },
-    });
+    const discussionIds = discussions.map((d) => d.id);
+    const voteScores = discussionIds.length
+      ? await prisma.discussionVote.groupBy({
+        by: ['discussionId'],
+        where: { discussionId: { in: discussionIds } },
+        _sum: { value: true },
+      })
+      : [];
     const scoreMap = Object.fromEntries(
       voteScores.map((v) => [v.discussionId, v._sum.value ?? 0])
+    );
+
+    const currentUserId = includeVotes ? await getCurrentSession() : null;
+    const currentUserVotes =
+      includeVotes && currentUserId && discussionIds.length
+        ? await prisma.discussionVote.findMany({
+          where: { userId: currentUserId, discussionId: { in: discussionIds } },
+          select: { discussionId: true, value: true },
+        })
+        : [];
+    const currentUserVoteMap = Object.fromEntries(
+      currentUserVotes.map((v) => [v.discussionId, v.value])
     );
 
     const result = discussions.map((d) => ({
       id: d.id,
       title: d.title,
-      content: d.content,
+      contentPreview: d.content
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 180),
       subjectId: d.subjectId,
       topicId: d.topicId,
       lastActivityAt: d.lastActivityAt,
@@ -72,6 +110,7 @@ export async function GET(request: Request) {
         d.user.email.split('@')[0],
       replyCount: d._count.replies,
       voteScore: scoreMap[d.id] ?? 0,
+      userVote: includeVotes ? currentUserVoteMap[d.id] ?? null : null,
     }));
 
     return NextResponse.json(result);

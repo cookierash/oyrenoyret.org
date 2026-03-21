@@ -23,7 +23,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Step3Props {
@@ -32,10 +32,13 @@ interface Step3Props {
   onSuccess: () => void;
   onPrevious: () => void;
 }
+const FIELD_LABEL_CLASS = 'text-xs font-medium text-muted-foreground';
+const INPUT_CLASS = 'h-10 rounded-lg bg-background/70';
 
 export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }: Step3Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingCode, setIsSendingCode] = useState(false);
+  const hasSentInitialCode = useRef(false);
 
   const form = useForm<VerificationCodeInput>({
     resolver: zodResolver(verificationCodeSchema),
@@ -47,6 +50,8 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
 
   // Send code on mount
   useEffect(() => {
+    if (hasSentInitialCode.current) return;
+    hasSentInitialCode.current = true;
     handleSendCode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -61,7 +66,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
       } else {
         toast.error(result.error || 'Failed to send verification code');
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred');
     } finally {
       setIsSendingCode(false);
@@ -80,7 +85,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
         toast.error(result.error || 'Invalid verification code');
         form.resetField('code');
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
@@ -90,8 +95,8 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-4">
-          <div className="rounded-md border border-primary/30 bg-primary/10 p-4">
+        <div className="space-y-2">
+          <div className="rounded-lg border border-primary/20 bg-primary/10 p-3">
             <p className="text-sm text-muted-foreground">
               A 6-digit verification code has been sent to:
             </p>
@@ -106,19 +111,19 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
           <FormField
             control={form.control}
             name="code"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Verification Code</FormLabel>
-                <FormControl>
-                  <Input
-                    type="text"
-                    placeholder="000000"
-                    maxLength={6}
-                    className="text-center text-2xl tracking-widest font-sans tabular-nums"
-                    {...field}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                      field.onChange(value);
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className={FIELD_LABEL_CLASS}>Verification Code</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="000000"
+                      maxLength={6}
+                      className={`${INPUT_CLASS} text-center text-2xl tracking-widest font-sans tabular-nums`}
+                      {...field}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        field.onChange(value);
                     }}
                   />
                 </FormControl>
@@ -129,7 +134,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
 
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              Didn't receive the code?
+              Didn&apos;t receive the code?
             </span>
             <Button
               type="button"
@@ -144,10 +149,22 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
         </div>
 
         <div className="flex gap-3">
-          <Button type="button" variant="outline" size="md" onClick={onPrevious} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={onPrevious}
+            className="h-10 flex-1 text-sm font-semibold"
+          >
             Previous
           </Button>
-          <Button type="submit" variant="primary" size="md" className="flex-1" disabled={isSubmitting || !form.formState.isValid}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="h-10 flex-1 text-sm font-semibold"
+            disabled={isSubmitting || !form.formState.isValid}
+          >
             {isSubmitting ? 'Verifying...' : 'Next: Consent'}
           </Button>
         </div>

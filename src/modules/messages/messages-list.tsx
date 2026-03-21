@@ -44,19 +44,21 @@ export function MessagesList({ transactions }: MessagesListProps) {
     });
 
     const groups: { dateKey: string; dateLabel: string; items: MessageTransaction[] }[] = [];
+    const groupMap = new Map<string, { dateKey: string; dateLabel: string; items: MessageTransaction[] }>();
 
     for (const tx of sorted) {
       const d = new Date(tx.createdAt);
-      const dateKey = d.toISOString().slice(0, 10); // YYYY-MM-DD
+      const dateKey = d.toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
       const dateLabel = d.toLocaleDateString('en-US', {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
       });
 
-      let group = groups.find((g) => g.dateKey === dateKey);
+      let group = groupMap.get(dateKey);
       if (!group) {
         group = { dateKey, dateLabel, items: [] };
+        groupMap.set(dateKey, group);
         groups.push(group);
       }
       group.items.push(tx);
@@ -161,4 +163,3 @@ export function MessagesList({ transactions }: MessagesListProps) {
     </div>
   );
 }
-

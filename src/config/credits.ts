@@ -82,7 +82,9 @@ export const CREDITS_SPRINT = {
 
 export const CREDITS_DISCUSSION = {
   /** Cost to create a discussion */
-  BASE_CREATE: 1.0,
+  BASE_CREATE: 0.1,
+  /** Reward for posting a reply */
+  BASE_REPLY: 0.02,
   /** Base reward for helpful reply */
   BASE_HELP: 0.5,
   /** Validation strength multipliers */

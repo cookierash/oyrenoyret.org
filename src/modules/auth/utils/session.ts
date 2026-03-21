@@ -11,6 +11,19 @@ import { prisma } from '@/src/db/client';
 
 const SESSION_TOKEN_LENGTH = 32;
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (common for educational/SaaS)
+const SESSION_CACHE_TTL_MS = Number(process.env.SESSION_CACHE_TTL_MS ?? 60_000);
+
+const globalForSessionCache = globalThis as unknown as {
+  sessionCache?: Map<string, { userId: string; expiresAt: number; cachedAt: number }>;
+};
+
+const sessionCache =
+  globalForSessionCache.sessionCache ??
+  new Map<string, { userId: string; expiresAt: number; cachedAt: number }>();
+
+if (!globalForSessionCache.sessionCache) {
+  globalForSessionCache.sessionCache = sessionCache;
+}
 
 /**
  * Generates a secure session token
@@ -54,6 +67,12 @@ export async function createSession(
     path: '/',
   });
 
+  sessionCache.set(token, {
+    userId,
+    expiresAt: expiresAt.getTime(),
+    cachedAt: Date.now(),
+  });
+
   return token;
 }
 
@@ -63,25 +82,49 @@ export async function createSession(
  * @returns User ID if session is valid, null otherwise
  */
 export async function validateSession(token: string): Promise<string | null> {
+  if (!token || token.trim().length === 0) {
+    return null;
+  }
+
+  const cached = sessionCache.get(token);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now && now - cached.cachedAt < SESSION_CACHE_TTL_MS) {
+    return cached.userId;
+  }
+
   const session = await prisma.authSession.findUnique({
     where: { token },
-    include: { user: true },
+    select: {
+      id: true,
+      userId: true,
+      expiresAt: true,
+      user: { select: { status: true } },
+    },
   });
 
   if (!session) {
+    sessionCache.delete(token);
     return null;
   }
 
   // Check if session is expired
   if (session.expiresAt < new Date()) {
     await prisma.authSession.delete({ where: { id: session.id } });
+    sessionCache.delete(token);
     return null;
   }
 
   // Check if user is active
   if (session.user.status !== 'ACTIVE') {
+    sessionCache.delete(token);
     return null;
   }
+
+  sessionCache.set(token, {
+    userId: session.userId,
+    expiresAt: session.expiresAt.getTime(),
+    cachedAt: Date.now(),
+  });
 
   return session.userId;
 }
@@ -113,6 +156,7 @@ export async function deleteSession(token?: string): Promise<void> {
     await prisma.authSession.deleteMany({
       where: { token: sessionToken },
     });
+    sessionCache.delete(sessionToken);
   }
 
   cookieStore.delete('session_token');

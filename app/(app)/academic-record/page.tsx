@@ -20,21 +20,27 @@ export default async function AcademicRecordPage() {
     orderBy: { createdAt: 'desc' },
   });
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { publicId: true },
+  });
+
   return (
     <DashboardShell>
       <PageHeader
         title="Academic record"
         description="Your grades and academic progress."
       />
-      <main className="space-y-4">
+      <main className="space-y-4 pt-2">
+        {user?.publicId ? (
+          <p className="text-xs text-muted-foreground font-mono">
+            Your ID: {user.publicId}
+          </p>
+        ) : null}
         {records.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">
-                No academic records yet. Records will appear here when added.
-              </p>
-            </CardContent>
-          </Card>
+          <p className="text-sm text-muted-foreground">
+            No academic records yet. Records will appear here when added.
+          </p>
         ) : (
           <div className="space-y-4">
             {records.map((r) => (

@@ -35,25 +35,25 @@ export interface ButtonProps
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  // Primary: solid blue, white text, 3D raised
+  // Primary: solid, minimal
   primary:
-    'bg-primary text-primary-foreground border border-primary/30 btn-3d hover:bg-primary/90',
-  // Secondary: light background, 3D raised
+    'bg-primary text-primary-foreground border border-primary/20 hover:bg-primary/90',
+  // Secondary: light background, minimal
   secondary:
-    'bg-secondary text-secondary-foreground border border-border btn-3d hover:bg-secondary/80',
-  // Outline: bordered, 3D raised
+    'bg-secondary text-secondary-foreground border border-border hover:bg-secondary/70',
+  // Outline: bordered, minimal
   outline:
-    'border border-input bg-background btn-3d hover:bg-accent hover:text-accent-foreground',
-  // Ghost: minimal, no 3D
-  ghost: 'hover:bg-accent hover:text-accent-foreground',
-  // Danger / destructive: red, 3D raised
+    'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+  // Ghost: minimal
+  ghost: 'text-foreground hover:bg-accent/70',
+  // Danger / destructive: red, minimal
   danger:
-    'bg-destructive text-destructive-foreground border border-destructive/30 btn-3d hover:bg-destructive/90',
+    'bg-destructive text-destructive-foreground border border-destructive/20 hover:bg-destructive/90',
   destructive:
-    'bg-destructive text-destructive-foreground border border-destructive/30 btn-3d hover:bg-destructive/90',
+    'bg-destructive text-destructive-foreground border border-destructive/20 hover:bg-destructive/90',
   // Secondary-primary: primary-colored text, pastel primary background (back/catalog nav)
   'secondary-primary':
-    'bg-primary/15 text-primary border-0 hover:bg-primary/25 dark:bg-primary/10 dark:text-primary dark:hover:bg-primary/20',
+    'bg-primary/10 text-primary border border-primary/10 hover:bg-primary/15 dark:bg-primary/15 dark:text-primary dark:hover:bg-primary/20',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -76,7 +76,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const base =
-      'inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-0 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none [&_svg]:shrink-0';
+      'inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0';
 
     const styles = cn(base, variantStyles[variant], sizeStyles[size], className);
 

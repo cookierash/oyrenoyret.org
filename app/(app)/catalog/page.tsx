@@ -20,8 +20,8 @@ export default function CatalogPage() {
         description="Browse all subjects and topics. Pick what you want to learn next."
       />
 
-      <main className="space-y-4">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <main className="space-y-4 pt-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SUBJECTS.map((subject) => {
             const Icon = SUBJECT_ICONS[subject.id];
             const topicCount = CURRICULUM_TOPICS[subject.id]?.length ?? 0;
@@ -29,7 +29,7 @@ export default function CatalogPage() {
               <Link
                 key={subject.id}
                 href={`/catalog/${subject.id}`}
-                className="group flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-all duration-200 hover:bg-muted/30 hover:shadow-sm"
+                className="group card-frame bg-card flex items-center gap-3 px-3 py-2.5 transition-all duration-200 hover:bg-muted/30"
               >
                 <div
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${SUBJECT_COLORS[subject.id]}`}

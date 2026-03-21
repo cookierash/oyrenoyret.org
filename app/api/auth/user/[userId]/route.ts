@@ -47,6 +47,8 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Strip status from the response payload.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { status: _status, ...safeUser } = user;
     return NextResponse.json(safeUser);
   } catch (error) {

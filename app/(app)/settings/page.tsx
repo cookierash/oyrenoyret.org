@@ -14,7 +14,7 @@ export default function SettingsPage() {
         title="Settings"
         description="Manage your account and preferences."
       />
-      <main className="space-y-4">
+      <main className="space-y-4 pt-2">
         <p className="text-sm text-muted-foreground">
           Settings options will be available here.
         </p>

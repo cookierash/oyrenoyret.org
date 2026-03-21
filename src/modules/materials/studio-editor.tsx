@@ -12,11 +12,10 @@ import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { toast } from 'sonner';
 import {
   AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogTitle,
+  AlertDialogHeader,
 } from '@/components/ui/alert-dialog';
 
 interface StudioEditorProps {
@@ -48,24 +47,32 @@ export function StudioEditor({
   const [subjectId, setSubjectId] = useState(initialSubjectId);
   const [topicId, setTopicId] = useState(initialTopicId);
   const [title, setTitle] = useState(initialTitle);
+  const [savedTitle, setSavedTitle] = useState(initialTitle);
   const [objectiveSlots, setObjectiveSlots] = useState<string[]>(() => {
     const slots = (initialObjectives || '').split('\n').filter(Boolean);
     while (slots.length < 5) slots.push('');
     return slots.slice(0, 5);
   });
+  const [savedObjectives, setSavedObjectives] = useState((initialObjectives || '').trim());
   const [content, setContent] = useState(initialContent || '<p></p>');
+  const [savedContent, setSavedContent] = useState(initialContent || '<p></p>');
   const [difficulty, setDifficulty] = useState<'BASIC' | 'INTERMEDIATE' | 'ADVANCED'>(initialDifficulty);
+  const [savedDifficulty, setSavedDifficulty] = useState(initialDifficulty);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<'DRAFT' | 'PUBLISHED'>(initialStatus);
 
   const isModified =
-    title !== initialTitle ||
-    content !== initialContent ||
-    objectiveSlots.join('\n').trim() !== (initialObjectives || '').trim() ||
-    difficulty !== initialDifficulty;
+    title !== savedTitle ||
+    content !== savedContent ||
+    objectiveSlots.join('\n').trim() !== savedObjectives ||
+    difficulty !== savedDifficulty;
 
-  const isPublished = initialStatus === 'PUBLISHED';
+  const isPublished = currentStatus === 'PUBLISHED';
 
   const topics = subjectId
     ? (CURRICULUM_TOPICS as Record<string, { id: string; name: string }[]>)[subjectId] ?? []
@@ -98,6 +105,11 @@ export function StudioEditor({
         }
         const created = await res.json();
 
+        setSavedTitle(title);
+        setSavedContent(content);
+        setSavedObjectives(objectiveSlots.join('\n').trim());
+        setSavedDifficulty(difficulty);
+
         if (!andPublish && !skipRedirect) {
           toast.success('Draft saved');
           onSaved?.(created.id);
@@ -119,6 +131,11 @@ export function StudioEditor({
           throw new Error(data.error || 'Failed to save');
         }
 
+        setSavedTitle(title);
+        setSavedContent(content);
+        setSavedObjectives(objectiveSlots.join('\n').trim());
+        setSavedDifficulty(difficulty);
+
         if (!andPublish && !skipRedirect) {
           toast.success('Saved');
         }
@@ -131,7 +148,7 @@ export function StudioEditor({
     } finally {
       setSaving(false);
     }
-  }, [mode, materialId, subjectId, topicId, title, objectiveSlots, content, router, onSaved]);
+  }, [mode, materialId, subjectId, topicId, title, objectiveSlots, content, difficulty, router, onSaved]);
 
   const publish = useCallback(async (confirmed = false) => {
     if (!subjectId || !topicId || !title.trim()) {
@@ -140,6 +157,23 @@ export function StudioEditor({
     }
 
     if (!confirmed) {
+      if (mode === 'edit' && materialId) {
+        try {
+          const res = await fetch(`/api/materials/${materialId}`, { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            const existing = (data.objectives ?? '')
+              .split('\n')
+              .map((s: string) => s.trim())
+              .filter(Boolean);
+            const nextSlots = existing.slice(0, 5);
+            while (nextSlots.length < 5) nextSlots.push('');
+            setObjectiveSlots(nextSlots);
+          }
+        } catch {
+          /* ignore objective refresh */
+        }
+      }
       setShowPublishDialog(true);
       return;
     }
@@ -179,6 +213,7 @@ export function StudioEditor({
           : '';
       toast.success(`Published! Your material is now visible in the catalog.${creditsMsg}`);
 
+      setCurrentStatus('PUBLISHED');
       router.refresh();
       onSaved?.();
     } catch (err) {
@@ -188,9 +223,49 @@ export function StudioEditor({
     }
   }, [subjectId, topicId, title, objectiveSlots, mode, materialId, difficulty, save, router, onSaved]);
 
+  const unpublish = useCallback(async () => {
+    if (!materialId) return;
+    setUnpublishing(true);
+    try {
+      const res = await fetch(`/api/materials/${materialId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'DRAFT' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to unpublish');
+      toast.success('Material moved back to drafts.');
+      setCurrentStatus('DRAFT');
+      router.refresh();
+      onSaved?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to unpublish');
+    } finally {
+      setUnpublishing(false);
+    }
+  }, [materialId, router, onSaved]);
+
+  const deleteMaterial = useCallback(async () => {
+    if (!materialId) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/materials/${materialId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to delete');
+      toast.success('Material deleted.');
+      setShowDeleteDialog(false);
+      router.push('/studio');
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    } finally {
+      setDeleting(false);
+    }
+  }, [materialId, router]);
+
   return (
     <div className="flex flex-col h-full">
-      <div className="rounded-lg border border-border bg-card p-6 space-y-4 mb-4 flex-shrink-0">
+      <div className="card-frame bg-card p-6 space-y-4 mb-4 flex-shrink-0">
         <div className="flex items-end justify-between gap-4">
           <div className="space-y-2 flex-1 max-w-xl">
             <label className="text-sm font-medium">Title</label>
@@ -200,21 +275,49 @@ export function StudioEditor({
               placeholder="Material title"
             />
           </div>
-          <div className="flex gap-2 mb-0.5">
-            <Button variant="secondary-primary" onClick={() => save(false)} disabled={saving}>
+          <div className="flex flex-wrap gap-2 mb-0.5">
+            {mode === 'edit' && materialId ? (
+              <>
+                <Button
+                  variant="danger"
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={deleting || publishing || unpublishing || saving}
+                >
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </Button>
+                {isPublished ? (
+                  <Button
+                    variant="secondary-primary"
+                    onClick={unpublish}
+                    disabled={deleting || publishing || unpublishing || saving}
+                  >
+                    {unpublishing ? 'Unpublishing...' : 'Unpublish'}
+                  </Button>
+                ) : null}
+              </>
+            ) : null}
+            <Button variant="secondary-primary" onClick={() => save(false)} disabled={saving || publishing || unpublishing || deleting}>
               {saving ? 'Saving...' : 'Save Draft'}
             </Button>
             <Button
               variant="primary"
               onClick={() => publish(false)}
-              disabled={publishing || saving || (isPublished && !isModified)}
+              disabled={publishing || saving || unpublishing || deleting || (isPublished && !isModified)}
             >
-              {publishing ? 'Yoxlanılır: Uyğunluq, Məqsədlər və Moderasiya...' : (isPublished && isModified) ? 'Publish Changes' : isPublished ? 'Published' : mode === 'create' ? 'Save & Publish' : 'Publish'}
+              {publishing
+                ? 'Publishing...'
+                : mode === 'create'
+                  ? 'Save & Publish'
+                : isModified
+                    ? 'Save & Publish'
+                    : isPublished
+                      ? 'Published'
+                      : 'Publish'}
             </Button>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
           <div className="space-y-2">
             <label className="text-sm font-medium">Subject</label>
             <Select
@@ -268,20 +371,20 @@ export function StudioEditor({
       </div>
 
       <AlertDialog open={showPublishDialog} onOpenChange={setShowPublishDialog}>
-        <AlertDialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-none shadow-2xl">
-          <div className="bg-background p-6 pt-8 space-y-6">
+        <AlertDialogContent>
+          <div className="space-y-6">
             <header className="space-y-1">
-              <AlertDialogTitle className="text-xl font-semibold tracking-tight sm:text-2xl text-foreground">
+              <AlertDialogTitle>
                 Ready to publish?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm text-muted-foreground">
-                Provide learning objectives to help learners understand what they will achieve.
+              <AlertDialogDescription>
+                Provide learning objectives to help learners understand what they will achieve. Please enter at least two objectives.
               </AlertDialogDescription>
             </header>
             <div className="space-y-4">
               <div className="space-y-2.5">
                 {objectiveSlots.map((slot, idx) => (
-                  <div key={idx} className="group relative">
+                  <div key={idx} className="flex items-center gap-2">
                     <Input
                       value={slot}
                       onChange={(e) => {
@@ -289,55 +392,73 @@ export function StudioEditor({
                         newSlots[idx] = e.target.value;
                         setObjectiveSlots(newSlots);
                       }}
-                      placeholder={idx < 2 ? `Objective ${idx + 1} (required)` : `Objective ${idx + 1} (optional)`}
+                      placeholder={`Objective ${idx + 1}`}
                       className={cn(
-                        "h-10 text-sm transition-all duration-200",
-                        idx < 2 && !slot.trim()
-                          ? "border-primary/20 bg-primary/[0.02] focus:bg-background focus:border-primary"
-                          : "focus:border-primary/50"
+                        "h-10 text-sm transition-all duration-200 flex-1 focus:border-primary/50"
                       )}
                       autoFocus={idx === 0}
                     />
-                    {idx < 2 && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none transition-opacity group-focus-within:opacity-40">
-                        <span className="text-[10px] font-bold text-primary/40 uppercase tracking-widest">Req</span>
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
 
-              <div className="space-y-1.5 mb-2">
-                <label className="text-xs font-semibold text-foreground/70 uppercase tracking-wider">Difficulty Level</label>
-                <Select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')}
-                >
-                  <SelectItem value="BASIC">Basic</SelectItem>
-                  <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
-                  <SelectItem value="ADVANCED">Advanced</SelectItem>
-                </Select>
-              </div>
             </div>
-            <div className="flex flex-col gap-2 pt-2">
-              <AlertDialogAction
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPublishDialog(false)}
+                disabled={publishing}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={(e) => {
                   e.preventDefault();
                   publish(true);
                 }}
                 disabled={publishing || (isPublished && !isModified) || objectiveSlots.filter(s => s.trim()).length < 2}
-                className="w-full h-11 text-sm font-medium"
               >
-                {publishing ? 'Publishing...' : (isPublished && isModified) ? 'Publish Changes' : isPublished ? 'Already Published' : 'Save & Publish'}
-              </AlertDialogAction>
-
-              <AlertDialogCancel
-                disabled={publishing}
-                className="w-full h-11 text-sm font-medium"
-              >
-                Cancel
-              </AlertDialogCancel>
+                {publishing
+                  ? 'Publishing...'
+                  : isModified
+                    ? 'Save & Publish'
+                  : isPublished
+                    ? 'Already Published'
+                      : 'Publish'}
+              </Button>
             </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete material?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this material. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={deleteMaterial}
+              disabled={deleting}
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
           </div>
         </AlertDialogContent>
       </AlertDialog>

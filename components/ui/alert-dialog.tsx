@@ -107,8 +107,8 @@ const AlertDialogContent = React.forwardRef<
         ref={ref}
         role="alertdialog"
         className={cn(
-          'fixed left-[50%] top-[50%] z-[51] w-full max-w-lg -translate-x-1/2 -translate-y-1/2',
-          'rounded-lg border border-border bg-background p-4',
+          'fixed left-[50%] top-[50%] z-[51] w-full max-w-md -translate-x-1/2 -translate-y-1/2',
+          'rounded-lg bg-background px-4 pt-8 pb-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)]',
           className
         )}
         {...props}
@@ -121,7 +121,7 @@ const AlertDialogContent = React.forwardRef<
 AlertDialogContent.displayName = 'AlertDialogContent';
 
 const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col gap-2 text-center sm:text-left', className)} {...props} />
+  <div className={cn('flex flex-col gap-2 text-left mb-6', className)} {...props} />
 );
 AlertDialogHeader.displayName = 'AlertDialogHeader';
 
@@ -142,7 +142,7 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn('text-lg font-bold', className)}
+    className={cn('text-xl font-semibold tracking-tight', className)}
     {...props}
   />
 ));
@@ -152,7 +152,11 @@ const AlertDialogDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn('text-sm text-muted-foreground', className)} {...props} />
+  <p
+    ref={ref}
+    className={cn('max-w-2xl text-sm text-muted-foreground', className)}
+    {...props}
+  />
 ));
 AlertDialogDescription.displayName = 'AlertDialogDescription';
 

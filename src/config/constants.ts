@@ -5,7 +5,7 @@
  * Environment-specific values should use environment variables.
  */
 
-export const APP_NAME = 'Oyrenoyret.org';
+export const APP_NAME = 'oyrenoyret.org';
 
 export const USER_ROLES = {
   STUDENT: 'STUDENT',
@@ -32,8 +32,8 @@ export const CONTENT_LIMITS = {
   MATERIAL_TITLE_MAX: 200,
   MATERIAL_CONTENT_MAX: 50_000,
   DISCUSSION_TITLE_MAX: 300,
-  DISCUSSION_CONTENT_MAX: 10_000,
-  REPLY_CONTENT_MAX: 5_000,
+  DISCUSSION_CONTENT_MAX: 2_000,
+  REPLY_CONTENT_MAX: 2_000,
 } as const;
 
 /** Subject catalog for grades 5–11 */
