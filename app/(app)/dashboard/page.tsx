@@ -1,10 +1,12 @@
 /**
  * Dashboard Page
  *
- * Personalized student dashboard with:
- * - Welcome greeting
+ * Compact, friendly student dashboard with:
+ * - Greeting and daily focus
+ * - Micro progress tiles
  * - Upcoming live activities
- * - Recently purchased materials
+ * - Recent materials
+ * - Quick actions
  */
 
 import Link from 'next/link';
@@ -12,18 +14,105 @@ import { redirect } from 'next/navigation';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
+import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';
 import {
-  Calendar,
-  Clock,
-  Video,
   BookOpen,
+  Check,
   ChevronRight,
-  Sparkles,
-  Package,
+  Clock,
+  Flame,
+  Video,
 } from 'lucide-react';
 
+const STREAK_OFFSET_HOURS = 4;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function toDayNumber(date: Date) {
+  return Math.floor((date.getTime() + STREAK_OFFSET_HOURS * 60 * 60 * 1000) / DAY_MS);
+}
+
+function formatDayCount(count: number) {
+  return `${count} day${count === 1 ? '' : 's'}`;
+}
+
+function calcStreakStats(dates: Date[]) {
+  const daySet = new Set<number>();
+  for (const date of dates) {
+    daySet.add(toDayNumber(date));
+  }
+
+  const today = toDayNumber(new Date());
+  const hasToday = daySet.has(today);
+  const hasYesterday = daySet.has(today - 1);
+
+  if (daySet.size === 0) {
+    return {
+      current: 0,
+      best: 0,
+      weekCount: 0,
+      weekDays: buildWeekDays(daySet, today),
+      hasToday,
+      hasYesterday,
+    };
+  }
+
+  let cursor: number | null = null;
+  if (hasToday) {
+    cursor = today;
+  } else if (hasYesterday) {
+    cursor = today - 1;
+  }
+
+  let current = 0;
+  if (cursor !== null) {
+    while (daySet.has(cursor)) {
+      current += 1;
+      cursor -= 1;
+    }
+  }
+
+  const daysAsc = Array.from(daySet).sort((a, b) => a - b);
+  let best = 0;
+  let run = 0;
+  let prev: number | null = null;
+  for (const day of daysAsc) {
+    if (prev !== null && day === prev + 1) {
+      run += 1;
+    } else {
+      run = 1;
+    }
+    best = Math.max(best, run);
+    prev = day;
+  }
+
+  const weekCount = daysAsc.filter((day) => day >= today - 6).length;
+
+  return {
+    current,
+    best,
+    weekCount,
+    weekDays: buildWeekDays(daySet, today),
+    hasToday,
+    hasYesterday,
+  };
+}
+
+function buildWeekDays(daySet: Set<number>, today: number) {
+  return Array.from({ length: 7 }).map((_, idx) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - idx));
+    const dayNumber = toDayNumber(date);
+    return {
+      key: `${dayNumber}-${idx}`,
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
+      isActive: daySet.has(dayNumber),
+      isToday: dayNumber === today,
+    };
+  });
+}
+
 function getGreeting() {
-  const hour = new Date().getUTCHours() + 4; // UTC+4 (user's timezone)
+  const hour = new Date().getUTCHours() + STREAK_OFFSET_HOURS; // UTC+4 (user's timezone)
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
@@ -36,7 +125,7 @@ export default async function DashboardPage() {
   const now = new Date();
 
   // Fetch user info + upcoming activities + recent purchases in parallel
-  const [user, upcomingActivities, recentPurchases] = await Promise.all([
+  const [user, upcomingActivities, recentPurchases, streakActivity] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { firstName: true, lastName: true },
@@ -66,37 +155,90 @@ export default async function DashboardPage() {
         },
       },
     }),
+    prisma.creditTransaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 365,
+      select: { createdAt: true },
+    }),
   ]);
 
   const displayName = user?.firstName || 'there';
   const greeting = getGreeting();
+  const streakStats = calcStreakStats(streakActivity.map((entry) => entry.createdAt));
 
   return (
     <DashboardShell>
-      {/* Greeting */}
-      <header className="mb-8">
-        <div className="flex items-center gap-2.5 mb-1">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <h1 className="text-2xl font-bold tracking-tight">
-            {greeting}, {displayName}! 👋
-          </h1>
-        </div>
-        <p className="text-muted-foreground text-sm">
-          Welcome back to your learning dashboard. Here&apos;s what&apos;s coming up.
-        </p>
-      </header>
+      <main className="space-y-6">
+        <section className="card-frame bg-card p-4">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h1 className="text-xl font-semibold text-foreground">
+                {greeting}, {displayName}
+              </h1>
+            </div>
 
-      <main className="space-y-10">
-        {/* Upcoming Live Activities */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <Video className="h-4 w-4 text-emerald-500" />
-              Upcoming Live Activities
-            </h2>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border/60 bg-muted/20 px-4 py-3">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/90 text-white shadow-sm">
+                    <Flame className="h-5 w-5" />
+                  </div>
+                  <div className="leading-tight">
+                    <p className="text-sm font-semibold text-foreground">
+                      {formatDayCount(streakStats.current)} streak
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {streakStats.hasToday
+                        ? 'Streak updated today'
+                        : streakStats.hasYesterday
+                          ? 'Last chance!'
+                          : 'Start a streak today'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-7 gap-2">
+                  {streakStats.weekDays.map((day) => (
+                    <div key={day.key} className="flex flex-col items-center gap-1">
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {day.label}
+                      </span>
+                      <div
+                        className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] ${
+                          day.isActive
+                            ? 'border-amber-300 bg-amber-400 text-white'
+                            : 'border-border/60 bg-muted/40 text-muted-foreground'
+                        } ${day.isToday ? 'ring-2 ring-amber-300/60' : ''}`}
+                      >
+                        {day.isActive ? <Check className="h-3.5 w-3.5" /> : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="hidden items-end sm:flex" aria-hidden="true">
+                <div className="relative h-16 w-16 rounded-2xl bg-emerald-400/90">
+                  <div className="absolute left-3.5 top-4 h-4 w-4 rounded-full bg-white" />
+                  <div className="absolute right-3.5 top-4 h-4 w-4 rounded-full bg-white" />
+                  <div className="absolute left-[18px] top-5.5 h-1.5 w-1.5 rounded-full bg-emerald-700" />
+                  <div className="absolute right-[18px] top-5.5 h-1.5 w-1.5 rounded-full bg-emerald-700" />
+                  <div className="absolute bottom-3.5 left-1/2 h-2.5 w-5 -translate-x-1/2 rounded-full bg-emerald-300" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Video className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Upcoming live activities</h2>
+            </div>
             <Link
               href="/live-activities"
-              className="text-xs text-muted-foreground hover:text-primary font-medium flex items-center gap-1 transition-colors"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               View all
               <ChevronRight className="h-3.5 w-3.5" />
@@ -104,138 +246,123 @@ export default async function DashboardPage() {
           </div>
 
           {upcomingActivities.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-8 text-center">
-              <Video className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No upcoming live activities scheduled.</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">New sessions will appear here once added.</p>
+            <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+              <Video className="mx-auto mb-2 h-7 w-7 text-muted-foreground/60" />
+              <p className="text-sm font-medium text-muted-foreground">No live activities yet</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">
+                New sessions will appear here once scheduled.
+              </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {upcomingActivities.map((activity) => (
-                <div
-                  key={activity.id}
-                  className="group rounded-xl border border-border bg-card p-4 hover:border-emerald-500/30 hover:bg-emerald-500/5 transition-all duration-200 flex flex-col gap-3"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-sm leading-tight line-clamp-2">
-                      {activity.title}
-                    </h3>
-                    <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400 px-2 py-0.5 rounded-full">
-                      <Video className="h-2.5 w-2.5" />
-                      {activity.type.replace(/_/g, ' ')}
-                    </span>
+            <div className="space-y-3">
+              {upcomingActivities.map((activity) => {
+                const activityDate = new Date(activity.date);
+                return (
+                  <div
+                    key={activity.id}
+                    className="card-frame border-dashed bg-muted/20 px-4 py-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-4">
+                      <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-muted/60 text-center">
+                        <span className="text-[11px] font-semibold uppercase text-muted-foreground">
+                          {activityDate.toLocaleDateString('en-US', { month: 'short' })}
+                        </span>
+                        <span className="text-lg font-semibold text-foreground">
+                          {activityDate.toLocaleDateString('en-US', { day: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className="min-w-[200px] flex-1">
+                        <p className="text-sm font-semibold text-foreground line-clamp-1">
+                          {activity.title}
+                        </p>
+                        {activity.description && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            {activity.description}
+                          </p>
+                        )}
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                            <Video className="h-3 w-3" />
+                            {activity.type.replace(/_/g, ' ')}
+                          </span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                            <Clock className="h-3 w-3" />
+                            {activityDate.toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          {activity.duration && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                              <Clock className="h-3 w-3" />
+                              {activity.duration} min
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-
-                  {activity.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">{activity.description}</p>
-                  )}
-
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-auto">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {new Date(activity.date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
-                    {activity.duration && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {activity.duration} min
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
 
-        {/* Recently Purchased Materials */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-primary" />
-              Recently Purchased Materials
-            </h2>
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-semibold">Recently purchased materials</h2>
+            </div>
             <Link
-              href="/my-materials"
-              className="text-xs text-muted-foreground hover:text-primary font-medium flex items-center gap-1 transition-colors group"
+              href="/library"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
-              <Package className="h-3.5 w-3.5" />
-              All my materials
-              <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              All materials
+              <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
           {recentPurchases.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-muted/20 px-5 py-8 text-center">
-              <BookOpen className="h-8 w-8 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">No materials purchased yet.</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
+            <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+              <BookOpen className="mx-auto mb-2 h-7 w-7 text-muted-foreground/60" />
+              <p className="text-sm font-medium text-muted-foreground">No materials yet</p>
+              <p className="mt-1 text-xs text-muted-foreground/70">
                 Browse the{' '}
-                <Link href="/catalog" className="text-primary underline underline-offset-2">
+                <Link href="/catalog" className="text-foreground underline underline-offset-2">
                   catalog
                 </Link>{' '}
-                to find materials.
+                to find your first one.
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               {recentPurchases.map(({ material, createdAt }) => (
                 <Link
                   key={material.id}
                   href={`/catalog/${material.subjectId}/${material.topicId}/${material.id}`}
-                  className="group rounded-xl border border-border bg-card p-4 hover:border-primary/30 hover:bg-primary/5 transition-all duration-200 flex flex-col gap-2"
+                  className="card-frame border-dashed bg-muted/20 px-4 py-3"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
-                      {material.title}
-                    </h3>
-                    <span className={`shrink-0 inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full ${material.materialType === 'PRACTICE_TEST'
-                      ? 'text-purple-600 bg-purple-50 dark:bg-purple-500/10 dark:text-purple-400'
-                      : 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400'
-                      }`}>
-                      {material.materialType === 'PRACTICE_TEST' ? 'Test' : 'Textual'}
+                  <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    <span className="capitalize">{material.subjectId.replace(/-/g, ' ')}</span>
+                    <span>
+                      {new Date(createdAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
                     </span>
                   </div>
-
-                  <div className="flex items-center gap-2 mt-auto">
-                    <span className="text-xs text-muted-foreground capitalize">
-                      {material.subjectId.replace(/-/g, ' ')}
-                    </span>
-                    {material.difficulty && (
-                      <>
-                        <span className="text-muted-foreground/30">·</span>
-                        <span className="text-xs text-muted-foreground capitalize">
-                          {material.difficulty.toLowerCase()}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <p className="text-[11px] text-muted-foreground/60">
-                    Purchased{' '}
-                    {new Date(createdAt).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                    })}
+                  <p className="mt-2 text-sm font-semibold text-foreground line-clamp-2">
+                    {material.title}
                   </p>
+                  <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                      {material.materialType === 'PRACTICE_TEST' ? 'Practice test' : 'Text lesson'}
+                    </span>
+                    <DifficultyBars difficulty={material.difficulty} />
+                  </div>
                 </Link>
               ))}
-            </div>
-          )}
-
-          {recentPurchases.length > 0 && (
-            <div className="mt-3 text-center">
-              <Link
-                href="/my-materials"
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline underline-offset-4 transition-colors"
-              >
-                <Package className="h-4 w-4" />
-                View all my materials
-                <ChevronRight className="h-4 w-4" />
-              </Link>
             </div>
           )}
         </section>

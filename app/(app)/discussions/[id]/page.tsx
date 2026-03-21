@@ -1,20 +1,29 @@
 /**
  * Discussion Detail Page
  *
- * X-style single post with replies, nested replies, and voting.
+ * Single post with replies and voting.
  */
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { PostAvatar } from '@/src/modules/discussions/post-avatar';
 import { formatRelativeTime } from '@/src/modules/discussions/relative-time';
-import { ChevronLeft, ChevronUp, ChevronDown, ArrowBigUp, ArrowBigDown, MessageSquare, MoreHorizontal, TrendingUp } from 'lucide-react';
+import { ArrowBigUp, ArrowBigDown, MessageSquare, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/src/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from '@/components/ui/alert-dialog';
 
 interface Reply {
   id: string;
@@ -23,7 +32,7 @@ interface Reply {
   authorName: string;
   createdAt: string;
   voteScore: number;
-  childReplies?: Reply[];
+  userVote?: 1 | -1 | null;
 }
 
 interface Discussion {
@@ -34,29 +43,47 @@ interface Discussion {
   authorName: string;
   createdAt: string;
   voteScore: number;
-  upvotes?: number;
-  downvotes?: number;
+  userVote?: 1 | -1 | null;
   replies: Reply[];
   archivedAt?: string | null;
   acceptedReplyId?: string | null;
+  currentUserId?: string | null;
 }
 
-import { Skeleton } from '@/components/ui/skeleton';
+const formatDateTime = (iso: string) => {
+  const date = new Date(iso);
+  const time = new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+  const day = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+  return `${time} · ${day}`;
+};
 
 export default function DiscussionDetailPage() {
+  const MAX_REPLY_LENGTH = 2000;
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const currentUserName = 'You';
   const [loading, setLoading] = useState(true);
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [acceptingReplyId, setAcceptingReplyId] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
+  const [inlineReply, setInlineReply] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogContent, setDialogContent] = useState('');
+  const [dialogParentId, setDialogParentId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [voteLoading, setVoteLoading] = useState<string | null>(null);
+  const inlineRemaining = MAX_REPLY_LENGTH - inlineReply.length;
+  const dialogRemaining = MAX_REPLY_LENGTH - dialogContent.length;
 
-  const fetchDiscussion = async () => {
+  const fetchDiscussion = useCallback(async () => {
     try {
       const res = await fetch(`/api/discussions/${id}`, { cache: 'no-store' });
       if (!res.ok) {
@@ -68,25 +95,47 @@ export default function DiscussionDetailPage() {
       }
       const data = await res.json();
       setDiscussion(data);
+      setCurrentUserId(data?.currentUserId ?? null);
     } catch {
       setDiscussion(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchDiscussion();
   }, [id]);
 
   useEffect(() => {
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((data) => setCurrentUserId(data?.user?.id ?? null));
-  }, []);
+    fetchDiscussion();
+  }, [fetchDiscussion]);
 
-  const handleVote = async (target: 'discussion' | 'reply', targetId: string, value: number) => {
+  const handleVote = async (target: 'discussion' | 'reply', targetId: string, value: 1 | -1) => {
+    if (!discussion || voteLoading) return;
+
+    let previousVote: 1 | -1 | null = null;
+    let newVote: 1 | -1 | null = null;
+
+    // Optimistic update
+    const newDiscussion = { ...discussion };
+    if (target === 'discussion') {
+      previousVote = newDiscussion.userVote ?? null;
+      newVote = previousVote === value ? null : value;
+      const delta = (newVote ?? 0) - (previousVote ?? 0);
+      newDiscussion.voteScore += delta;
+      newDiscussion.userVote = newVote;
+    } else {
+      newDiscussion.replies = newDiscussion.replies.map((r) => {
+        if (r.id === targetId) {
+          previousVote = r.userVote ?? null;
+          newVote = previousVote === value ? null : value;
+          const delta = (newVote ?? 0) - (previousVote ?? 0);
+          return { ...r, voteScore: r.voteScore + delta, userVote: newVote };
+        }
+        return r;
+      });
+    }
+
+    setDiscussion(newDiscussion);
     setVoteLoading(targetId);
+
     try {
       const url =
         target === 'discussion'
@@ -95,26 +144,12 @@ export default function DiscussionDetailPage() {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value }),
+        body: JSON.stringify({ value: newVote ?? 0 }),
       });
       if (!res.ok) throw new Error('Failed to vote');
-      const data = await res.json();
-      router.refresh();
-      if (discussion) {
-        if (target === 'discussion') {
-          setDiscussion({ ...discussion, voteScore: data.voteScore });
-        } else {
-          const updateReplyScore = (replies: Reply[]): Reply[] =>
-            replies.map((r) =>
-              r.id === targetId
-                ? { ...r, voteScore: data.voteScore }
-                : { ...r, childReplies: r.childReplies ? updateReplyScore(r.childReplies) : [] }
-            );
-          setDiscussion({ ...discussion, replies: updateReplyScore(discussion.replies) });
-        }
-      }
     } catch {
       toast.error('Failed to vote');
+      setDiscussion(discussion);
     } finally {
       setVoteLoading(null);
     }
@@ -139,22 +174,29 @@ export default function DiscussionDetailPage() {
     }
   };
 
-  const handleReply = async (parentReplyId?: string) => {
-    if (!replyContent.trim()) return;
+  const submitReply = async (content: string, parentReplyId?: string | null) => {
+    if (!content.trim()) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/discussions/${id}/replies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: replyContent.trim(),
-          ...(parentReplyId && { parentReplyId }),
+          content: content.trim(),
+          parentReplyId: parentReplyId || undefined,
         }),
       });
+      const created = await res.json();
       if (!res.ok) throw new Error('Failed to reply');
-      setReplyContent('');
-      setReplyingTo(null);
-      fetchDiscussion();
+      setInlineReply('');
+      setDialogContent('');
+      setDialogOpen(false);
+      router.refresh();
+      if (created?.id) {
+        router.push(`/discussions/${id}/replies/${created.id}`);
+      } else {
+        fetchDiscussion();
+      }
     } catch {
       toast.error('Failed to reply');
     } finally {
@@ -162,132 +204,44 @@ export default function DiscussionDetailPage() {
     }
   };
 
-  const ReplyBlock = ({ reply, depth = 0 }: { reply: Reply; depth?: number }) => (
-    <div
-      className={
-        depth > 0
-          ? 'ml-12 mt-3 pl-4 border-l-2 border-border/60'
-          : 'mt-4'
-      }
-    >
-      <div className="flex gap-3">
-        <PostAvatar
-          userId={reply.authorId}
-          authorName={reply.authorName}
-          size="sm"
-        />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-1.5 flex-wrap">
-            <span className="font-semibold text-foreground text-sm">
-              {reply.authorName}
-            </span>
-            <span className="text-muted-foreground text-xs">
-              · {formatRelativeTime(reply.createdAt)}
-            </span>
-          </div>
-          <p className="text-sm text-foreground mt-0.5 whitespace-pre-wrap">
-            {reply.content}
-          </p>
-          <div className="flex items-center gap-3 mt-2">
-            {currentUserId === discussion?.authorId &&
-              reply.authorId !== discussion.authorId &&
-              !discussion?.archivedAt && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAcceptReply(reply.id);
-                  }}
-                  disabled={acceptingReplyId === reply.id}
-                  className={`flex items-center gap-1 text-xs font-medium transition-colors ${discussion?.acceptedReplyId === reply.id
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-primary'
-                    }`}
-                >
-                  {discussion?.acceptedReplyId === reply.id ? '✓ Best answer' : 'Accept as best answer'}
-                </button>
-              )}
-            {!discussion?.archivedAt && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setReplyingTo(replyingTo === reply.id ? null : reply.id);
-                }}
-                className="flex items-center gap-1 text-muted-foreground hover:text-primary text-xs font-medium transition-colors"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                Reply
-              </button>
-            )}
-            <div className="flex items-center gap-0.5">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleVote('reply', reply.id, 1);
-                }}
-                disabled={voteLoading === reply.id}
-                className="p-1 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                <ChevronUp className="h-3.5 w-3.5" />
-              </button>
-              <span className="text-xs font-medium text-muted-foreground min-w-[1.25rem] text-center">
-                {reply.voteScore}
-              </span>
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleVote('reply', reply.id, -1);
-                }}
-                disabled={voteLoading === reply.id}
-                className="p-1 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-              >
-                <ChevronDown className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-          {replyingTo === reply.id && (
-            <div className="mt-3">
-              <textarea
-                value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
-                placeholder="Write a reply..."
-                className="w-full min-h-[80px] rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-0"
-              />
-              <div className="flex gap-2 mt-2">
-                <Button size="sm" onClick={() => handleReply(reply.id)} disabled={submitting}>
-                  Post
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setReplyingTo(null)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          )}
-          {reply.childReplies?.map((c) => (
-            <ReplyBlock key={c.id} reply={c} depth={depth + 1} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+  const openReplyDialog = (parentReplyId?: string) => {
+    setDialogParentId(parentReplyId ?? null);
+    setDialogOpen(true);
+  };
 
   if (loading) {
     return (
-      <DashboardShell className="max-w-2xl mx-auto px-4">
-        <div className="flex items-center py-3">
-          <Skeleton className="h-8 w-16" />
-        </div>
-        <div className="flex gap-3 py-6">
-          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
-          <div className="flex-1 space-y-3">
-            <div className="flex gap-2">
-              <Skeleton className="h-4 w-24" />
-              <Skeleton className="h-4 w-12" />
+      <DashboardShell>
+        <main className="min-w-0 space-y-6">
+            <div className="border-b border-border/60 py-2">
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/discussions" className="inline-flex items-center gap-1">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Back to discussions
+                </Link>
+              </Button>
             </div>
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-        </div>
+            <div className="space-y-4">
+              <Skeleton className="h-7 w-2/3" />
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-4 w-40" />
+              </div>
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-5/6" />
+              <Skeleton className="h-4 w-1/3" />
+              <div className="flex gap-2">
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-8 w-24" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-8 w-24 ml-auto" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </main>
       </DashboardShell>
     );
   }
@@ -295,177 +249,304 @@ export default function DiscussionDetailPage() {
   if (!discussion) {
     return (
       <DashboardShell>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center border-b border-border py-3">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/discussions" className="flex items-center gap-1 -ml-2">
-                <ChevronLeft className="h-4 w-4" />
-                Back
+        <div className="space-y-6">
+          <div className="border-b border-border/60 py-2">
+            <Button size="sm" variant="ghost" asChild>
+              <Link href="/discussions" className="inline-flex items-center gap-1">
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to discussions
               </Link>
             </Button>
           </div>
-          <div className="py-8 text-center">
-            <p className="text-muted-foreground mb-4">Discussion not found</p>
-            <Button variant="outline" asChild>
-              <Link href="/discussions">Back to discussions</Link>
-            </Button>
-          </div>
+          <p className="text-sm text-muted-foreground">Discussion not found.</p>
         </div>
       </DashboardShell>
     );
   }
 
+  const replyCount = discussion.replies?.length ?? 0;
+
   return (
-    <DashboardShell className="pb-20">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-8 items-start">
-        {/* Thread content */}
-        <div className="min-w-0">
-          <div className="flex items-center sticky top-0 z-10 bg-background/80 backdrop-blur-md py-3 -mx-4 px-4 border-b border-border/50">
-            <Button variant="ghost" size="sm" asChild className="h-8 -ml-2 gap-1 text-muted-foreground hover:text-foreground rounded-full">
-              <Link href="/discussions">
-                <ChevronLeft className="h-4 w-4" />
-                <span className="font-bold">Post</span>
-              </Link>
-            </Button>
-          </div>
+    <DashboardShell>
+      <main className="lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
+          <div className="space-y-6 min-w-0 lg:overflow-y-auto">
+            <div className="border-b border-border/60 py-2">
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/discussions" className="inline-flex items-center gap-1">
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Back to discussions
+                </Link>
+              </Button>
+            </div>
 
-          <main className="mt-4">
-            {/* Main post - X style */}
-            <article className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <PostAvatar
-                    userId={discussion.authorId}
-                    authorName={discussion.authorName}
-                    size="md"
-                  />
-                  <div className="flex flex-col">
-                    <span className="font-bold text-foreground leading-tight hover:underline cursor-pointer">
-                      {discussion.authorName}
-                    </span>
-                    <span className="text-muted-foreground text-[13px]">
-                      @{discussion.authorName.toLowerCase().replace(/\s+/g, '')}
-                    </span>
-                  </div>
-                </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-full">
-                  <MoreHorizontal className="h-4 w-4" />
+            <div className="space-y-3 min-w-0">
+              <h1 className="text-xl font-semibold text-foreground break-words">{discussion.title}</h1>
+              <div className="flex items-center gap-3">
+                <PostAvatar
+                  userId={discussion.authorId}
+                  authorName={discussion.authorName}
+                  size="sm"
+                />
+                <span className="text-sm font-semibold text-foreground">{discussion.authorName}</span>
+              </div>
+              <p className="text-[15px] text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
+                {discussion.content}
+              </p>
+              <div className="text-xs text-muted-foreground">{formatDateTime(discussion.createdAt)}</div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openReplyDialog()}
+                  className="h-8 gap-1 px-2 text-xs"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Reply
                 </Button>
-              </div>
-
-              <div className="space-y-3">
-                <h1 className="font-bold text-xl md:text-2xl leading-tight text-foreground tracking-tight">
-                  {discussion.title}
-                </h1>
-                <p className="text-[17px] text-foreground/90 whitespace-pre-wrap leading-normal">
-                  {discussion.content}
-                </p>
-              </div>
-
-              <div className="py-3 border-y border-border/50 flex items-center gap-6 text-[14px] text-muted-foreground">
-                <span>{new Date(discussion.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {new Date(discussion.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-              </div>
-
-              <div className="flex items-center justify-between max-w-sm py-1">
-                <div className="flex items-center gap-2">
-                  {/* Upvote Group */}
-                  <div
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-orange-500/10 text-muted-foreground hover:text-orange-500 transition-colors cursor-pointer group/up"
+                <div className="flex items-center overflow-hidden rounded-md border border-border/60 bg-muted/40">
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     onClick={() => handleVote('discussion', discussion.id, 1)}
+                    disabled={!!voteLoading}
+                    aria-label="Upvote"
+                    className={cn(
+                      'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
+                      discussion.userVote === 1 && 'text-primary bg-primary/10'
+                    )}
                   >
-                    <ArrowBigUp className="h-6 w-6 group-hover/up:text-orange-500 transition-colors" />
-                    <span className="text-sm font-bold">{discussion.upvotes ?? discussion.voteScore}</span>
-                  </div>
-
-                  {/* Downvote Group */}
-                  <div
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-full hover:bg-blue-500/10 text-muted-foreground hover:text-blue-500 transition-colors cursor-pointer group/down"
+                    <ArrowBigUp className={cn('h-4 w-4', discussion.userVote === 1 && 'fill-current')} />
+                  </Button>
+                  <span
+                    className={cn(
+                      'min-w-[2rem] px-2 text-center text-xs font-semibold',
+                      discussion.voteScore > 0
+                        ? 'text-primary'
+                        : discussion.voteScore < 0
+                          ? 'text-destructive'
+                          : 'text-muted-foreground'
+                    )}
+                  >
+                    {discussion.voteScore}
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     onClick={() => handleVote('discussion', discussion.id, -1)}
+                    disabled={!!voteLoading}
+                    aria-label="Downvote"
+                    className={cn(
+                      'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
+                      discussion.userVote === -1 && 'text-destructive bg-destructive/10'
+                    )}
                   >
-                    <ArrowBigDown className="h-6 w-6 group-hover/down:text-blue-500 transition-colors" />
-                    <span className="text-sm font-bold">{discussion.downvotes ?? 0}</span>
-                  </div>
+                    <ArrowBigDown className={cn('h-4 w-4', discussion.userVote === -1 && 'fill-current')} />
+                  </Button>
                 </div>
-
-                <Button variant="ghost" size="sm" className="h-10 px-4 gap-2 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 rounded-full">
-                  <MessageSquare className="h-5 w-5" />
-                  <span className="font-medium text-sm">{discussion.replies?.length ?? 0}</span>
-                </Button>
               </div>
-            </article>
+            </div>
 
-            {/* Reply composer */}
-            {!discussion.archivedAt && (
-              <div className="py-4 border-b border-border/50">
-                <div className="flex gap-3">
-                  <div className="h-10 w-10 shrink-0">
-                    <PostAvatar userId={currentUserId || ''} authorName="You" size="md" className="opacity-50" />
-                  </div>
-                  <div className="flex-1 flex flex-col gap-3">
+            <div className="border-t border-border/60 pt-6">
+              <div className="space-y-4">
+                <div className="flex gap-3 items-start">
+                  <PostAvatar
+                    userId={currentUserId || 'current-user'}
+                    authorName={currentUserName}
+                    size="sm"
+                  />
+                  <div className="flex-1 min-w-0">
                     <textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Post your reply"
-                      className="w-full min-h-[40px] text-lg bg-transparent border-none focus:ring-0 resize-none placeholder:text-muted-foreground/60 py-2"
-                      rows={1}
-                      onInput={(e) => {
-                        const target = e.target as HTMLTextAreaElement;
-                        target.style.height = 'auto';
-                        target.style.height = `${target.scrollHeight}px`;
-                      }}
+                      value={inlineReply}
+                      onChange={(e) => setInlineReply(e.target.value)}
+                      placeholder="Write a reply"
+                      className="w-full min-h-[88px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-b border-border/60 pb-3"
+                      maxLength={MAX_REPLY_LENGTH}
                     />
-                    <div className="flex justify-end border-t border-border/30 pt-3">
+                    {inlineRemaining <= 100 ? (
+                      <div className="mt-1 text-right text-xs text-muted-foreground">
+                        {inlineRemaining} characters left
+                      </div>
+                    ) : null}
+                    <div className="flex justify-end pt-2">
                       <Button
-                        variant="primary"
                         size="sm"
-                        className="rounded-full px-5 font-bold"
-                        onClick={() => handleReply()}
-                        disabled={submitting || !replyContent.trim()}
+                        onClick={() => submitReply(inlineReply)}
+                        disabled={submitting || !inlineReply.trim()}
                       >
                         Reply
                       </Button>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Replies section */}
-            <section className="mt-2 divide-y divide-border/30">
-              {discussion.replies?.map((r) => (
-                <div key={r.id} className="py-1">
-                  <ReplyBlock reply={r} />
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground">Replies</h2>
+                  <span className="text-xs text-muted-foreground">{replyCount}</span>
                 </div>
-              ))}
-              {(discussion.replies?.length ?? 0) === 0 && (
-                <div className="py-12 text-center">
-                  <p className="text-muted-foreground text-sm">No replies yet.</p>
-                </div>
-              )}
-            </section>
-          </main>
-        </div>
 
-        {/* Right Sidebar */}
-        <aside className="hidden lg:block space-y-6 sticky top-6">
-          <section className="bg-muted/30 rounded-xl p-5 border border-border/50">
-            <h2 className="text-sm font-bold flex items-center gap-2 mb-4">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              Thread Stats
-            </h2>
-            <div className="space-y-4 font-medium text-xs text-muted-foreground">
-              <div className="flex justify-between">
-                <span>Net votes</span>
-                <span className="text-primary font-bold">+{discussion.voteScore}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Replies</span>
-                <span className="text-foreground font-bold">{discussion.replies?.length ?? 0}</span>
+                {replyCount > 0 ? (
+                  <div className="space-y-5">
+                    {discussion.replies.map((reply) => (
+                      <div
+                        key={reply.id}
+                        className="flex gap-3 cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => router.push(`/discussions/${id}/replies/${reply.id}`)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            router.push(`/discussions/${id}/replies/${reply.id}`);
+                          }
+                        }}
+                      >
+                        <PostAvatar
+                          userId={reply.authorId}
+                          authorName={reply.authorName}
+                          size="sm"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-sm font-semibold text-foreground">
+                              {reply.authorName}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatRelativeTime(reply.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground/90 mt-1 whitespace-pre-wrap break-words">
+                            {reply.content}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
+                            {!discussion.archivedAt && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openReplyDialog(reply.id);
+                                }}
+                                className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                                Reply
+                              </Button>
+                            )}
+                            {currentUserId === discussion?.authorId &&
+                              reply.authorId !== discussion.authorId &&
+                              !discussion?.archivedAt && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAcceptReply(reply.id);
+                                  }}
+                                  disabled={acceptingReplyId === reply.id}
+                                  className={cn(
+                                    'text-xs font-medium transition-colors',
+                                    discussion?.acceptedReplyId === reply.id
+                                      ? 'text-primary'
+                                      : 'text-muted-foreground hover:text-primary'
+                                  )}
+                                >
+                                  {discussion?.acceptedReplyId === reply.id
+                                    ? '✓ Best answer'
+                                    : 'Accept as best answer'}
+                                </button>
+                              )}
+                            <div className="flex items-center overflow-hidden rounded-md border border-border/60 bg-muted/40">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVote('reply', reply.id, 1);
+                                }}
+                                disabled={voteLoading === reply.id}
+                                aria-label="Upvote"
+                                className={cn(
+                                  'h-7 w-7 rounded-none text-muted-foreground hover:bg-muted/60',
+                                  reply.userVote === 1 && 'text-primary bg-primary/10'
+                                )}
+                              >
+                                <ArrowBigUp className={cn('h-4 w-4', reply.userVote === 1 && 'fill-current')} />
+                              </Button>
+                              <span
+                                className={cn(
+                                  'min-w-[1.75rem] px-2 text-center text-xs font-semibold',
+                                  reply.voteScore > 0
+                                    ? 'text-primary'
+                                    : reply.voteScore < 0
+                                      ? 'text-destructive'
+                                      : 'text-muted-foreground'
+                                )}
+                              >
+                                {reply.voteScore}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleVote('reply', reply.id, -1);
+                                }}
+                                disabled={voteLoading === reply.id}
+                                aria-label="Downvote"
+                                className={cn(
+                                  'h-7 w-7 rounded-none text-muted-foreground hover:bg-muted/60',
+                                  reply.userVote === -1 && 'text-destructive bg-destructive/10'
+                                )}
+                              >
+                                <ArrowBigDown className={cn('h-4 w-4', reply.userVote === -1 && 'fill-current')} />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No replies yet.</p>
+                )}
               </div>
             </div>
-          </section>
-        </aside>
-      </div>
+          </div>
+        </main>
+
+        <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Write a reply</AlertDialogTitle>
+              <AlertDialogDescription>
+                Share your thoughts on this discussion.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-3">
+              <textarea
+                value={dialogContent}
+                onChange={(e) => setDialogContent(e.target.value)}
+                placeholder="Write your reply..."
+                className="w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
+                maxLength={MAX_REPLY_LENGTH}
+              />
+              {dialogRemaining <= 100 ? (
+                <div className="text-right text-xs text-muted-foreground">
+                  {dialogRemaining} characters left
+                </div>
+              ) : null}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => submitReply(dialogContent, dialogParentId)}
+                  disabled={submitting || !dialogContent.trim()}
+                >
+                  Post reply
+                </Button>
+              </div>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
     </DashboardShell>
   );
 }

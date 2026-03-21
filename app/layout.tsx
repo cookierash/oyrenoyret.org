@@ -18,7 +18,7 @@ const comfortaa = Comfortaa({
 });
 
 export const metadata: Metadata = {
-  title: 'Oyrenoyret.org - NGO EdTech Platform',
+  title: 'oyrenoyret.org - NGO EdTech Platform',
   description: 'A secure educational platform for minors',
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
 };
@@ -40,4 +40,3 @@ export default function RootLayout({
     </html>
   );
 }
-

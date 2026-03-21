@@ -7,7 +7,9 @@ const PAGE_LABELS: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/studio': 'Studio',
   '/catalog': 'Catalog',
-  '/mistakes': 'Mistake library',
+  '/library': 'Library',
+  '/live-activities': 'Live Activities',
+  '/admin/live-activities': 'Live Activities Admin',
   '/discussions': 'Discussions',
   '/messages': 'Messages',
   '/academic-record': 'Academic record',
@@ -17,9 +19,13 @@ const PAGE_LABELS: Record<string, string> = {
 function getPageLabel(pathname: string): string {
   if (pathname in PAGE_LABELS) return PAGE_LABELS[pathname];
   if (pathname.startsWith('/catalog/')) return 'Catalog';
+  if (pathname.startsWith('/preview/')) return 'Preview';
+  if (pathname.startsWith('/library/')) return 'Library';
   if (pathname.startsWith('/discussions/')) return 'Discussion';
+  if (pathname.startsWith('/sprints/')) return 'Problem Sprint';
+  if (pathname.startsWith('/admin/')) return 'Admin';
   if (pathname.startsWith('/studio/')) return 'Editor';
-  return 'Oyrenoyret';
+  return 'oyrenoyret';
 }
 
 interface AccountTitleProps {
@@ -28,16 +34,16 @@ interface AccountTitleProps {
 
 /**
  * Sets document.title to include account identity so multi-tab,
- * multi-account usage is clear. Format: "Page · Account - Oyrenoyret.org"
+ * multi-account usage is clear. Format: "Page · Account - oyrenoyret.org"
  */
 export function AccountTitle({ displayName }: AccountTitleProps) {
   const pathname = usePathname();
 
   useEffect(() => {
     const pageLabel = getPageLabel(pathname);
-    document.title = `${pageLabel} · ${displayName} - Oyrenoyret.org`;
+    document.title = `${pageLabel} · ${displayName} - oyrenoyret.org`;
     return () => {
-      document.title = 'Oyrenoyret.org - NGO EdTech Platform';
+      document.title = 'oyrenoyret.org - NGO EdTech Platform';
     };
   }, [pathname, displayName]);
 

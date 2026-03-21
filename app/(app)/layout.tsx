@@ -11,8 +11,7 @@ export const dynamic = 'force-dynamic';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { roundCredits } from '@/src/modules/credits';
-import { AppSidebar } from '@/src/components/layout/app-sidebar';
-import { AccountTitle } from '@/src/components/layout/account-title';
+import { AppShell } from '@/src/components/layout/app-shell';
 
 export default async function AppLayout({
   children,
@@ -32,6 +31,7 @@ export default async function AppLayout({
       lastName: true,
       email: true,
       credits: true,
+      role: true,
     },
   });
 
@@ -43,22 +43,18 @@ export default async function AppLayout({
     [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email.split('@')[0];
 
   return (
-    <div className="min-h-screen bg-background">
-      <AccountTitle displayName={displayName} />
-      <div className="mx-auto grid min-h-screen max-w-[1200px] grid-cols-[1fr_4fr]">
-        <AppSidebar
-          user={{
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            email: user.email,
-            credits: user.credits != null ? roundCredits(user.credits) : undefined,
-          }}
-        />
-        <main className="min-w-0 px-4 py-8 sm:px-6 lg:px-8">
-          {children}
-        </main>
-      </div>
-    </div>
+    <AppShell
+      displayName={displayName}
+      user={{
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        credits: user.credits != null ? roundCredits(user.credits) : undefined,
+        role: user.role,
+      }}
+    >
+      {children}
+    </AppShell>
   );
 }

@@ -19,7 +19,7 @@ export function DashboardShell({ children, className }: DashboardShellProps) {
   return (
     <div
       className={cn(
-        'flex min-h-full flex-col gap-4 text-foreground',
+        'flex min-h-full flex-col gap-2 text-foreground',
         className,
       )}
     >
@@ -27,4 +27,3 @@ export function DashboardShell({ children, className }: DashboardShellProps) {
     </div>
   );
 }
-

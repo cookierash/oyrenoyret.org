@@ -20,13 +20,13 @@ export interface BadgeProps
 
 const badgeVariants: Record<BadgeVariant, string> = {
   default:
-    'bg-primary/15 text-primary font-semibold border border-primary/30',
+    'bg-primary/10 text-primary font-medium border border-primary/15',
   secondary:
-    'bg-secondary text-secondary-foreground border border-border',
+    'bg-secondary text-secondary-foreground border border-border/70',
   success:
-    'bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border border-[hsl(var(--success))]/30',
+    'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border border-[hsl(var(--success))]/20',
   outline:
-    'bg-transparent text-foreground border-2 border-border',
+    'bg-transparent text-foreground border border-border/70',
 };
 
 const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
@@ -36,7 +36,7 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
       <span
         ref={ref}
         className={cn(
-          'inline-flex items-center rounded px-2 py-0.5 text-xs font-medium',
+          'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium',
           'transition-colors',
           badgeVariants[variant],
           className

@@ -68,5 +68,5 @@ export function sanitizeInput(input: string): string {
  */
 export function sanitizeHtml(input: string): string {
   const trimmed = input.trim();
-  return DOMPurify.sanitize(trimmed);
+  return DOMPurify.sanitize(trimmed, { FORBID_TAGS: ['a'] });
 }

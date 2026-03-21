@@ -4,6 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
+import { getCurrentSession } from '@/src/modules/auth/utils/session';
 
 export async function GET(
   _request: Request,
@@ -11,6 +12,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    const currentUserId = await getCurrentSession();
 
     const discussion = await prisma.discussion.findUnique({
       where: { id, archivedAt: null },
@@ -81,13 +83,26 @@ export async function GET(
     ];
     const replyVoteScores = allReplyIds.length
       ? await prisma.replyVote.groupBy({
-          by: ['replyId'],
-          where: { replyId: { in: allReplyIds } },
-          _sum: { value: true },
-        })
+        by: ['replyId'],
+        where: { replyId: { in: allReplyIds } },
+        _sum: { value: true },
+      })
       : [];
     const replyScoreMap = Object.fromEntries(
       replyVoteScores.map((v) => [v.replyId, v._sum.value ?? 0])
+    );
+
+    const currentUserVote =
+      currentUserId && discussion.votes.find((v) => v.userId === currentUserId)?.value;
+
+    const currentUserReplyVotes = currentUserId && allReplyIds.length
+      ? await prisma.replyVote.findMany({
+        where: { userId: currentUserId, replyId: { in: allReplyIds } },
+        select: { replyId: true, value: true },
+      })
+      : [];
+    const currentUserReplyVoteMap = Object.fromEntries(
+      currentUserReplyVotes.map((v) => [v.replyId, v.value])
     );
 
     const formatReply = (r: (typeof discussion.replies)[0]) => ({
@@ -99,6 +114,7 @@ export async function GET(
         [r.user.firstName, r.user.lastName].filter(Boolean).join(' ') ||
         r.user.email.split('@')[0],
       voteScore: replyScoreMap[r.id] ?? 0,
+      userVote: currentUserReplyVoteMap[r.id] ?? null,
       childReplies: r.childReplies.map((c) => ({
         id: c.id,
         content: c.content,
@@ -108,6 +124,7 @@ export async function GET(
           [c.user.firstName, c.user.lastName].filter(Boolean).join(' ') ||
           c.user.email.split('@')[0],
         voteScore: replyScoreMap[c.id] ?? 0,
+        userVote: currentUserReplyVoteMap[c.id] ?? null,
       })),
     });
 
@@ -126,7 +143,9 @@ export async function GET(
         [discussion.user.firstName, discussion.user.lastName].filter(Boolean).join(' ') ||
         discussion.user.email.split('@')[0],
       voteScore: discussionVoteScore,
+      userVote: currentUserVote ?? null,
       replies: discussion.replies.map(formatReply),
+      currentUserId: currentUserId ?? null,
     });
   } catch (error) {
     console.error('Error fetching discussion:', error);
@@ -136,4 +155,3 @@ export async function GET(
     );
   }
 }
-

@@ -39,6 +39,7 @@ enum SessionStatus {
 
 model User {
   id        String   @id @default(uuid())
+  publicId  String?  @unique
   email     String   @unique
   passwordHash String? // Nullable for OAuth users
   role      UserRole @default(STUDENT)
@@ -65,6 +66,12 @@ model User {
   authSessions     AuthSession[]
   sessions         Session[]
   academicRecords  AcademicRecord[]
+  certificates     Certificate[]
+  activities       Activity[]
+  liveEventsCreated LiveEvent[] @relation("LiveEventsCreated")
+  liveEventEnrollments LiveEventEnrollment[]
+  liveAnnouncementsCreated LiveAnnouncement[] @relation("LiveAnnouncementsCreated")
+  activityStats    UserActivityStats?
   materials        Material[]
   discussions      Discussion[]
   discussionReplies DiscussionReply[]
@@ -81,6 +88,25 @@ model User {
   @@index([status])
   @@index([deletedAt])
   @@index([parentEmail])
+}
+
+model UserActivityStats {
+  id                           String   @id @default(uuid())
+  userId                       String   @unique
+  userPublicId                 String
+  materialsSharedTextual       Int      @default(0)
+  materialsSharedPractice      Int      @default(0)
+  liveProblemSprintTop3        Int      @default(0)
+  liveGuidedGroupFacilitated   Int      @default(0)
+  discussionHelps              Int      @default(0)
+  materialsPurchasedFromUser   Int      @default(0)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userPublicId])
 }
 
 model GuardianVerification {
@@ -187,6 +213,115 @@ model AcademicRecord {
   deletedAt   DateTime? // Soft delete support
   
   @@index([userId])
+  @@index([deletedAt])
+}
+
+model Certificate {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  description String?  @db.Text
+  issuedAt    DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([userId])
+  @@index([issuedAt])
+  @@index([deletedAt])
+}
+
+model Activity {
+  id          String   @id @default(uuid())
+  userId      String
+  title       String
+  description String?  @db.Text
+  date        DateTime
+  duration    Int?
+  type        String
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  @@index([userId])
+  @@index([date])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+enum LiveEventType {
+  PROBLEM_SPRINT
+}
+
+enum LiveEventEnrollmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+model LiveEvent {
+  id              String   @id @default(uuid())
+  topic           String
+  date            DateTime
+  durationMinutes Int
+  difficulty      MaterialDifficulty?
+  creditCost      Float
+  type            LiveEventType @default(PROBLEM_SPRINT)
+
+  createdById     String?
+  createdBy       User?    @relation("LiveEventsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  enrollments     LiveEventEnrollment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([date])
+  @@index([type])
+  @@index([deletedAt])
+}
+
+model LiveEventEnrollment {
+  id          String   @id @default(uuid())
+  liveEventId String
+  userId      String
+  status      LiveEventEnrollmentStatus @default(PENDING)
+  verifiedAt  DateTime?
+
+  liveEvent   LiveEvent @relation(fields: [liveEventId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([liveEventId, userId])
+  @@index([userId])
+  @@index([liveEventId])
+  @@index([status])
+}
+
+model LiveAnnouncement {
+  id          String   @id @default(uuid())
+  title       String
+  body        String   @db.Text
+  createdById String?
+  createdBy   User?    @relation("LiveAnnouncementsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([createdAt])
   @@index([deletedAt])
 }
 

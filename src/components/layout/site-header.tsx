@@ -26,19 +26,19 @@ function HoverDropdown({ label, items }: HoverDropdownProps) {
     <div className="group relative">
       <button
         type="button"
-        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors group-hover:bg-black/5 dark:group-hover:bg-white/10"
+        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors group-hover:bg-muted/70"
       >
         {label}
         <ChevronDown className="h-3.5 w-3.5 group-hover:rotate-180" />
       </button>
       <div className="pointer-events-none invisible absolute left-1/2 top-full z-[100] w-56 -translate-x-1/2 origin-top scale-[0.98] opacity-0 transition-all duration-150 ease-out group-hover:visible group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100">
         <div className="pt-3" aria-hidden />
-        <div className="rounded-xl border border-border/80 bg-background py-1 px-1.5 backdrop-blur-sm">
+        <div className="card-frame bg-background py-1 px-1.5 backdrop-blur-sm">
           {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="block rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+              className="block rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
             >
               <div className="font-medium">{item.label}</div>
               {item.description && (
@@ -142,7 +142,7 @@ export function SiteHeader() {
           />
           <Link
             href="/contact"
-            className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+            className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
           >
             Contact
           </Link>
@@ -161,7 +161,7 @@ export function SiteHeader() {
             <>
               <Link
                 href="/login"
-                className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
               >
                 Log in
               </Link>

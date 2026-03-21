@@ -7,6 +7,7 @@ import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { CONTENT_LIMITS } from '@/src/config/constants';
 import { sanitizeHtml } from '@/src/security/validation';
+import { grantDiscussionReply } from '@/src/modules/credits';
 
 export async function POST(
   request: Request,
@@ -59,6 +60,9 @@ export async function POST(
       where: { id: discussionId },
       data: { lastActivityAt: new Date() },
     });
+
+    // Grant 0.02 credits for replying
+    await grantDiscussionReply(userId, discussionId, reply.id);
 
     return NextResponse.json({
       id: reply.id,

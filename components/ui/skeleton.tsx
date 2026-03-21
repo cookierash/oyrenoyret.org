@@ -3,13 +3,22 @@
 import * as React from 'react';
 import { cn } from '@/src/lib/utils';
 
+interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
+  animate?: boolean;
+}
+
 function Skeleton({
   className,
+  animate = true,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: SkeletonProps) {
   return (
     <div
-      className={cn('animate-skeleton-shimmer rounded-md bg-muted', className)}
+      className={cn(
+        animate ? 'skeleton-sheen' : 'bg-muted/40',
+        'rounded-md',
+        className
+      )}
       {...props}
     />
   );

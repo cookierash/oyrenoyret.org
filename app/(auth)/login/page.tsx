@@ -4,21 +4,26 @@
  * Renders inside auth layout's right panel.
  */
 
-'use client';
-
 import Link from 'next/link';
 import { LoginForm } from '@/src/modules/auth/components/login-form';
+import { getCurrentSession } from '@/src/modules/auth/utils/session';
+import { redirect } from 'next/navigation';
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const userId = await getCurrentSession();
+  if (userId) {
+    redirect('/dashboard');
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-md space-y-6 animate-fade-up">
       <LoginForm />
-      <p className="text-center text-sm text-muted-foreground">
-        Don&apos;t have an account?{' '}
+      <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground text-center">
+        <span>Don&apos;t have an account?</span>{' '}
         <Link href="/register" className="text-primary hover:underline font-medium">
           Register here
         </Link>
-      </p>
+      </div>
     </div>
   );
 }

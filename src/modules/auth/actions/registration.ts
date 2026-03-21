@@ -9,6 +9,7 @@
 
 import { prisma } from '@/src/db/client';
 import { hashPassword } from '../utils/password';
+import { getOrCreatePublicId } from '@/src/lib/public-id';
 import {
   studentInfoSchema,
   parentInfoSchema,
@@ -45,10 +46,19 @@ export async function registerStudentInfo(data: StudentInfoInput) {
     });
 
     if (existingUser) {
-      return {
-        success: false,
-        error: 'An account with this email already exists',
-      };
+      if (existingUser.status === 'INACTIVE') {
+        await prisma.$transaction([
+          prisma.guardianVerification.deleteMany({ where: { userId: existingUser.id } }),
+          prisma.parentalConsent.deleteMany({ where: { userId: existingUser.id } }),
+          prisma.authSession.deleteMany({ where: { userId: existingUser.id } }),
+          prisma.user.delete({ where: { id: existingUser.id } }),
+        ]);
+      } else {
+        return {
+          success: false,
+          error: 'An account with this email already exists',
+        };
+      }
     }
 
     // Hash password
@@ -67,6 +77,7 @@ export async function registerStudentInfo(data: StudentInfoInput) {
         registrationStep: 2, // Move to step 2
       },
     });
+    await getOrCreatePublicId(user.id);
 
     return {
       success: true,

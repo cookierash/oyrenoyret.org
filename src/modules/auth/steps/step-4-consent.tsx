@@ -20,14 +20,19 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ShieldCheck } from 'lucide-react';
+import { cn } from '@/src/lib/utils';
 
 interface Step4Props {
   userId: string;
   onSuccess: () => void;
   onPrevious: () => void;
+  initialValues?: Partial<ConsentInput>;
+  onValuesChange?: (values: ConsentInput) => void;
 }
+const BUTTON_CLASS = 'h-10 text-sm font-semibold';
 
 const CONSENT_TEXT = `
 By checking the box below, I acknowledge that:
@@ -53,16 +58,32 @@ By checking the box below, I acknowledge that:
 This consent is required for students under 18 years of age to use the platform in accordance with applicable data protection regulations.
 `;
 
-export function Step4Consent({ userId, onSuccess, onPrevious }: Step4Props) {
+export function Step4Consent({
+  userId,
+  onSuccess,
+  onPrevious,
+  initialValues,
+  onValuesChange,
+}: Step4Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ConsentInput>({
     resolver: zodResolver(consentSchema),
     mode: 'onChange',
     defaultValues: {
-      consentGranted: false,
+      consentGranted: initialValues?.consentGranted ?? false,
     },
   });
+
+  const consentGranted = form.watch('consentGranted');
+
+  useEffect(() => {
+    if (!onValuesChange) return;
+    const subscription = form.watch((value) => {
+      onValuesChange(value as ConsentInput);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onValuesChange]);
 
   const onSubmit = async (data: ConsentInput) => {
     setIsSubmitting(true);
@@ -75,7 +96,7 @@ export function Step4Consent({ userId, onSuccess, onPrevious }: Step4Props) {
       } else {
         toast.error(result.error || 'Failed to grant consent');
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
@@ -84,20 +105,34 @@ export function Step4Consent({ userId, onSuccess, onPrevious }: Step4Props) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Parental Consent Required</h3>
-            <p className="text-sm text-muted-foreground mb-3">
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Consent required
+            </p>
+            <h3 className="text-lg font-semibold">Parental Consent Required</h3>
+            <p className="text-sm text-muted-foreground">
               As required by law, we need parental or legal guardian consent for students under 18 years of age.
             </p>
           </div>
 
-          <div className="rounded-md border border-border bg-card/80 p-4">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <pre className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
+          <div className="rounded-2xl border border-border/70 bg-card/70 p-4 sm:p-5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Consent summary</p>
+                <p className="text-xs text-muted-foreground">
+                  Please review the statements below before granting consent.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-border/60 bg-background/60 p-3 sm:p-4">
+              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                 {CONSENT_TEXT}
-              </pre>
+              </p>
             </div>
           </div>
 
@@ -105,20 +140,33 @@ export function Step4Consent({ userId, onSuccess, onPrevious }: Step4Props) {
             control={form.control}
             name="consentGranted"
             render={({ field }) => (
-              <FormItem className="flex flex-row items-start gap-3 rounded-md bg-muted/40 p-4">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none flex-1">
-                  <FormLabel className="cursor-pointer font-medium">
-                    I have read and agree to the terms above
-                  </FormLabel>
-                  <p className="text-xs text-muted-foreground">
-                    You must grant consent to complete registration
-                  </p>
+              <FormItem
+                className={cn(
+                  'rounded-xl border p-4 transition',
+                  consentGranted
+                    ? 'border-primary/40 bg-primary/5'
+                    : 'border-border bg-muted/30'
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      className="mt-1"
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none flex-1">
+                    <FormLabel className="cursor-pointer font-medium">
+                      I agree to the parental consent terms
+                    </FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Required to activate the student account
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Required
+                  </span>
                 </div>
                 <FormMessage />
               </FormItem>
@@ -127,10 +175,22 @@ export function Step4Consent({ userId, onSuccess, onPrevious }: Step4Props) {
         </div>
 
         <div className="flex gap-3">
-          <Button type="button" variant="outline" size="md" onClick={onPrevious} className="flex-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            onClick={onPrevious}
+            className={`flex-1 ${BUTTON_CLASS}`}
+          >
             Previous
           </Button>
-          <Button type="submit" variant="primary" size="md" className="flex-1" disabled={isSubmitting || !form.formState.isValid}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className={`flex-1 ${BUTTON_CLASS}`}
+            disabled={isSubmitting || !form.formState.isValid}
+          >
             {isSubmitting ? 'Completing...' : 'Complete Registration'}
           </Button>
         </div>

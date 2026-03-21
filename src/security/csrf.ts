@@ -29,8 +29,10 @@ export function generateCsrfToken(): string {
  * @param _sessionToken The session token to compare against
  * @returns True if token is valid. Currently always false - not implemented.
  */
-export function validateCsrfToken(_token: string, _sessionToken: string): boolean {
+export function validateCsrfToken(token: string, sessionToken: string): boolean {
   // TODO: Implement token validation logic
   // WARNING: Do not wire this to auth until implemented - it would block all requests
+  void token;
+  void sessionToken;
   return false;
 }

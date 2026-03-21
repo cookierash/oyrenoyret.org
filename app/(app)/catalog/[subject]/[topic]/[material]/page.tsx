@@ -58,7 +58,7 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
   if (!material) notFound();
 
   const userId = await getCurrentSession();
-  const [unlocked, balance] = await Promise.all([
+  const [unlocked, balance, unlockCount] = await Promise.all([
     userId
       ? prisma.materialAccess.findUnique({
         where: { userId_materialId: { userId, materialId } },
@@ -66,6 +66,7 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
       })
       : null,
     userId ? getBalance(userId) : 0,
+    prisma.materialAccess.count({ where: { materialId } }),
   ]);
 
   let questionCount = 0;
@@ -93,15 +94,13 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
         title={material.title}
         description={`${topic.name} · ${subject.name}`}
         actions={
-          <>
-            <Button size="sm" variant="secondary-primary" asChild>
-              <Link href={`/catalog/${subjectId}/${topicId}`}>Back to {topic.name}</Link>
-            </Button>
-          </>
+          <Button size="sm" variant="secondary-primary" asChild>
+            <Link href="/library">Back to library</Link>
+          </Button>
         }
       />
 
-      <main>
+      <main className="space-y-4 pt-2">
         <MaterialDetailView
           id={material.id}
           title={material.title}
@@ -115,6 +114,7 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
           difficulty={material.difficulty}
           estimatedCost={estimatedCost}
           balance={balance}
+          unlockCount={unlockCount}
         />
       </main>
     </DashboardShell>

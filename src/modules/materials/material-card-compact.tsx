@@ -36,7 +36,7 @@ interface MaterialCardCompactProps {
 export function MaterialCardCompact({
   id,
   title,
-  materialType: _materialType,
+  materialType,
   authorName,
   isUnlocked,
   isOwn = false,
@@ -55,6 +55,12 @@ export function MaterialCardCompact({
   const [unlocking, setUnlocking] = useState(false);
   const [unlocked, setUnlocked] = useState(isUnlocked);
   const detailHref = `/catalog/${subjectId}/${topicId}/${id}`;
+  const previewHref = `/preview/${id}`;
+  const canViewFull = unlocked && !isOwn;
+  const typeBadge =
+    materialType === 'PRACTICE_TEST'
+      ? 'text-purple-600 bg-purple-50 dark:bg-purple-500/10 dark:text-purple-400'
+      : 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400';
 
   const handleUnlock = async () => {
     if (unlocked || unlocking || isUnlockDisabled) return;
@@ -94,12 +100,19 @@ export function MaterialCardCompact({
             {!unlocked && !isOwn && <Lock className="h-3.5 w-3.5 text-muted-foreground inline mr-1.5 align-text-bottom shrink-0" />}
             {title}
           </h3>
-          {isOwn && (
-            <span className="shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-primary/15 text-primary" title="You published this">
-              <User className="h-3 w-3" />
-              Yours
+          <div className="shrink-0 flex items-center gap-1">
+            <span
+              className={`inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full ${typeBadge}`}
+            >
+              {materialType === 'PRACTICE_TEST' ? 'Test' : 'Textual'}
             </span>
-          )}
+            {isOwn && (
+              <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-primary/15 text-primary" title="You published this">
+                <User className="h-3 w-3" />
+                Yours
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -129,8 +142,8 @@ export function MaterialCardCompact({
             </Button>
           )}
           <Button variant="secondary-primary" size="sm" className="h-7 text-xs" asChild>
-            <Link href={detailHref}>
-              View more
+            <Link href={canViewFull ? detailHref : previewHref}>
+              {canViewFull ? 'View in library' : 'Preview'}
               <ExternalLink className="h-3 w-3" />
             </Link>
           </Button>

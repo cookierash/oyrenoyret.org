@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { MessageSquare, ArrowBigUp, ArrowBigDown, MoreHorizontal } from 'lucide-react';
+import { MessageSquare, ArrowBigUp, ArrowBigDown } from 'lucide-react';
 import { PostAvatar } from './post-avatar';
 import { formatRelativeTime } from './relative-time';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/src/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -12,11 +11,12 @@ import { toast } from 'sonner';
 interface DiscussionFeedItemProps {
     id: string;
     title: string;
-    content: string;
+    contentPreview: string;
     authorId?: string;
     authorName: string;
     replyCount: number;
     voteScore: number;
+    userVote?: 1 | -1 | null;
     createdAt: string;
     className?: string;
 }
@@ -24,38 +24,38 @@ interface DiscussionFeedItemProps {
 export function DiscussionFeedItem({
     id,
     title,
-    content,
+    contentPreview,
     authorId,
     authorName,
     replyCount,
-    voteScore,
+    voteScore: initialScore,
+    userVote: initialUserVote = null,
     createdAt,
     className,
 }: DiscussionFeedItemProps) {
-    const [localUpvotes, setLocalUpvotes] = useState(0); // Temporary until API returns separate
-    const [localDownvotes, setLocalDownvotes] = useState(0); // Temporary until API returns separate
+    const [score, setScore] = useState(initialScore);
+    const [userVote, setUserVote] = useState<1 | -1 | null>(initialUserVote);
     const [voteLoading, setVoteLoading] = useState(false);
 
-    // Initial sync - we need to update the interface to pass these down
-    // For now, I'll update the component to accept separate counts
-    // In the meantime, I'll use the combined score logic if separate ones aren't provided
-
-    const handleVote = async (value: number) => {
+    const handleVote = async (e: React.MouseEvent, value: 1 | -1) => {
+        e.preventDefault();
         if (voteLoading) return;
+        const newVote = userVote === value ? null : value;
+        const delta = (newVote ?? 0) - (userVote ?? 0);
+        setScore((s) => s + delta);
+        setUserVote(newVote);
         setVoteLoading(true);
         try {
             const res = await fetch(`/api/discussions/${id}/vote`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value }),
+                body: JSON.stringify({ value: newVote ?? 0 }),
             });
-            if (!res.ok) throw new Error('Failed to vote');
-            const data = await res.json();
-            // Upvote logic: if value is 1, data.voteScore likely changes
-            // For now, I'll use the API's return structure once I update it
-            // Assuming I update the vote API to return separate counts too
-            toast.success('Vote recorded');
+            if (!res.ok) throw new Error();
         } catch {
+            // revert
+            setScore((s) => s - delta);
+            setUserVote(userVote);
             toast.error('Failed to vote');
         } finally {
             setVoteLoading(false);
@@ -64,78 +64,77 @@ export function DiscussionFeedItem({
 
     return (
         <div className={cn(
-            "group flex gap-3 p-3 transition-colors hover:bg-muted/30 border-b border-border last:border-0",
+            'group flex gap-3 px-4 py-3 transition-colors hover:bg-muted/30 border-b border-border last:border-0',
             className
         )}>
-            <Link href={`/users/${authorId || 'anonymous'}`} className="shrink-0">
-                <PostAvatar userId={authorId} authorName={authorName} size="md" />
-            </Link>
+            <PostAvatar userId={authorId} authorName={authorName} size="sm" />
 
-            <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                {/* Header */}
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-sm truncate">
-                        <Link href={`/users/${authorId || 'anonymous'}`} className="font-bold hover:underline truncate">
-                            {authorName}
-                        </Link>
-                        <span className="text-muted-foreground opacity-50">·</span>
-                        <span className="text-muted-foreground whitespace-nowrap text-xs">
-                            {formatRelativeTime(createdAt)}
-                        </span>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+            <div className="flex-1 min-w-0">
+                {/* Author + time */}
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground text-sm">{authorName}</span>
+                    <span className="opacity-40">·</span>
+                    <span>{formatRelativeTime(createdAt)}</span>
                 </div>
 
-                {/* Content */}
-                <Link href={`/discussions/${id}`} className="block group/link -mt-0.5">
-                    <h3 className="font-bold text-[15px] leading-snug mb-0.5 group-hover/link:underline text-foreground">
+                {/* Title + preview */}
+                <Link href={`/discussions/${id}`} className="block mt-0.5 group/link">
+                    <h3 className="font-semibold text-[14px] leading-snug text-foreground group-hover/link:text-primary transition-colors">
                         {title}
                     </h3>
-                    <p className="text-[14px] text-foreground/80 line-clamp-2 leading-normal">
-                        {content}
+                    <p className="text-[13px] text-muted-foreground line-clamp-1 mt-0.5">
+                        {contentPreview}
                     </p>
                 </Link>
 
-                {/* Footer Actions */}
-                <div className="flex items-center justify-between max-w-[280px] mt-1.5 -ml-2">
-                    <div className="flex items-center gap-1">
-                        {/* Upvote Group */}
-                        <div
-                            className="flex items-center gap-0.5 px-2 py-1 rounded-full hover:bg-orange-500/10 hover:text-orange-500 transition-colors cursor-pointer group/up"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleVote(1);
-                            }}
+                {/* Actions */}
+                <div className="flex items-center gap-1 mt-2 -ml-1">
+                    <div className="flex items-center bg-muted/50 rounded-md border border-border/50 overflow-hidden">
+                        {/* Upvote */}
+                        <button
+                            onClick={(e) => handleVote(e, 1)}
+                            disabled={voteLoading}
+                            className={cn(
+                                'flex items-center justify-center p-1.5 transition-colors',
+                                userVote === 1
+                                    ? 'text-orange-500 bg-orange-500/10'
+                                    : 'text-muted-foreground hover:text-orange-500'
+                            )}
                         >
-                            <ArrowBigUp className="h-5 w-5 text-muted-foreground group-hover/up:text-orange-500 transition-colors" />
-                            <span className="text-[13px] font-bold text-muted-foreground group-hover/up:text-orange-500 transition-colors">
-                                {voteScore > 0 ? voteScore : 0}
-                            </span>
-                        </div>
+                            <ArrowBigUp className={cn("h-4 w-4", userVote === 1 && "fill-current")} />
+                        </button>
 
-                        {/* Downvote Group */}
-                        <div
-                            className="flex items-center gap-0.5 px-2 py-1 rounded-full hover:bg-blue-500/10 hover:text-blue-500 transition-colors cursor-pointer group/down"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleVote(-1);
-                            }}
+                        {/* Score */}
+                        <span className={cn(
+                            "px-1 text-[13px] font-bold min-w-[1.5rem] text-center",
+                            score > 0 ? "text-orange-500" : score < 0 ? "text-blue-500" : "text-muted-foreground"
+                        )}>
+                            {score}
+                        </span>
+
+                        {/* Downvote */}
+                        <button
+                            onClick={(e) => handleVote(e, -1)}
+                            disabled={voteLoading}
+                            className={cn(
+                                'flex items-center justify-center p-1.5 transition-colors',
+                                userVote === -1
+                                    ? 'text-blue-500 bg-blue-500/10'
+                                    : 'text-muted-foreground hover:text-blue-500'
+                            )}
                         >
-                            <ArrowBigDown className="h-5 w-5 text-muted-foreground group-hover/down:text-blue-500 transition-colors" />
-                            <span className="text-[13px] font-bold text-muted-foreground group-hover/down:text-blue-500 transition-colors">
-                                {voteScore < 0 ? Math.abs(voteScore) : 0}
-                            </span>
-                        </div>
+                            <ArrowBigDown className={cn("h-4 w-4", userVote === -1 && "fill-current")} />
+                        </button>
                     </div>
 
-                    <Button variant="ghost" size="sm" asChild className="h-8 px-3 gap-2 text-muted-foreground hover:text-blue-500 hover:bg-blue-500/10 cursor-pointer rounded-full">
-                        <Link href={`/discussions/${id}`}>
-                            <MessageSquare className="h-4 w-4" />
-                            <span className="text-[13px] font-medium">{replyCount}</span>
-                        </Link>
-                    </Button>
+                    {/* Reply count */}
+                    <Link
+                        href={`/discussions/${id}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:bg-muted transition-colors ml-2"
+                    >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        <span>{replyCount}</span>
+                    </Link>
                 </div>
             </div>
         </div>

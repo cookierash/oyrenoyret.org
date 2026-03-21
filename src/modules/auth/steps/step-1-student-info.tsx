@@ -21,30 +21,43 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { cn } from '@/src/lib/utils';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { PasswordInput } from '@/src/modules/auth/components/password-input';
 
 interface Step1Props {
   onSuccess: (userId: string, firstName: string) => void;
+  initialValues?: Partial<StudentInfoInput>;
+  onValuesChange?: (values: StudentInfoInput) => void;
 }
 
 const GRADES = ['5', '6', '7', '8', '9', '10', '11'] as const;
+const FIELD_LABEL_CLASS = 'text-xs font-medium text-muted-foreground';
+const INPUT_CLASS = 'h-10 rounded-lg bg-background/70';
 
-export function Step1StudentInfo({ onSuccess }: Step1Props) {
+export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: Step1Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<StudentInfoInput>({
     resolver: zodResolver(studentInfoSchema),
     mode: 'onChange',
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      grade: undefined,
+      firstName: initialValues?.firstName ?? '',
+      lastName: initialValues?.lastName ?? '',
+      email: initialValues?.email ?? '',
+      password: initialValues?.password ?? '',
+      confirmPassword: initialValues?.confirmPassword ?? '',
+      grade: initialValues?.grade ?? undefined,
     },
   });
+
+  useEffect(() => {
+    if (!onValuesChange) return;
+    const subscription = form.watch((value) => {
+      onValuesChange(value as StudentInfoInput);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onValuesChange]);
 
   const onSubmit = async (data: StudentInfoInput) => {
     setIsSubmitting(true);
@@ -57,7 +70,7 @@ export function Step1StudentInfo({ onSuccess }: Step1Props) {
       } else {
         toast.error(result.error || 'Failed to save student information');
       }
-    } catch (error) {
+    } catch {
       toast.error('An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
@@ -67,16 +80,16 @@ export function Step1StudentInfo({ onSuccess }: Step1Props) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <div className="space-y-4">
+        <div className="space-y-2">
           <div className="grid grid-cols-2 gap-4">
             <FormField
               control={form.control}
               name="firstName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>First Name</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>First Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="John" {...field} />
+                    <Input placeholder="John" className={INPUT_CLASS} {...field} />
                   </FormControl>
                 </FormItem>
               )}
@@ -87,9 +100,9 @@ export function Step1StudentInfo({ onSuccess }: Step1Props) {
               name="lastName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Last Name</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>Last Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="Doe" {...field} />
+                    <Input placeholder="Doe" className={INPUT_CLASS} {...field} />
                   </FormControl>
                 </FormItem>
               )}
@@ -101,31 +114,31 @@ export function Step1StudentInfo({ onSuccess }: Step1Props) {
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email Address</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="john.doe@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              <FormLabel className={FIELD_LABEL_CLASS}>Email Address</FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="john.doe@example.com" className={INPUT_CLASS} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
           <FormField
             control={form.control}
             name="grade"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Grade</FormLabel>
-                <FormControl>
-                  <div className="space-y-2">
-                    <input
+              <FormLabel className={FIELD_LABEL_CLASS}>Grade</FormLabel>
+              <FormControl>
+                <div className="space-y-2">
+                  <input
                       type="hidden"
                       {...field}
                       value={field.value ?? ''}
                       ref={field.ref}
                     />
                     <div
-                      className="flex w-full rounded-md border border-input overflow-hidden"
+                      className="flex w-full rounded-lg border border-input overflow-hidden bg-background/70"
                       role="group"
                       aria-label="Select grade"
                     >
@@ -163,34 +176,40 @@ export function Step1StudentInfo({ onSuccess }: Step1Props) {
             name="password"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Must be at least 8 characters with uppercase, lowercase, number, and special character
-                </p>
-              </FormItem>
-            )}
-          />
+              <FormLabel className={FIELD_LABEL_CLASS}>Password</FormLabel>
+              <FormControl>
+                <PasswordInput placeholder="••••••••" className={INPUT_CLASS} {...field} />
+              </FormControl>
+              <FormMessage />
+              <p className="text-xs text-muted-foreground mt-1">
+                Must be at least 8 characters with uppercase, lowercase, number, and special character
+              </p>
+            </FormItem>
+          )}
+        />
 
           <FormField
             control={form.control}
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Confirm Password</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              <FormLabel className={FIELD_LABEL_CLASS}>Confirm Password</FormLabel>
+              <FormControl>
+                <PasswordInput placeholder="••••••••" className={INPUT_CLASS} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         </div>
 
-        <Button type="submit" variant="primary" size="md" className="w-full" disabled={isSubmitting || !form.formState.isValid}>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          className="h-10 w-full text-sm font-semibold"
+          disabled={isSubmitting || !form.formState.isValid}
+        >
           {isSubmitting ? 'Saving...' : 'Next: Parent Information'}
         </Button>
       </form>

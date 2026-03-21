@@ -5,6 +5,7 @@ import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { CatalogMaterialsGrid } from './catalog-materials-grid';
+import { TopicMaterialsListSkeleton } from './topic-materials-skeleton';
 
 export type TopicMaterialWithCost = {
   id: string;
@@ -40,6 +41,7 @@ interface TopicMaterialsSectionProps {
   userId: string | null;
   unlockedIds: string[];
   balance: number;
+  loading?: boolean;
 }
 
 export function TopicMaterialsSection({
@@ -49,6 +51,7 @@ export function TopicMaterialsSection({
   userId,
   unlockedIds,
   balance,
+  loading = false,
 }: TopicMaterialsSectionProps) {
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('newest');
@@ -95,14 +98,14 @@ export function TopicMaterialsSection({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 sm:max-w-xs">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
             placeholder="Search materials..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="w-full pl-9"
             aria-label="Search materials by title or author"
           />
         </div>
@@ -128,10 +131,21 @@ export function TopicMaterialsSection({
         </div>
       </div>
 
-      {filteredAndSorted.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4">
-          {search.trim() ? 'No materials match your search.' : 'No materials to show.'}
-        </p>
+      {loading ? (
+        <TopicMaterialsListSkeleton />
+      ) : filteredAndSorted.length === 0 ? (
+        <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            {search.trim()
+              ? 'No materials match your search.'
+              : 'No materials shared yet for this topic.'}
+          </p>
+          {!search.trim() ? (
+            <p className="mt-2 text-xs text-muted-foreground/70">
+              Be the first to create one in the studio.
+            </p>
+          ) : null}
+        </div>
       ) : (
         <CatalogMaterialsGrid
           materials={filteredAndSorted}

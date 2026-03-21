@@ -29,6 +29,15 @@ export function isAdmin(userRole: UserRole): boolean {
 }
 
 /**
+ * Checks if a user is staff (admin or teacher)
+ * @param userRole The user's role
+ * @returns True if user is staff
+ */
+export function isStaff(userRole: UserRole): boolean {
+  return userRole === USER_ROLES.ADMIN || userRole === USER_ROLES.TEACHER;
+}
+
+/**
  * Checks if a user is a student
  * @param userRole The user's role
  * @returns True if user is a student

@@ -30,12 +30,14 @@ export function Logo({ className, size = 'sm', showText = false, textSize = 'sm'
           textSize === 'lg' && 'text-lg',
           className
         )}
-        aria-label="Oyrenoyret home"
+        aria-label="oyrenoyret home"
       >
-        <img
+        <Image
           src="/oyrenoyretlogo.svg"
-          alt="Oyrenoyret"
-          className="h-[1.5em] w-[1.5em] shrink-0"
+          alt="oyrenoyret"
+          width={w}
+          height={h}
+          className="h-[1.5em] w-[1.5em] shrink-0 dark:invert"
         />
         <span className="font-semibold font-comfortaa">oyrenoyret</span>
       </Link>
@@ -46,14 +48,14 @@ export function Logo({ className, size = 'sm', showText = false, textSize = 'sm'
     <Link
       href="/"
       className={cn('flex items-center gap-2', className)}
-      aria-label="Oyrenoyret home"
+      aria-label="oyrenoyret home"
     >
       <Image
         src="/oyrenoyretlogo.svg"
-        alt="Oyrenoyret"
+        alt="oyrenoyret"
         width={w}
         height={h}
-        className="shrink-0"
+        className="shrink-0 dark:invert"
       />
     </Link>
   );

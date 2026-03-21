@@ -23,9 +23,20 @@ export async function POST(
     const body = await request.json();
     const value = body.value === -1 ? -1 : 1;
 
-    const reply = await prisma.discussionReply.findFirst({
+    const reply = await prisma.discussionReply.findUnique({
       where: { id: replyId },
-      include: { discussion: true },
+      select: {
+        id: true,
+        userId: true,
+        discussionId: true,
+        discussion: {
+          select: {
+            id: true,
+            archivedAt: true,
+            userId: true,
+          },
+        },
+      },
     });
 
     if (!reply || reply.discussion.archivedAt) {
@@ -45,10 +56,11 @@ export async function POST(
       data: { lastActivityAt: new Date() },
     });
 
-    const votes = await prisma.replyVote.findMany({
+    const scoreResult = await prisma.replyVote.aggregate({
       where: { replyId },
+      _sum: { value: true },
     });
-    const score = votes.reduce((s, v) => s + v.value, 0);
+    const score = scoreResult._sum.value ?? 0;
 
     // Grant help credits to reply author when upvoted (once per reply)
     if (reply.userId !== reply.discussion.userId && score >= 1) {

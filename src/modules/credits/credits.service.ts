@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/src/db/client';
+import { recordUserActivity } from '@/src/modules/activity-stats';
 import type { CreditTransactionType } from '@prisma/client';
 import type { CreditResult, MaterialCreditParams } from './credits.types';
 import {
@@ -98,6 +99,11 @@ export function calcMaterialUnlockCost(params: MaterialCreditParams): number {
 /** Calculate discussion create cost */
 export function calcDiscussionCreateCost(): number {
   return CREDITS_DISCUSSION.BASE_CREATE;
+}
+
+/** Calculate discussion reply reward */
+export function calcDiscussionReplyCredit(): number {
+  return CREDITS_DISCUSSION.BASE_REPLY;
 }
 
 /** Calculate discussion help reward (accepted or upvoted) */
@@ -261,6 +267,13 @@ export async function spendMaterialUnlock(
       });
       return { balanceAfter: afterUser.credits };
     });
+    if (publisherUserId !== userId) {
+      try {
+        await recordUserActivity(publisherUserId, { materialsPurchasedFromUser: 1 });
+      } catch (error) {
+        console.error('[Material unlock] Activity tracking failed:', error);
+      }
+    }
     return { success: true, amount: -cost, balanceAfter: roundCredits(result.balanceAfter) };
   } catch (e) {
     return {
@@ -287,6 +300,59 @@ export async function spendDiscussionCreate(
       discussionId !== 'pending' ? { discussionId } : undefined
     );
     return { success: true, amount: -cost, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(userId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+/** Deduct credits for sprint entry */
+export async function spendSprintEntry(
+  userId: string,
+  cost: number,
+  liveEventId?: string
+): Promise<CreditResult> {
+  const amount = roundCredits(cost);
+
+  try {
+    const { balanceAfter, transactionId } = await executeTransaction(
+      userId,
+      -amount,
+      'SPRINT_ENTRY',
+      liveEventId ? { liveEventId, cost: amount } : undefined,
+      liveEventId
+    );
+    return { success: true, amount: -amount, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(userId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+/** Grant credits for replying to a discussion */
+export async function grantDiscussionReply(
+  userId: string,
+  discussionId: string,
+  replyId: string
+): Promise<CreditResult> {
+  const amount = roundCredits(calcDiscussionReplyCredit());
+  try {
+    const { balanceAfter, transactionId } = await executeTransaction(
+      userId,
+      amount,
+      'DISCUSSION_HELP', // Reusing DISCUSSION_HELP or could add DISCUSSION_REPLY, but we'll stick to DISCUSSION_HELP semantic or use a generic one if type mismatch. Actually, looking at types, maybe we should just use DISCUSSION_HELP with different validations. Let's use DISCUSSION_HELP.
+      { discussionId, replyId, type: 'reply_post' },
+      replyId
+    );
+    return { success: true, amount, balanceAfter, transactionId };
   } catch (e) {
     return {
       success: false,
@@ -324,6 +390,11 @@ export async function grantDiscussionHelp(
       { discussionId, replyId, validation },
       replyId
     );
+    try {
+      await recordUserActivity(helperUserId, { discussionHelps: 1 });
+    } catch (error) {
+      console.error('[Discussion help] Activity tracking failed:', error);
+    }
     return { success: true, amount, balanceAfter, transactionId };
   } catch (e) {
     return {

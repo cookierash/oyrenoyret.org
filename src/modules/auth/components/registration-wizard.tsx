@@ -7,21 +7,85 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Step1StudentInfo } from '../steps/step-1-student-info';
 import { Step2ParentInfo } from '../steps/step-2-parent-info';
 import { Step3Verification } from '../steps/step-3-verification';
 import { Step4Consent } from '../steps/step-4-consent';
 import { Step5Complete } from '../steps/step-5-complete';
 import { cn } from '@/src/lib/utils';
+import type { ConsentInput, ParentInfoInput, StudentInfoInput } from '../schemas/registration';
 
 const TOTAL_STEPS = 5;
+const REGISTRATION_STORAGE_KEY = 'oyrenoyret_registration_progress_v1';
 
-export function RegistrationWizard() {
+export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: number) => void }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [userId, setUserId] = useState<string | null>(null);
   const [parentEmail, setParentEmail] = useState<string | null>(null);
   const [studentName, setStudentName] = useState<string | null>(null);
+  const [step1Values, setStep1Values] = useState<Partial<StudentInfoInput>>({});
+  const [step2Values, setStep2Values] = useState<Partial<ParentInfoInput>>({});
+  const [step4Values, setStep4Values] = useState<Partial<ConsentInput>>({});
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem(REGISTRATION_STORAGE_KEY);
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored) as {
+        currentStep?: number;
+        userId?: string | null;
+        parentEmail?: string | null;
+        studentName?: string | null;
+      };
+
+      if (!parsed.currentStep || parsed.currentStep < 1) return;
+
+      let nextStep = Math.min(parsed.currentStep, TOTAL_STEPS);
+      const nextUserId = parsed.userId ?? null;
+      const nextParentEmail = parsed.parentEmail ?? null;
+      const nextStudentName = parsed.studentName ?? null;
+
+      if (!nextUserId && nextStep > 1) {
+        nextStep = 1;
+      }
+      if (!nextParentEmail && nextStep > 2) {
+        nextStep = 2;
+      }
+
+      setCurrentStep(nextStep);
+      setUserId(nextUserId);
+      setParentEmail(nextParentEmail);
+      setStudentName(nextStudentName);
+    } catch {
+      localStorage.removeItem(REGISTRATION_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (currentStep >= TOTAL_STEPS) {
+      localStorage.removeItem(REGISTRATION_STORAGE_KEY);
+      return;
+    }
+
+    localStorage.setItem(
+      REGISTRATION_STORAGE_KEY,
+      JSON.stringify({
+        currentStep,
+        userId,
+        parentEmail,
+        studentName,
+        savedAt: Date.now(),
+      })
+    );
+  }, [currentStep, userId, parentEmail, studentName]);
+
+  useEffect(() => {
+    onStepChange?.(currentStep);
+  }, [currentStep, onStepChange]);
 
 
   const handleStep1Success = (newUserId: string, firstName: string) => {
@@ -84,66 +148,79 @@ export function RegistrationWizard() {
   };
 
   return (
-    <div className="w-full rounded-lg border border-border bg-card text-card-foreground px-4 py-6 sm:px-6 sm:py-8 space-y-6">
-        <header className="space-y-2">
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
-              {getStepTitle()}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {getStepDescription()}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: TOTAL_STEPS }, (_, i) => {
-              const step = i + 1;
-              const isCompleted = step < currentStep;
-              const isCurrent = step === currentStep;
-              return (
-                <div
-                  key={step}
-                  className={cn(
-                    'h-2.5 flex-1 rounded-full transition-all duration-500 ease-out',
-                    isCompleted && 'bg-primary',
-                    isCurrent && 'bg-primary',
-                    !isCompleted && !isCurrent && 'bg-muted',
-                  )}
-                />
-              );
-            })}
-          </div>
-        </header>
+    <div className="w-full space-y-5">
+      <header
+        className={cn(
+          'space-y-2',
+          currentStep === 4 && 'lg:pt-10'
+        )}
+      >
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+            {getStepTitle()}
+          </h1>
+          <p className="text-sm text-muted-foreground max-w-lg">
+            {getStepDescription()}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {Array.from({ length: TOTAL_STEPS }, (_, i) => {
+            const step = i + 1;
+            const isCompleted = step < currentStep;
+            const isCurrent = step === currentStep;
+            return (
+              <div
+                key={step}
+                className={cn(
+                  'h-1.5 flex-1 rounded-full transition-all duration-500 ease-out',
+                  isCompleted && 'bg-primary',
+                  isCurrent && 'bg-primary',
+                  !isCompleted && !isCurrent && 'bg-muted',
+                )}
+              />
+            );
+          })}
+        </div>
+      </header>
 
-        <section>
-          {currentStep === 1 && (
-            <Step1StudentInfo onSuccess={handleStep1Success} />
-          )}
-          {currentStep === 2 && userId && (
-            <Step2ParentInfo
-              userId={userId}
-              onSuccess={handleStep2Success}
-              onPrevious={handlePrevious}
-            />
-          )}
-          {currentStep === 3 && userId && parentEmail && (
-            <Step3Verification
-              userId={userId}
-              parentEmail={parentEmail}
-              onSuccess={handleStep3Success}
-              onPrevious={handlePrevious}
-            />
-          )}
-          {currentStep === 4 && userId && (
-            <Step4Consent
-              userId={userId}
-              onSuccess={handleStep4Success}
-              onPrevious={handlePrevious}
-            />
-          )}
-          {currentStep === 5 && (
-            <Step5Complete studentName={studentName || undefined} />
-          )}
-        </section>
+      <section className="space-y-4">
+        {currentStep === 1 && (
+          <Step1StudentInfo
+            onSuccess={handleStep1Success}
+            initialValues={step1Values}
+            onValuesChange={setStep1Values}
+          />
+        )}
+        {currentStep === 2 && userId && (
+          <Step2ParentInfo
+            userId={userId}
+            onSuccess={handleStep2Success}
+            onPrevious={handlePrevious}
+            initialValues={step2Values}
+            onValuesChange={setStep2Values}
+          />
+        )}
+        {currentStep === 3 && userId && parentEmail && (
+          <Step3Verification
+            userId={userId}
+            parentEmail={parentEmail}
+            onSuccess={handleStep3Success}
+            onPrevious={handlePrevious}
+          />
+        )}
+        {currentStep === 4 && userId && (
+          <Step4Consent
+            userId={userId}
+            onSuccess={handleStep4Success}
+            onPrevious={handlePrevious}
+            initialValues={step4Values}
+            onValuesChange={setStep4Values}
+          />
+        )}
+        {currentStep === 5 && (
+          <Step5Complete studentName={studentName || undefined} />
+        )}
+      </section>
     </div>
   );
 }

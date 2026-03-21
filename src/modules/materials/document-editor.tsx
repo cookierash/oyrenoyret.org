@@ -6,6 +6,8 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { TextStyle, Color } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
+import SubscriptExtension from '@tiptap/extension-subscript';
+import SuperscriptExtension from '@tiptap/extension-superscript';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +15,12 @@ import {
   Italic,
   Underline as UnderlineIcon,
   Strikethrough,
+  Subscript as SubscriptIcon,
+  Superscript as SuperscriptIcon,
+  Code,
+  Code2,
+  Quote,
+  Minus,
   List,
   ListOrdered,
   Heading1,
@@ -81,6 +89,8 @@ export function DocumentEditor({
       Color,
       Underline,
       Highlight.configure({ multicolor: true }),
+      SubscriptExtension,
+      SuperscriptExtension,
     ],
     content: content || '<p></p>',
     editable,
@@ -110,12 +120,21 @@ export function DocumentEditor({
   const setItalic = useCallback(() => editor?.chain().focus().toggleItalic().run(), [editor]);
   const setUnderline = useCallback(() => editor?.chain().focus().toggleUnderline().run(), [editor]);
   const setStrike = useCallback(() => editor?.chain().focus().toggleStrike().run(), [editor]);
+  const setSubscript = useCallback(() => editor?.chain().focus().toggleSubscript().run(), [editor]);
+  const setSuperscript = useCallback(() => editor?.chain().focus().toggleSuperscript().run(), [editor]);
+  const setInlineCode = useCallback(() => editor?.chain().focus().toggleCode().run(), [editor]);
+  const setCodeBlock = useCallback(() => editor?.chain().focus().toggleCodeBlock().run(), [editor]);
+  const setBlockquote = useCallback(() => editor?.chain().focus().toggleBlockquote().run(), [editor]);
+  const insertHorizontalRule = useCallback(() => editor?.chain().focus().setHorizontalRule().run(), [editor]);
   const setBulletList = useCallback(() => editor?.chain().focus().toggleBulletList().run(), [editor]);
   const setOrderedList = useCallback(() => editor?.chain().focus().toggleOrderedList().run(), [editor]);
   const setH1 = useCallback(() => editor?.chain().focus().toggleHeading({ level: 1 }).run(), [editor]);
   const setH2 = useCallback(() => editor?.chain().focus().toggleHeading({ level: 2 }).run(), [editor]);
   const setH3 = useCallback(() => editor?.chain().focus().toggleHeading({ level: 3 }).run(), [editor]);
   const setParagraph = useCallback(() => editor?.chain().focus().setParagraph().run(), [editor]);
+  const clearFormatting = useCallback(() => {
+    editor?.chain().focus().clearNodes().unsetAllMarks().run();
+  }, [editor]);
   const setColor = useCallback((color: string) => {
     if (color) editor?.chain().focus().setColor(color).run();
     else editor?.chain().focus().unsetColor().run();
@@ -134,7 +153,10 @@ export function DocumentEditor({
   return (
     <div className={className}>
       {editable && (
-        <div className="flex flex-wrap items-center gap-1 border-b border-border pb-2 mb-4">
+        <div
+          className="flex flex-wrap items-center gap-1 border-b border-border pb-2 mb-4"
+          onMouseDown={(e) => e.preventDefault()}
+        >
           <Button
             type="button"
             variant="ghost"
@@ -142,6 +164,8 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={undo}
             disabled={!editor.can().undo()}
+            aria-label="Undo"
+            title="Undo"
           >
             <Undo className="h-4 w-4" />
           </Button>
@@ -152,6 +176,8 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={redo}
             disabled={!editor.can().redo()}
+            aria-label="Redo"
+            title="Redo"
           >
             <Redo className="h-4 w-4" />
           </Button>
@@ -163,6 +189,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setBold}
             data-active={editor.isActive('bold')}
+            aria-label="Bold"
+            aria-pressed={editor.isActive('bold')}
+            title="Bold"
           >
             <Bold className="h-4 w-4" />
           </Button>
@@ -173,6 +202,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setItalic}
             data-active={editor.isActive('italic')}
+            aria-label="Italic"
+            aria-pressed={editor.isActive('italic')}
+            title="Italic"
           >
             <Italic className="h-4 w-4" />
           </Button>
@@ -183,6 +215,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setUnderline}
             data-active={editor.isActive('underline')}
+            aria-label="Underline"
+            aria-pressed={editor.isActive('underline')}
+            title="Underline"
           >
             <UnderlineIcon className="h-4 w-4" />
           </Button>
@@ -193,8 +228,61 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setStrike}
             data-active={editor.isActive('strike')}
+            aria-label="Strikethrough"
+            aria-pressed={editor.isActive('strike')}
+            title="Strikethrough"
           >
             <Strikethrough className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={setSubscript}
+            data-active={editor.isActive('subscript')}
+            aria-label="Subscript"
+            aria-pressed={editor.isActive('subscript')}
+            title="Subscript"
+          >
+            <SubscriptIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={setSuperscript}
+            data-active={editor.isActive('superscript')}
+            aria-label="Superscript"
+            aria-pressed={editor.isActive('superscript')}
+            title="Superscript"
+          >
+            <SuperscriptIcon className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={setInlineCode}
+            data-active={editor.isActive('code')}
+            aria-label="Inline code"
+            aria-pressed={editor.isActive('code')}
+            title="Inline code"
+          >
+            <Code className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={clearFormatting}
+            aria-label="Clear formatting"
+            title="Clear formatting"
+          >
+            <Eraser className="h-4 w-4" />
           </Button>
           <span className="w-px h-5 bg-border mx-1" />
           <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -204,6 +292,9 @@ export function DocumentEditor({
               size="icon"
               className="h-8 w-10 flex flex-col gap-0.5"
               onClick={(e) => { e.stopPropagation(); setShowColors((s) => (s === 'text' ? null : 'text')); }}
+              aria-label="Text color"
+              aria-haspopup="menu"
+              aria-expanded={showColors === 'text'}
               title="Text color"
             >
               <Palette className="h-4 w-4" />
@@ -237,6 +328,10 @@ export function DocumentEditor({
               onClick={(e) => { e.stopPropagation(); setShowColors((s) => (s === 'highlight' ? null : 'highlight')); }}
               title="Highlight"
               data-active={editor.isActive('highlight')}
+              aria-label="Highlight"
+              aria-pressed={editor.isActive('highlight')}
+              aria-haspopup="menu"
+              aria-expanded={showColors === 'highlight'}
             >
               <Highlighter className="h-4 w-4" />
               <div className="h-0.5 w-3 rounded-full" style={{ backgroundColor: editor.getAttributes('highlight').color || 'transparent', border: !editor.getAttributes('highlight').color ? '1px solid currentColor' : 'none' }} />
@@ -268,6 +363,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setH1}
             data-active={editor.isActive('heading', { level: 1 })}
+            aria-label="Heading 1"
+            aria-pressed={editor.isActive('heading', { level: 1 })}
+            title="Heading 1"
           >
             <Heading1 className="h-4 w-4" />
           </Button>
@@ -278,6 +376,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setH2}
             data-active={editor.isActive('heading', { level: 2 })}
+            aria-label="Heading 2"
+            aria-pressed={editor.isActive('heading', { level: 2 })}
+            title="Heading 2"
           >
             <Heading2 className="h-4 w-4" />
           </Button>
@@ -288,6 +389,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setH3}
             data-active={editor.isActive('heading', { level: 3 })}
+            aria-label="Heading 3"
+            aria-pressed={editor.isActive('heading', { level: 3 })}
+            title="Heading 3"
           >
             <Heading3 className="h-4 w-4" />
           </Button>
@@ -298,6 +402,8 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setParagraph}
             data-active={editor.isActive('paragraph')}
+            aria-label="Body text"
+            aria-pressed={editor.isActive('paragraph')}
             title="Body text"
           >
             <Type className="h-4 w-4" />
@@ -310,6 +416,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setBulletList}
             data-active={editor.isActive('bulletList')}
+            aria-label="Bulleted list"
+            aria-pressed={editor.isActive('bulletList')}
+            title="Bulleted list"
           >
             <List className="h-4 w-4" />
           </Button>
@@ -320,8 +429,49 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setOrderedList}
             data-active={editor.isActive('orderedList')}
+            aria-label="Numbered list"
+            aria-pressed={editor.isActive('orderedList')}
+            title="Numbered list"
           >
             <ListOrdered className="h-4 w-4" />
+          </Button>
+          <span className="w-px h-5 bg-border mx-1" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={setBlockquote}
+            data-active={editor.isActive('blockquote')}
+            aria-label="Quote"
+            aria-pressed={editor.isActive('blockquote')}
+            title="Quote"
+          >
+            <Quote className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={setCodeBlock}
+            data-active={editor.isActive('codeBlock')}
+            aria-label="Code block"
+            aria-pressed={editor.isActive('codeBlock')}
+            title="Code block"
+          >
+            <Code2 className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={insertHorizontalRule}
+            aria-label="Divider"
+            title="Divider"
+          >
+            <Minus className="h-4 w-4" />
           </Button>
         </div>
       )}

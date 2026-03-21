@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { grantMaterialPublish } from '@/src/modules/credits';
+import { recordUserActivity } from '@/src/modules/activity-stats';
 import { CONTENT_LIMITS } from '@/src/config/constants';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
 
@@ -82,7 +83,7 @@ export async function PATCH(
       objectives?: string | null;
       content?: string;
       status?: 'DRAFT' | 'PUBLISHED';
-      publishedAt?: Date;
+      publishedAt?: Date | null;
       difficulty?: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
     } = {};
 
@@ -117,6 +118,10 @@ export async function PATCH(
       } else {
         updates.difficulty = 'BASIC';
       }
+    }
+    if (body.status === 'DRAFT') {
+      updates.status = 'DRAFT';
+      updates.publishedAt = null;
     }
 
     const updated = await prisma.material.update({
@@ -162,6 +167,14 @@ export async function PATCH(
       }
       balanceAfter = result.balanceAfter;
       creditsGranted = result.amount;
+      try {
+        await recordUserActivity(userId, {
+          materialsSharedTextual: material.materialType === 'TEXTUAL' ? 1 : 0,
+          materialsSharedPractice: material.materialType === 'PRACTICE_TEST' ? 1 : 0,
+        });
+      } catch (error) {
+        console.error('[Material publish] Activity tracking failed:', error);
+      }
     }
 
     return NextResponse.json({ ...updated, balanceAfter, creditsGranted });
@@ -170,6 +183,41 @@ export async function PATCH(
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       { error: process.env.NODE_ENV === 'development' ? message : 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ materialId: string }> }
+) {
+  try {
+    const userId = await getCurrentSession();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { materialId } = await params;
+    const material = await prisma.material.findFirst({
+      where: { id: materialId, userId, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!material) {
+      return NextResponse.json({ error: 'Material not found' }, { status: 404 });
+    }
+
+    await prisma.material.update({
+      where: { id: materialId },
+      data: { deletedAt: new Date() },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting material:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
