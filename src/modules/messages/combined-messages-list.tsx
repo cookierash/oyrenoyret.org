@@ -50,6 +50,7 @@ interface CombinedMessagesListProps {
 
 export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+  const isEmpty = items.length === 0;
 
   const grouped = useMemo(() => {
     const sorted = [...items].sort((a, b) => {
@@ -82,18 +83,6 @@ export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
     return groups;
   }, [items, sortOrder]);
 
-  if (items.length === 0) {
-    return (
-      <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
-        <MessageSquare className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
-        <p className="text-sm text-muted-foreground font-medium">No messages yet.</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">
-          Notifications and credit activity will appear here.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-end">
@@ -113,103 +102,113 @@ export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
           </Select>
         </div>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <div>
-          {grouped.map((group) => (
-            <div key={group.dateKey}>
-              <div
-                suppressHydrationWarning
-                className={cn(
-                  'px-4 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border/80 bg-muted/40',
-                )}
-              >
-                {group.dateLabel}
-              </div>
-              <ul className="divide-y divide-border">
-                {group.items.map((item) => {
-                  if (item.type === 'reply') {
-                    return (
-                      <li key={`reply-${item.id}`}>
-                        <Link
-                          href={`/discussions/${item.discussionId}/replies/${item.replyId}`}
-                          className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/20"
-                        >
-                          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground truncate">
-                              {item.authorName} {item.contextLabel}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground truncate">
-                              {item.discussionTitle}
-                            </p>
-                            <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
-                              {item.contentPreview}
-                            </p>
-                          </div>
-                          <div className="shrink-0 text-[11px] text-muted-foreground">
-                            {new Date(item.createdAt).toLocaleTimeString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </div>
-                        </Link>
-                      </li>
-                    );
-                  }
+      {isEmpty ? (
+        <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
+          <MessageSquare className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground font-medium">No messages yet.</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            Notifications and credit activity will appear here.
+          </p>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <div>
+              {grouped.map((group) => (
+                <div key={group.dateKey}>
+                  <div
+                    suppressHydrationWarning
+                    className={cn(
+                      'px-4 py-1.5 text-[11px] font-medium text-muted-foreground border-b border-border/80 bg-muted/40',
+                    )}
+                  >
+                    {group.dateLabel}
+                  </div>
+                  <ul className="divide-y divide-border">
+                    {group.items.map((item) => {
+                      if (item.type === 'reply') {
+                        return (
+                          <li key={`reply-${item.id}`}>
+                            <Link
+                              href={`/discussions/${item.discussionId}/replies/${item.replyId}`}
+                              className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/20"
+                            >
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                <MessageSquare className="h-3.5 w-3.5" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {item.authorName} {item.contextLabel}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  {item.discussionTitle}
+                                </p>
+                                <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
+                                  {item.contentPreview}
+                                </p>
+                              </div>
+                              <div className="shrink-0 text-[11px] text-muted-foreground">
+                                {new Date(item.createdAt).toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                            </Link>
+                          </li>
+                        );
+                      }
 
-                  const isGain = item.amount > 0;
-                  const absAmount = Math.abs(item.amount);
-                  const label = TRANSACTION_LABELS[item.label] ?? item.label;
+                      const isGain = item.amount > 0;
+                      const absAmount = Math.abs(item.amount);
+                      const label = TRANSACTION_LABELS[item.label] ?? item.label;
 
-                  return (
-                    <li key={`credit-${item.id}`}>
-                      <div className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/20">
-                        <div
-                          className={cn(
-                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                            isGain
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-destructive/10 text-destructive',
-                          )}
-                        >
-                          {isGain ? '+' : '−'}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">{label}</p>
-                          <p suppressHydrationWarning className="text-[11px] text-muted-foreground">
-                            {new Date(item.createdAt).toLocaleTimeString('en-US', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <span
-                            className={cn(
-                              'text-sm font-medium',
-                              isGain ? 'text-primary' : 'text-destructive',
-                            )}
-                          >
-                            {isGain ? '+' : '−'}
-                            {absAmount.toFixed(2)} credits
-                          </span>
-                          <p className="text-[10px] text-muted-foreground">
-                            Balance: {item.balanceAfter.toFixed(2)}
-                          </p>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                      return (
+                        <li key={`credit-${item.id}`}>
+                          <div className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/20">
+                            <div
+                              className={cn(
+                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                                isGain
+                                  ? 'bg-primary/10 text-primary'
+                                  : 'bg-destructive/10 text-destructive',
+                              )}
+                            >
+                              {isGain ? '+' : '−'}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground truncate">{label}</p>
+                              <p suppressHydrationWarning className="text-[11px] text-muted-foreground">
+                                {new Date(item.createdAt).toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <span
+                                className={cn(
+                                  'text-sm font-medium',
+                                  isGain ? 'text-primary' : 'text-destructive',
+                                )}
+                              >
+                                {isGain ? '+' : '−'}
+                                {absAmount.toFixed(2)} credits
+                              </span>
+                              <p className="text-[10px] text-muted-foreground">
+                                Balance: {item.balanceAfter.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ))}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
