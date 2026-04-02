@@ -12,10 +12,18 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
 import { sanitizeInput } from '@/src/security/validation';
 import { RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(request: Request) {
   try {
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`live-events:list:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { searchParams } = new URL(request.url);
     const takeParam = Number(searchParams.get('take') ?? 100);
     const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : 100;
@@ -55,7 +63,7 @@ export async function GET(request: Request) {
       enrollmentStatus: enrollmentMap.get(event.id) ?? null,
     }));
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching live events:', error);
     const message =

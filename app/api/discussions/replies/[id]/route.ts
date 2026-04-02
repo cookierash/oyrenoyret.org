@@ -5,12 +5,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`discussions:reply:detail:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { id: replyId } = await params;
     const { searchParams } = new URL(request.url);
     const expectedDiscussionId = searchParams.get('discussionId');
@@ -87,7 +97,7 @@ export async function GET(
         userVote: userVote?.value ?? null,
       },
       threadPath,
-    });
+    }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching reply:', error);
     return NextResponse.json(

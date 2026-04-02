@@ -10,11 +10,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { z } from 'zod';
+import { requireRegistrationToken } from '@/src/modules/auth/utils/registration-token';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 const uuidSchema = z.string().uuid('Invalid user ID format');
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
@@ -23,6 +27,18 @@ export async function GET(
     const parseResult = uuidSchema.safeParse(userId);
     if (!parseResult.success) {
       return NextResponse.json({ error: 'Invalid user ID' }, { status: 400 });
+    }
+
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`auth:user:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
+    const tokenCheck = await requireRegistrationToken(parseResult.data);
+    if (!tokenCheck.ok) {
+      return NextResponse.json({ error: tokenCheck.error }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -50,7 +66,7 @@ export async function GET(
     // Strip status from the response payload.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { status: _status, ...safeUser } = user;
-    return NextResponse.json(safeUser);
+    return NextResponse.json(safeUser, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching user:', error);
     return NextResponse.json(

@@ -19,10 +19,29 @@ const envSchema = z.object({
     .string()
     .optional()
     .refine((val) => !val || val.length >= 16, 'CRON_SECRET must be at least 16 characters when set'),
+  /** Optional secret for registration tokens (falls back to NEXTAUTH_SECRET when unset). */
+  REGISTRATION_TOKEN_SECRET: z
+    .string()
+    .optional()
+    .refine((val) => !val || val.length >= 32, 'REGISTRATION_TOKEN_SECRET must be at least 32 characters when set'),
+  /** Upstash Redis REST endpoint for distributed rate limiting (recommended in production). */
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  /** Upstash Redis REST token for distributed rate limiting (recommended in production). */
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   /** Optional admin bootstrap credentials */
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD_HASH: z.string().optional(),
-});
+}).refine(
+  (env) => {
+    const hasUrl = Boolean(env.UPSTASH_REDIS_REST_URL);
+    const hasToken = Boolean(env.UPSTASH_REDIS_REST_TOKEN);
+    return (hasUrl && hasToken) || (!hasUrl && !hasToken);
+  },
+  {
+    message: 'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set together',
+    path: ['UPSTASH_REDIS_REST_URL'],
+  }
+);
 
 export type Env = z.infer<typeof envSchema>;
 

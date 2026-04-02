@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { sanitizeHtml } from '@/src/security/validation';
 import { grantDiscussionReply } from '@/src/modules/credits';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
@@ -15,6 +16,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`discussions:replies:list:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { id: discussionId } = await params;
     const { searchParams } = new URL(request.url);
     const parentReplyId = searchParams.get('parentReplyId');
@@ -89,7 +97,7 @@ export async function GET(
       parentReplyId,
     }));
 
-    return NextResponse.json({ replies: formatted });
+    return NextResponse.json({ replies: formatted }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching replies:', error);
     return NextResponse.json(

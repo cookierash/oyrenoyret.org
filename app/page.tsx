@@ -174,13 +174,19 @@ export default async function HomePage() {
                 </Button>
               </div>
 
-              <div className="mt-12 w-full max-w-5xl pb-16 lg:pb-24">
+              <div className="mt-12 w-full pb-16 lg:pb-24">
                 <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-background/80 shadow-[0_30px_80px_-40px_rgba(15,23,42,0.6)]">
                   <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-muted/30" />
                   <div className="relative flex aspect-[16/9] w-full items-center justify-center">
-                    <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
-                      <div className="h-3 w-24 rounded-full bg-muted/70" />
-                      <span>Video preview will live here</span>
+                    <div className="relative h-full w-full">
+                      <Image
+                        src="/landing-page-screen.gif"
+                        alt="Landing page preview"
+                        fill
+                        priority
+                        unoptimized
+                        className="object-cover"
+                      />
                     </div>
                   </div>
                 </div>

@@ -11,6 +11,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { refundDiscussionCreate } from '@/src/modules/credits';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 const DEFAULT_INACTIVITY_HOURS = 24;
 const parsedHours = Number(process.env.DISCUSSION_INACTIVITY_HOURS);
@@ -38,6 +40,16 @@ export async function GET(request: Request) {
     } else if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       // In dev/test: if CRON_SECRET is set, require it
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(
+      `cron:archive-discussions:${identifier}`,
+      RATE_LIMITS.ADMIN_WRITE
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const archiveCutoff = new Date(Date.now() - ARCHIVE_THRESHOLD_MS);

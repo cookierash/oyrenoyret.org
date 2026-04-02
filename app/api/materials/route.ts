@@ -11,15 +11,27 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { calcMaterialUnlockCost, getBalance, roundCredits } from '@/src/modules/credits';
 import { SUBJECTS, CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
+import { getPrivateNoStoreHeaders, getPublicCacheHeaders } from '@/src/lib/http-cache';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(request: Request) {
   try {
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`materials:list:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
+    const takeParam = Number(searchParams.get('take'));
+    const skipParam = Number(searchParams.get('skip'));
+    const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : undefined;
+    const skip = Number.isFinite(skipParam) && skipParam > 0 ? skipParam : undefined;
     const includeAccess =
       searchParams.get('includeAccess') === '1' ||
       searchParams.get('includeAccess') === 'true' ||
@@ -41,6 +53,8 @@ export async function GET(request: Request) {
           deletedAt: null,
         },
         orderBy: { publishedAt: 'desc' },
+        ...(take ? { take } : {}),
+        ...(skip ? { skip } : {}),
         select: {
           id: true,
           title: true,
@@ -64,7 +78,8 @@ export async function GET(request: Request) {
           materialType: m.materialType,
           publishedAt: m.publishedAt,
           authorName: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student',
-        }))
+        })),
+        { headers: getPublicCacheHeaders() }
       );
     }
 
@@ -76,6 +91,8 @@ export async function GET(request: Request) {
         deletedAt: null,
       },
       orderBy: { publishedAt: 'desc' },
+      ...(take ? { take } : {}),
+      ...(skip ? { skip } : {}),
       select: {
         id: true,
         userId: true,
@@ -135,12 +152,15 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({
-      materials: mappedMaterials,
-      unlockedIds: Array.from(unlockedIds),
-      balance,
-      userId,
-    });
+    return NextResponse.json(
+      {
+        materials: mappedMaterials,
+        unlockedIds: Array.from(unlockedIds),
+        balance,
+        userId,
+      },
+      { headers: getPrivateNoStoreHeaders() }
+    );
   } catch (error) {
     console.error('Error fetching materials:', error);
     return NextResponse.json(

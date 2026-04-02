@@ -71,7 +71,7 @@ export function StickyPartnersBar({ partners }: StickyPartnersBarProps) {
           isDocked ? 'fixed inset-x-0 bottom-0 z-30' : 'relative z-20',
         )}
       >
-        <div className="w-full bg-background py-4">
+        <div className="w-full bg-background/80 py-4 backdrop-blur-md">
           <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
             <PartnersMarquee partners={partners} />
           </div>
