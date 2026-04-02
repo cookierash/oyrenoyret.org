@@ -8,6 +8,7 @@
     "dev:turbo": "next dev",
     "build": "next build --webpack",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
