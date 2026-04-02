@@ -163,7 +163,7 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
       <AlertDialogContent className="max-w-2xl px-6 pb-6 pt-7">
         <div className="space-y-6">
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground tracking-normal">
               <span>Quick tour</span>
               <span>
                 Step {stepIndex + 1} of {totalSteps}
@@ -172,9 +172,11 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
             <Progress value={progressValue} max={totalSteps} />
           </div>
 
-          <AlertDialogHeader className="mb-0 space-y-2">
-            <AlertDialogTitle className="text-2xl">{step.title}</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm mb-2">
+          <AlertDialogHeader className="space-y-2 mb-4">
+            <AlertDialogTitle className="text-2xl tracking-normal">
+              {step.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm leading-relaxed">
               {step.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -208,7 +210,12 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
           ) : null}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="outline" size="sm" onClick={handleSkip}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSkip}
+              className="self-end sm:self-auto"
+            >
               Skip for now
             </Button>
             <div className="flex items-center gap-2">
