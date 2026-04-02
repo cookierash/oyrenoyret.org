@@ -10,12 +10,13 @@ import { prisma } from '@/src/db/client';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { AcademicRecord } from '@prisma/client';
 
 export default async function AcademicRecordPage() {
   const userId = await getCurrentSession();
   if (!userId) redirect('/login');
 
-  const records = await prisma.academicRecord.findMany({
+  const records: AcademicRecord[] = await prisma.academicRecord.findMany({
     where: { userId, deletedAt: null },
     orderBy: { createdAt: 'desc' },
   });
