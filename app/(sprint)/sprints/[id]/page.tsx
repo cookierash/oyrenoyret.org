@@ -32,7 +32,7 @@ export default async function SprintWorkspacePage({
     },
   });
 
-  if (!event) {
+  if (!event || event.type !== 'PROBLEM_SPRINT') {
     redirect('/live-activities');
   }
 
@@ -152,7 +152,7 @@ export default async function SprintWorkspacePage({
                   <Coins className="h-4 w-4" />
                   Entry cost
                 </span>
-                <span className="text-foreground">{event.creditCost.toFixed(1)} credits</span>
+                <span className="text-foreground">{Math.round(event.creditCost)} credits</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-2">Difficulty</span>

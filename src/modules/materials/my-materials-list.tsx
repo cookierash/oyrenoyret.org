@@ -183,7 +183,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       }
       const creditsMsg =
         typeof data.creditsGranted === 'number' && data.creditsGranted > 0
-          ? ` +${Number(data.creditsGranted).toFixed(2)} credits`
+          ? ` +${Math.round(Number(data.creditsGranted))} credits`
           : '';
       toast.success(`Material published! It will appear under the topic in the catalog.${creditsMsg}`);
       setObjectiveDialogOpen(false);

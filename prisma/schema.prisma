@@ -261,6 +261,7 @@ model Activity {
 
 enum LiveEventType {
   PROBLEM_SPRINT
+  EVENT
 }
 
 enum LiveEventEnrollmentStatus {
@@ -350,6 +351,7 @@ model Material {
   objectives     String?        @db.Text  // Learning objectives (shown on material page)
   content        String         @db.Text
   materialType   MaterialType   @default(TEXTUAL)
+  questionCount  Int            @default(0)
   status        MaterialStatus @default(DRAFT)
   publishedAt   DateTime?
   publishCreditsGrantedAt DateTime?  // Set when we grant 0.5 for first publish (idempotency)
@@ -369,6 +371,7 @@ model Material {
   @@index([subjectId, topicId])
   @@index([status])
   @@index([deletedAt])
+  @@index([subjectId, topicId, status, deletedAt, publishedAt])
 }
 
 model Discussion {
@@ -396,6 +399,7 @@ model Discussion {
   @@index([subjectId, topicId])
   @@index([archivedAt])
   @@index([lastActivityAt])
+  @@index([archivedAt, lastActivityAt])
 }
 
 model DiscussionReply {

@@ -9,9 +9,12 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { grantMaterialPublish } from '@/src/modules/credits';
+import { CREDITS_MATERIAL } from '@/src/config/credits';
 import { recordUserActivity } from '@/src/modules/activity-stats';
-import { CONTENT_LIMITS } from '@/src/config/constants';
+import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
+import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(
   _request: Request,
@@ -36,6 +39,7 @@ export async function GET(
         content: true,
         status: true,
         materialType: true,
+        questionCount: true,
         publishedAt: true,
         difficulty: true,
         createdAt: true,
@@ -67,6 +71,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `materials:update:${identifier}`,
+      RATE_LIMITS.WRITE
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { materialId } = await params;
     const body = await request.json();
 
@@ -85,6 +99,7 @@ export async function PATCH(
       status?: 'DRAFT' | 'PUBLISHED';
       publishedAt?: Date | null;
       difficulty?: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
+      questionCount?: number;
     } = {};
 
     if (body.title !== undefined) {
@@ -94,7 +109,12 @@ export async function PATCH(
       updates.objectives = body.objectives == null ? null : sanitizeInput(String(body.objectives)).slice(0, 2000);
     }
     if (body.content !== undefined) {
-      updates.content = sanitizeHtml(String(body.content)).slice(0, CONTENT_LIMITS.MATERIAL_CONTENT_MAX);
+      const sanitized = sanitizeHtml(String(body.content)).slice(0, CONTENT_LIMITS.MATERIAL_CONTENT_MAX);
+      updates.content = sanitized;
+      updates.questionCount =
+        material.materialType === 'PRACTICE_TEST'
+          ? getPracticeTestQuestionCount(sanitized)
+          : 0;
     }
     const isPublishing = body.status === 'PUBLISHED' && material.status !== 'PUBLISHED';
     if (isPublishing) {
@@ -141,13 +161,35 @@ export async function PATCH(
     let balanceAfter: number | undefined;
     let creditsGranted: number | undefined;
     if (isPublishing) {
-      let questionCount = 0;
-      if (material.materialType === 'PRACTICE_TEST' && material.content) {
-        try {
-          const parsed = JSON.parse(material.content) as { questions?: unknown[] };
-          questionCount = Array.isArray(parsed?.questions) ? parsed.questions.length : 0;
-        } catch {
-          /* ignore */
+      const effectiveContent = updates.content ?? material.content;
+      let questionCount =
+        material.materialType === 'PRACTICE_TEST'
+          ? updates.questionCount ?? material.questionCount
+          : 0;
+      if (material.materialType === 'PRACTICE_TEST' && questionCount === 0) {
+        questionCount = getPracticeTestQuestionCount(effectiveContent);
+      }
+      const wordCount =
+        material.materialType === 'TEXTUAL' ? getTextWordCount(effectiveContent) : 0;
+
+      if (material.materialType === 'TEXTUAL') {
+        if (wordCount < CREDITS_MATERIAL.TEXTUAL_MIN_WORDS) {
+          return NextResponse.json(
+            {
+              error: `Textual materials must be at least ${CREDITS_MATERIAL.TEXTUAL_MIN_WORDS} words to publish`,
+            },
+            { status: 400 }
+          );
+        }
+      }
+      if (material.materialType === 'PRACTICE_TEST') {
+        if (questionCount < CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS) {
+          return NextResponse.json(
+            {
+              error: `Practice tests must include at least ${CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS} questions to publish`,
+            },
+            { status: 400 }
+          );
         }
       }
       const result = await grantMaterialPublish(
@@ -155,6 +197,7 @@ export async function PATCH(
         {
           materialType: material.materialType,
           questionCount,
+          wordCount,
         },
         materialId
       );
@@ -189,13 +232,23 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ materialId: string }> }
 ) {
   try {
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `materials:delete:${identifier}`,
+      RATE_LIMITS.WRITE
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const { materialId } = await params;

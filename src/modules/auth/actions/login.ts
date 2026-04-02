@@ -33,10 +33,71 @@ export async function login(data: LoginInput) {
     // Validate input
     const validated = loginSchema.parse(data);
 
-    // Find user
-    const user = await prisma.user.findUnique({
+    const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
+    const isAdminLoginAttempt =
+      Boolean(adminEmail) && validated.email.toLowerCase() === adminEmail;
+
+    let user = await prisma.user.findUnique({
       where: { email: validated.email },
     });
+
+    let isAdminCredentials = false;
+
+    if (isAdminLoginAttempt && adminEmail) {
+      if (!adminPasswordHash) {
+        return {
+          success: false,
+          error: 'Invalid email or password',
+        };
+      }
+
+      let adminPasswordValid = false;
+      try {
+        adminPasswordValid = await verifyPassword(validated.password, adminPasswordHash);
+      } catch {
+        adminPasswordValid = false;
+      }
+
+      if (!adminPasswordValid) {
+        return {
+          success: false,
+          error: 'Invalid email or password',
+        };
+      }
+
+      isAdminCredentials = true;
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: {
+            email: adminEmail,
+            passwordHash: adminPasswordHash,
+            role: 'ADMIN',
+            status: 'ACTIVE',
+            registrationStep: 5,
+          },
+        });
+      } else if (user.role !== 'ADMIN') {
+        return {
+          success: false,
+          error: 'Admin account misconfigured. Contact support.',
+        };
+      } else if (
+        user.passwordHash !== adminPasswordHash ||
+        user.status !== 'ACTIVE' ||
+        user.registrationStep !== 5
+      ) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            passwordHash: adminPasswordHash,
+            status: 'ACTIVE',
+            registrationStep: 5,
+          },
+        });
+      }
+    }
 
     if (!user) {
       return {
@@ -54,7 +115,9 @@ export async function login(data: LoginInput) {
     }
 
     // Verify password
-    const passwordValid = await verifyPassword(validated.password, user.passwordHash);
+    const passwordValid = isAdminCredentials
+      ? true
+      : await verifyPassword(validated.password, user.passwordHash);
 
     if (!passwordValid) {
       return {
@@ -64,15 +127,17 @@ export async function login(data: LoginInput) {
     }
 
     // Check if registration is complete
-    if (user.status !== 'ACTIVE') {
+    if (!isAdminCredentials && user.status !== 'ACTIVE') {
       return {
         success: false,
         error: 'Registration incomplete. Please complete your registration.',
       };
     }
 
-    // Check if parent email is verified
-    if (user.parentEmail) {
+    const requiresGuardianChecks = !isAdminCredentials && user.role === 'STUDENT';
+
+    // Check if parent email is verified (students only)
+    if (requiresGuardianChecks && user.parentEmail) {
       const verified = await prisma.guardianVerification.findFirst({
         where: {
           userId: user.id,
@@ -90,19 +155,21 @@ export async function login(data: LoginInput) {
       }
     }
 
-    // Check if consent is granted
-    const consent = await prisma.parentalConsent.findFirst({
-      where: {
-        userId: user.id,
-        status: 'GRANTED',
-      },
-    });
+    // Check if consent is granted (students only)
+    if (requiresGuardianChecks) {
+      const consent = await prisma.parentalConsent.findFirst({
+        where: {
+          userId: user.id,
+          status: 'GRANTED',
+        },
+      });
 
-    if (!consent) {
-      return {
-        success: false,
-        error: 'Parental consent required. Please complete your registration.',
-      };
+      if (!consent) {
+        return {
+          success: false,
+          error: 'Parental consent required. Please complete your registration.',
+        };
+      }
     }
 
     // Create session
@@ -116,6 +183,7 @@ export async function login(data: LoginInput) {
     return {
       success: true,
       userId: user.id,
+      role: user.role,
     };
   } catch (error) {
     if (error instanceof Error) {

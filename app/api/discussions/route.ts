@@ -9,8 +9,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { spendDiscussionCreate, getBalance, calcDiscussionCreateCost, roundCredits } from '@/src/modules/credits';
-import { CONTENT_LIMITS } from '@/src/config/constants';
+import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(request: Request) {
   try {
@@ -128,6 +129,16 @@ export async function POST(request: Request) {
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `discussions:create:${identifier}`,
+      RATE_LIMITS.WRITE
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const body = await request.json();

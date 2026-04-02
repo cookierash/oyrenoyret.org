@@ -174,6 +174,8 @@ Required environment variables:
 
 - `DATABASE_URL`: PostgreSQL connection string
 - `NODE_ENV`: Environment (development/production)
+- `ADMIN_EMAIL` (optional): Admin login email for bootstrap
+- `ADMIN_PASSWORD_HASH` (optional): bcrypt hash for admin password
 
 ## Email Service
 

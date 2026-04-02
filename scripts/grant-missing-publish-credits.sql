@@ -1,11 +1,11 @@
--- One-time fix: Add 0.5 credits per published material that never received publish credits.
+-- One-time fix: Add 1 credit per published material that never received publish credits.
 -- Run: npx prisma db execute --file scripts/grant-missing-publish-credits.sql
 
--- Add 0.5 credits per material to each user
+-- Add 1 credit per material to each user
 UPDATE "User" u
 SET credits = credits + sub.credits_to_add
 FROM (
-  SELECT "userId", COUNT(*) * 0.5 AS credits_to_add
+  SELECT "userId", COUNT(*) * 1 AS credits_to_add
   FROM "Material"
   WHERE status = 'PUBLISHED' AND "deletedAt" IS NULL AND "publishCreditsGrantedAt" IS NULL
   GROUP BY "userId"

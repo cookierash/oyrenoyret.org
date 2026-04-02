@@ -7,9 +7,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
+import { getBalance, roundCredits, spendSprintEntry } from '@/src/modules/credits';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -18,8 +21,40 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `live-events:confirm:${identifier}`,
+      RATE_LIMITS.LIVE_EVENT
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const accepted = body?.accepted === true;
+    const eventId =
+      typeof body?.liveEventId === 'string' && body.liveEventId.trim().length > 0
+        ? body.liveEventId.trim()
+        : typeof params?.id === 'string' && params.id.trim().length > 0
+          ? params.id
+          : '';
+
+    if (!eventId) {
+      return NextResponse.json(
+        { error: 'Live event id is required' },
+        { status: 400 }
+      );
+    }
+    if (!accepted) {
+      return NextResponse.json(
+        { error: 'Registration rules must be accepted' },
+        { status: 400 }
+      );
+    }
+
     const enrollment = await prisma.liveEventEnrollment.findUnique({
-      where: { liveEventId_userId: { liveEventId: params.id, userId } },
+      where: { liveEventId_userId: { liveEventId: eventId, userId } },
       select: { id: true, status: true },
     });
 
@@ -31,15 +66,59 @@ export async function POST(
       return NextResponse.json({ status: enrollment.status });
     }
 
+    if (enrollment.status === 'CANCELLED') {
+      return NextResponse.json({ error: 'Registration was cancelled' }, { status: 400 });
+    }
+
+    const event = await prisma.liveEvent.findFirst({
+      where: { id: eventId, deletedAt: null },
+      select: { id: true, creditCost: true },
+    });
+
+    if (!event) {
+      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    }
+
+    const cost = roundCredits(event.creditCost);
+    const balance = await getBalance(userId);
+    if (balance < cost) {
+      return NextResponse.json(
+        { error: 'Insufficient credits', required: cost, balance },
+        { status: 402 },
+      );
+    }
+
+    const creditResult = await spendSprintEntry(userId, cost, event.id);
+    if (!creditResult.success) {
+      if (creditResult.error === 'INSUFFICIENT_CREDITS') {
+        return NextResponse.json(
+          { error: 'Insufficient credits', required: cost, balance },
+          { status: 402 },
+        );
+      }
+      return NextResponse.json(
+        { error: creditResult.error ?? 'Failed to complete registration' },
+        { status: 500 },
+      );
+    }
+
     const updated = await prisma.liveEventEnrollment.update({
       where: { id: enrollment.id },
       data: { status: 'CONFIRMED', verifiedAt: new Date() },
       select: { status: true },
     });
 
-    return NextResponse.json({ status: updated.status });
+    return NextResponse.json({
+      status: updated.status,
+      balanceAfter: creditResult.balanceAfter,
+      creditsSpent: Math.abs(creditResult.amount),
+    });
   } catch (error) {
     console.error('Error confirming live event registration:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const message =
+      process.env.NODE_ENV === 'development' && error instanceof Error
+        ? error.message
+        : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -108,7 +108,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   return (
     <aside
       className={cn(
-        'sticky top-0 z-40 flex h-screen w-full flex-col border-r border-border bg-background',
+        'sticky top-0 z-40 flex h-[100dvh] w-full flex-col border-r border-border bg-background',
         className,
       )}
     >
@@ -130,7 +130,8 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-0.5 p-2">
-        {navItems.map((item) => {
+        {!isStaff
+          ? navItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
           return (
@@ -154,38 +155,90 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
               )}
             </Link>
           );
-        })}
+        })
+          : null}
         {isStaff ? (
-          <div className="mt-4 border-t border-border/70 pt-3">
-            <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Admin
-            </p>
+          <div className="space-y-0.5">
             <Link
-              href="/admin/live-activities"
+              href="/admin/dashboard"
               className={cn(
                 'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                pathname === '/admin/live-activities'
+                pathname === '/admin/dashboard'
                   ? 'bg-muted text-foreground font-medium'
                   : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
               )}
             >
               <ShieldCheck className="h-4 w-4" />
-              Live activities
+              Dashboard
             </Link>
+            <Link
+              href="/admin/live-activities"
+              className={cn(
+                'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                pathname.startsWith('/admin/live-activities')
+                  ? 'bg-muted text-foreground font-medium'
+                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+              )}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              Manage live activities
+            </Link>
+            <div className="ml-6 space-y-0.5">
+              <Link
+                href="/admin/live-activities/problem-sprints"
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                  pathname === '/admin/live-activities/problem-sprints'
+                    ? 'bg-muted text-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                )}
+              >
+                <CalendarDays className="h-4 w-4" />
+                Problem Sprint
+              </Link>
+              <Link
+                href="/admin/live-activities/announcements"
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                  pathname === '/admin/live-activities/announcements'
+                    ? 'bg-muted text-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                )}
+              >
+                <MessageSquare className="h-4 w-4" />
+                Announcements
+              </Link>
+              <Link
+                href="/admin/live-activities/events"
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                  pathname === '/admin/live-activities/events'
+                    ? 'bg-muted text-foreground font-medium'
+                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                )}
+              >
+                <Sparkles className="h-4 w-4" />
+                Events
+              </Link>
+            </div>
           </div>
         ) : null}
       </nav>
 
-      <div className="mx-3 mb-3 rounded-md border border-primary/20 bg-primary/10 px-3 py-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
-          Credits
-        </p>
-        <p className="mt-1 text-sm font-semibold text-primary">
-          {Number(displayCredits).toFixed(2)} credits
-        </p>
-      </div>
+      {!isStaff ? (
+        <div className="px-2 pb-3">
+          <div className="w-full rounded-md border border-primary/20 bg-primary/10 px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+              Credits
+            </p>
+            <p className="mt-1 text-sm font-semibold text-primary">
+              {Math.round(Number(displayCredits))} credits
+            </p>
+          </div>
+        </div>
+      ) : null}
 
-      <div className="border-t border-border p-3">
+      <div className="border-t border-border px-2 py-3">
         <HoverCard
           openDelay={10}
           closeDelay={100}
@@ -195,7 +248,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
           <HoverCardTrigger asChild>
             <button
               type="button"
-              className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-muted/50"
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/70"
               onMouseEnter={() => setProfileMenuOpen(true)}
               onMouseLeave={() => setProfileMenuOpen(false)}
               onClick={() => setProfileMenuOpen((open) => !open)}
@@ -218,41 +271,33 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
             side="top"
             align="start"
             forceMount
+            sideOffset={4}
             className={cn(
-              'w-52 rounded-md border border-border/70 bg-popover p-1 shadow-sm transition-opacity duration-220 ease-out',
+              'relative origin-bottom-left w-[var(--radix-hover-card-trigger-width)] bg-background p-1.5 shadow-sm transition-all duration-240 ease-in-out will-change-[opacity,transform] after:absolute after:left-0 after:top-full after:h-2 after:w-full after:content-[\"\"]',
               profileMenuOpen
-                ? 'opacity-100'
-                : 'pointer-events-none opacity-0',
+                ? 'opacity-100 translate-y-0 scale-100'
+                : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.97]',
             )}
             onMouseEnter={() => setProfileMenuOpen(true)}
             onMouseLeave={() => setProfileMenuOpen(false)}
           >
-            <div
-              className={cn(
-                'origin-bottom-left transition-transform duration-220 ease-out',
-                profileMenuOpen
-                  ? 'scale-100 translate-y-0'
-                  : 'scale-[0.95] -translate-y-2',
-              )}
-            >
-              <div className="flex flex-col gap-1">
-                <Link
-                  href="/settings"
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted"
+            <div className="flex flex-col gap-1">
+              <Link
+                href="/settings"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/70"
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </Link>
+              <form action="/api/auth/logout" method="POST">
+                <button
+                  type="submit"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600"
                 >
-                  <Settings className="h-4 w-4" />
-                  Settings
-                </Link>
-                <form action="/api/auth/logout" method="POST">
-                  <button
-                    type="submit"
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Log out
-                  </button>
-                </form>
-              </div>
+                  <LogOut className="h-4 w-4" />
+                  Log out
+                </button>
+              </form>
             </div>
           </HoverCardContent>
         </HoverCard>

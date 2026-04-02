@@ -15,6 +15,7 @@ import { prisma } from '@/src/db/client';
 import { MaterialDetailView } from '@/src/modules/materials/material-detail-view';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { getBalance, calcMaterialUnlockCost, roundCredits } from '@/src/modules/credits';
+import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 
 interface PreviewPageProps {
   params: Promise<{ materialId: string }>;
@@ -29,16 +30,17 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
       status: 'PUBLISHED',
       deletedAt: null,
     },
-    select: {
-      id: true,
-      userId: true,
-      title: true,
-      objectives: true,
-      content: true,
-      materialType: true,
-      difficulty: true,
-      publishedAt: true,
-      subjectId: true,
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        objectives: true,
+        content: true,
+        materialType: true,
+        questionCount: true,
+        difficulty: true,
+        publishedAt: true,
+        subjectId: true,
       topicId: true,
       user: {
         select: {
@@ -76,20 +78,19 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
     prisma.materialAccess.count({ where: { materialId } }),
   ]);
 
-  let questionCount = 0;
-  if (material.materialType === 'PRACTICE_TEST' && material.content) {
-    try {
-      const parsed = JSON.parse(material.content) as { questions?: unknown[] };
-      questionCount = Array.isArray(parsed?.questions) ? parsed.questions.length : 0;
-    } catch {
-      /* ignore */
-    }
+  let questionCount =
+    material.materialType === 'PRACTICE_TEST' ? material.questionCount : 0;
+  if (material.materialType === 'PRACTICE_TEST' && questionCount === 0) {
+    questionCount = getPracticeTestQuestionCount(material.content);
   }
+  const wordCount =
+    material.materialType === 'TEXTUAL' ? getTextWordCount(material.content) : 0;
 
   const estimatedCost = roundCredits(
     calcMaterialUnlockCost({
       materialType: material.materialType,
       questionCount,
+      wordCount,
     }),
   );
 

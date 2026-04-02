@@ -25,6 +25,26 @@ export const RATE_LIMITS = {
     maxRequests: 100,
     windowMs: 15 * 60 * 1000, // 15 minutes
   },
+  WRITE: {
+    maxRequests: 30,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+  },
+  VOTE: {
+    maxRequests: 120,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+  },
+  UNLOCK: {
+    maxRequests: 20,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+  },
+  ADMIN_WRITE: {
+    maxRequests: 60,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+  },
+  LIVE_EVENT: {
+    maxRequests: 20,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+  },
 } as const;
 
 /** Content length limits for user-generated content (chars) */

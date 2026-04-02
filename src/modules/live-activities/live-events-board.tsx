@@ -7,7 +7,6 @@ import { Calendar, Clock, Coins, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/difficulty-bars';
-import { dispatchCreditsUpdated } from '@/src/lib/credits-events';
 
 interface LiveEvent {
   id: string;
@@ -17,7 +16,7 @@ interface LiveEvent {
   difficulty: MaterialDifficulty | null;
   creditCost: number;
   type: string;
-  enrollmentStatus: 'PENDING' | 'CONFIRMED' | null;
+  enrollmentStatus: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | null;
 }
 
 function formatDate(date: Date) {
@@ -64,7 +63,10 @@ export function LiveEventsBoard() {
 
   const fetchEvents = () => {
     setLoading(true);
-    fetch('/api/live-events?take=100', { cache: 'no-store' })
+    const params = new URLSearchParams();
+    params.set('take', '100');
+    params.set('type', 'PROBLEM_SPRINT');
+    fetch(`/api/live-events?${params.toString()}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setEvents(Array.isArray(data) ? data : []))
       .catch(() => setEvents([]))
@@ -79,14 +81,21 @@ export function LiveEventsBoard() {
     () => events.filter((event) => event.enrollmentStatus === 'CONFIRMED'),
     [events],
   );
+  const availableEvents = useMemo(
+    () => events.filter((event) => event.enrollmentStatus !== 'CONFIRMED'),
+    [events],
+  );
+  const hasNoEvents = events.length === 0;
 
   const handleEnroll = async (eventId: string) => {
     setActionId(eventId);
     try {
       const res = await fetch(`/api/live-events/${eventId}/enroll`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ liveEventId: eventId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 402) {
           toast.error('Insufficient credits to register.');
@@ -95,33 +104,28 @@ export function LiveEventsBoard() {
         }
         return;
       }
-      if (typeof data.balanceAfter === 'number') {
-        dispatchCreditsUpdated(data.balanceAfter);
+      const nextStatus = typeof data?.status === 'string' ? data.status : null;
+      const responseEventId =
+        typeof data?.eventId === 'string' && data.eventId.trim().length > 0
+          ? data.eventId
+          : eventId;
+      if (nextStatus) {
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === responseEventId
+              ? { ...event, enrollmentStatus: nextStatus as LiveEvent['enrollmentStatus'] }
+              : event
+          )
+        );
       }
-      toast.success('Registration received. Please verify to complete.');
+      toast.success(
+        nextStatus === 'CONFIRMED'
+          ? 'You are already enrolled in this sprint.'
+          : 'Registration started. Check your messages to complete.'
+      );
       fetchEvents();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to register.');
-    } finally {
-      setActionId(null);
-    }
-  };
-
-  const handleConfirm = async (eventId: string) => {
-    setActionId(eventId);
-    try {
-      const res = await fetch(`/api/live-events/${eventId}/confirm`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error ?? 'Failed to verify registration.');
-        return;
-      }
-      toast.success('Registration verified. You are enrolled.');
-      fetchEvents();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to verify registration.');
     } finally {
       setActionId(null);
     }
@@ -146,11 +150,19 @@ export function LiveEventsBoard() {
             ))}
           </div>
         ) : myEvents.length === 0 ? (
-          <div className="card-frame border-dashed bg-muted/20 px-5 py-8 text-center">
-            <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
-            <p className="text-sm font-medium text-muted-foreground">No confirmed events yet.</p>
+          <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+            {hasNoEvents ? (
+              <Calendar className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
+            ) : (
+              <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
+            )}
+            <p className="text-sm font-medium text-muted-foreground">
+              {hasNoEvents ? 'No live events scheduled.' : 'No confirmed events yet.'}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground/70">
-              Complete a registration below to see it here.
+              {hasNoEvents
+                ? 'Check back soon or watch the announcements sidebar.'
+                : 'Register in All events to see it here.'}
             </p>
           </div>
         ) : (
@@ -161,7 +173,6 @@ export function LiveEventsBoard() {
                 event={event}
                 actionId={actionId}
                 onEnroll={handleEnroll}
-                onConfirm={handleConfirm}
               />
             ))}
           </div>
@@ -181,22 +192,26 @@ export function LiveEventsBoard() {
               <EventCardSkeleton key={`all-skeleton-${i}`} />
             ))}
           </div>
-        ) : events.length === 0 ? (
-          <div className="card-frame border-dashed bg-muted/20 px-5 py-8 text-center">
-            <p className="text-sm font-medium text-muted-foreground">No live events scheduled.</p>
+        ) : availableEvents.length === 0 ? (
+          <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+            <Calendar className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
+            <p className="text-sm font-medium text-muted-foreground">
+              {hasNoEvents ? 'No live events scheduled.' : 'You are enrolled in all current events.'}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground/70">
-              Check back soon or watch the announcements sidebar.
+              {hasNoEvents
+                ? 'Check back soon or watch the announcements sidebar.'
+                : 'We will post new sprints soon.'}
             </p>
           </div>
         ) : (
           <div className="grid gap-4">
-            {events.map((event) => (
+            {availableEvents.map((event) => (
               <LiveEventCard
                 key={event.id}
                 event={event}
                 actionId={actionId}
                 onEnroll={handleEnroll}
-                onConfirm={handleConfirm}
               />
             ))}
           </div>
@@ -210,13 +225,13 @@ interface LiveEventCardProps {
   event: LiveEvent;
   actionId: string | null;
   onEnroll: (eventId: string) => void;
-  onConfirm: (eventId: string) => void;
 }
 
-function LiveEventCard({ event, actionId, onEnroll, onConfirm }: LiveEventCardProps) {
+function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
   const eventDate = new Date(event.date);
   const isPending = event.enrollmentStatus === 'PENDING';
   const isConfirmed = event.enrollmentStatus === 'CONFIRMED';
+  const isCancelled = event.enrollmentStatus === 'CANCELLED';
   const isBusy = actionId === event.id;
 
   return (
@@ -232,6 +247,10 @@ function LiveEventCard({ event, actionId, onEnroll, onConfirm }: LiveEventCardPr
             ) : isPending ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
                 Verification needed
+              </span>
+            ) : isCancelled ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+                Registration cancelled
               </span>
             ) : null}
           </div>
@@ -255,7 +274,7 @@ function LiveEventCard({ event, actionId, onEnroll, onConfirm }: LiveEventCardPr
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
           <Coins className="h-3 w-3" />
-          {Number(event.creditCost).toFixed(1)} credits
+          {Math.round(event.creditCost)} credits
         </span>
       </div>
 
@@ -263,12 +282,15 @@ function LiveEventCard({ event, actionId, onEnroll, onConfirm }: LiveEventCardPr
         {isPending ? (
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <AlertCircle className="h-4 w-4 text-amber-500" />
-            A verification message was sent to your account.
+            A confirmation request was sent to your messages inbox.
+          </div>
+        ) : isCancelled ? (
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-4 w-4 text-rose-500" />
+            This registration was cancelled. You can register again.
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">
-            Ready when you are.
-          </span>
+          <span className="text-xs text-muted-foreground">Ready when you are.</span>
         )}
 
         <div className="flex items-center gap-2">
@@ -277,17 +299,12 @@ function LiveEventCard({ event, actionId, onEnroll, onConfirm }: LiveEventCardPr
               <Link href={`/sprints/${event.id}`}>Enter sprint</Link>
             </Button>
           ) : isPending ? (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => onConfirm(event.id)}
-              disabled={isBusy}
-            >
-              Complete registration
+            <Button asChild size="sm" variant="secondary" disabled={isBusy}>
+              <Link href="/messages">Complete registration</Link>
             </Button>
           ) : (
             <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy}>
-              Register
+              {isCancelled ? 'Register again' : 'Register'}
             </Button>
           )}
         </div>

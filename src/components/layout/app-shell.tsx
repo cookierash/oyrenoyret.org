@@ -51,7 +51,7 @@ export function AppShell({ children, displayName, user }: AppShellProps) {
   }, [pathname, mobileNavOpen]);
 
   return (
-    <div className="h-screen overflow-hidden bg-background">
+    <div className="h-[100dvh] overflow-hidden bg-background">
       <AccountTitle displayName={displayName} />
       <div className="mx-auto flex h-full w-full max-w-[1200px] min-h-0 flex-col">
         <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3 lg:hidden">
@@ -70,7 +70,7 @@ export function AppShell({ children, displayName, user }: AppShellProps) {
         <div className={`grid w-full flex-1 min-h-0 ${gridColumns}`}>
           <AppSidebar user={user} className="hidden lg:flex" />
           <main
-            className={`min-h-0 min-w-0 overflow-y-auto px-4 ${removeMainPaddingY ? 'py-0' : 'py-6'} sm:px-6 lg:px-8 lg:py-8`}
+            className={`min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-4 ${removeMainPaddingY ? 'py-0' : 'py-6'} sm:px-6 lg:px-8 lg:py-8`}
           >
             {children}
             {showRight ? (

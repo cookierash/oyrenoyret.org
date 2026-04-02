@@ -1,10 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import Link from 'next/link';
-import { MessageSquare } from 'lucide-react';
+import { AlertCircle, Calendar, Clock, Coins, MessageSquare, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectItem } from '@/components/ui/select';
+import { dispatchCreditsUpdated } from '@/src/lib/credits-events';
 import { cn } from '@/src/lib/utils';
 
 type ReplyNotificationItem = {
@@ -28,7 +33,19 @@ type CreditActivityItem = {
   label: string;
 };
 
-type CombinedMessageItem = ReplyNotificationItem | CreditActivityItem;
+type SprintEnrollmentItem = {
+  type: 'sprint';
+  id: string;
+  liveEventId: string;
+  topic: string;
+  date: string;
+  creditCost: number;
+  durationMinutes: number;
+  status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | null;
+  createdAt: string;
+};
+
+type CombinedMessageItem = ReplyNotificationItem | CreditActivityItem | SprintEnrollmentItem;
 
 const TRANSACTION_LABELS: Record<string, string> = {
   REGISTRATION: 'Registration bonus',
@@ -44,11 +61,280 @@ const TRANSACTION_LABELS: Record<string, string> = {
   SPECIAL_EVENT: 'Special event',
 };
 
-interface CombinedMessagesListProps {
-  items: CombinedMessageItem[];
+const SPRINT_RULES_TEXT = `
+Please review the sprint procedures and policies before confirming:
+
+1. Your spot is reserved only after confirmation.
+2. Credits are deducted immediately after confirmation.
+3. Credits are non-refundable once the sprint is confirmed.
+4. Join on time; missed sessions are not refunded.
+5. Keep communication respectful and focused.
+6. You are responsible for stable internet and a working device.
+`;
+
+function formatDate(date: Date) {
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
-export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
+function formatTime(date: Date) {
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function SprintEnrollmentRow({
+  item,
+  onRefresh,
+}: {
+  item: SprintEnrollmentItem;
+  onRefresh?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [rulesRead, setRulesRead] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const isCancelled = item.status === 'CANCELLED';
+  const eventDate = new Date(item.date);
+  const createdTime = new Date(item.createdAt);
+  const rulesRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const node = rulesRef.current;
+    if (!node) return;
+    if (node.scrollHeight <= node.clientHeight + 2) {
+      setRulesRead(true);
+    }
+  }, [open, item.id]);
+
+  const handleRulesScroll = (event: UIEvent<HTMLDivElement>) => {
+    const node = event.currentTarget;
+    if (node.scrollTop + node.clientHeight >= node.scrollHeight - 4) {
+      setRulesRead(true);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (submitting) return;
+    if (isCancelled) {
+      toast.error('This registration was cancelled. Please register again from Live Activities.');
+      return;
+    }
+    if (!accepted) {
+      toast.error('Please accept the sprint rules to continue.');
+      return;
+    }
+    if (!item.liveEventId) {
+      toast.error('Missing sprint information. Please refresh the page.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/live-events/${item.liveEventId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accepted: true, liveEventId: item.liveEventId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 402) {
+          toast.error('Insufficient credits to complete registration.');
+        } else {
+          toast.error(data.error ?? 'Failed to complete registration.');
+        }
+        return;
+      }
+      if (typeof data.balanceAfter === 'number') {
+        dispatchCreditsUpdated(data.balanceAfter);
+      }
+      toast.success('Registration completed. See you at the sprint!');
+      setOpen(false);
+      setAccepted(false);
+      onRefresh?.();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to complete registration.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <li>
+      <div className="flex items-start gap-4 px-4 py-3 transition-colors hover:bg-muted/20">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+          <AlertCircle className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="text-sm font-medium text-foreground">
+            {isCancelled ? 'Registration cancelled' : 'Complete your sprint registration'}
+          </p>
+          <p className="text-xs text-muted-foreground">{item.topic}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+              <Calendar className="h-3 w-3" />
+              {formatDate(eventDate)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+              <Clock className="h-3 w-3" />
+              {formatTime(eventDate)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+              <Clock className="h-3 w-3" />
+              {item.durationMinutes} min
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+              <Coins className="h-3 w-3" />
+              {Math.round(item.creditCost)} credits
+            </span>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {isCancelled
+              ? 'This registration was cancelled. Return to Live Activities to register again.'
+              : 'A confirmation is required before credits are deducted.'}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <Button
+            size="sm"
+            variant={isCancelled ? 'outline' : 'secondary'}
+            onClick={() => setOpen(true)}
+          >
+            {isCancelled ? 'View details' : 'Complete registration'}
+          </Button>
+          <p suppressHydrationWarning className="mt-1 text-[10px] text-muted-foreground">
+            {formatTime(createdTime)}
+          </p>
+        </div>
+      </div>
+
+      <AlertDialog
+        open={open}
+        onOpenChange={(value) => {
+          setOpen(value);
+          if (!value) {
+            setAccepted(false);
+            setRulesRead(false);
+          } else {
+            setRulesRead(false);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+          <AlertDialogTitle>Confirm sprint registration</AlertDialogTitle>
+          <AlertDialogDescription>
+            {isCancelled
+              ? 'This registration was cancelled. Please register again from Live Activities.'
+              : 'Review the rules and policies before completing your registration.'}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-xl border border-border/70 bg-card/60 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Sprint summary</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.topic} on {formatDate(eventDate)} at {formatTime(eventDate)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Credits required: {Math.round(item.creditCost)} (no refunds)
+                  </p>
+                </div>
+              </div>
+              {isCancelled ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  This request was cancelled and cannot be confirmed. Visit Live Activities to
+                  register again.
+                </p>
+              ) : (
+                <>
+                  <div
+                    ref={rulesRef}
+                    onScroll={handleRulesScroll}
+                    className="mt-3 max-h-40 overflow-auto rounded-lg border border-border/60 bg-background/60 p-3"
+                  >
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                      {SPRINT_RULES_TEXT}
+                    </p>
+                  </div>
+                  {!rulesRead ? (
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Scroll to the end to enable confirmation.
+                    </p>
+                  ) : null}
+                </>
+              )}
+            </div>
+
+            {isCancelled ? null : (
+              <div
+                className={cn(
+                  'rounded-xl border p-4 transition',
+                  accepted ? 'border-primary/40 bg-primary/5' : 'border-border bg-muted/30'
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={accepted}
+                    onCheckedChange={setAccepted}
+                    className="mt-1"
+                    disabled={!rulesRead}
+                  />
+                  <div className="space-y-1 leading-none flex-1">
+                    <p className="text-sm font-medium">
+                      I have read and agree to the sprint rules and policies
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Credits will be deducted immediately and are non-refundable.
+                    </p>
+                    {!rulesRead ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Read all rules to unlock the confirmation checkbox.
+                      </p>
+                    ) : null}
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Required
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel onClick={() => setOpen(false)}>
+              {isCancelled ? 'Close' : 'Not now'}
+            </AlertDialogCancel>
+            {isCancelled ? null : (
+              <AlertDialogAction
+                onClick={handleConfirm}
+                disabled={!rulesRead || !accepted || submitting}
+              >
+                {submitting ? 'Completing...' : 'Complete registration'}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </li>
+  );
+}
+
+interface CombinedMessagesListProps {
+  items: CombinedMessageItem[];
+  onRefresh?: () => void;
+}
+
+export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListProps) {
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const isEmpty = items.length === 0;
 
@@ -84,21 +370,21 @@ export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
   }, [items, sortOrder]);
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-end">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
-          <label htmlFor="messages-sort" className="text-xs text-muted-foreground whitespace-nowrap">
-            Sort
+          <label htmlFor="messages-sort" className="text-sm text-muted-foreground whitespace-nowrap">
+            Sort by
           </label>
           <Select
             id="messages-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
-            className="w-[160px] text-xs"
+            className="w-[180px]"
             aria-label="Sort messages"
           >
-            <SelectItem value="newest">Newest to oldest</SelectItem>
-            <SelectItem value="oldest">Oldest to newest</SelectItem>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
           </Select>
         </div>
       </div>
@@ -157,6 +443,15 @@ export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
                           </li>
                         );
                       }
+                      if (item.type === 'sprint') {
+                        return (
+                          <SprintEnrollmentRow
+                            key={`sprint-${item.id}`}
+                            item={item}
+                            onRefresh={onRefresh}
+                          />
+                        );
+                      }
 
                       const isGain = item.amount > 0;
                       const absAmount = Math.abs(item.amount);
@@ -192,10 +487,10 @@ export function CombinedMessagesList({ items }: CombinedMessagesListProps) {
                                 )}
                               >
                                 {isGain ? '+' : '−'}
-                                {absAmount.toFixed(2)} credits
+                                {Math.round(absAmount)} credits
                               </span>
                               <p className="text-[10px] text-muted-foreground">
-                                Balance: {item.balanceAfter.toFixed(2)}
+                                Balance: {Math.round(item.balanceAfter)}
                               </p>
                             </div>
                           </div>

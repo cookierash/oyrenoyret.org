@@ -105,7 +105,7 @@ export function MaterialDetailView({
   isOwn = false,
   isPreview = false,
   difficulty,
-  estimatedCost = 2,
+  estimatedCost = 3,
   balance,
   unlockCount = 0,
 }: MaterialDetailViewProps) {
@@ -147,7 +147,7 @@ export function MaterialDetailView({
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
-      toast.success(`Unlocked! (−${Number(data.cost ?? estimatedCost).toFixed(2)} credits)`);
+      toast.success(`Unlocked! (−${Math.round(Number(data.cost ?? estimatedCost))} credits)`);
       router.refresh();
     } catch {
       toast.error('Failed to unlock');
@@ -173,13 +173,13 @@ export function MaterialDetailView({
           ) : (
             <>
               <Lock className="h-4 w-4 mr-1.5" />
-              Unlock for {Number(estimatedCost).toFixed(2)} credits
+              Unlock for {Math.round(Number(estimatedCost))} credits
             </>
           )}
         </Button>
         {balance !== undefined && balance < estimatedCost && (
           <p className="text-xs text-destructive">
-            You need {Number(estimatedCost - balance).toFixed(2)} more credits
+            You need {Math.round(Number(estimatedCost - balance))} more credits
           </p>
         )}
       </>
@@ -290,13 +290,13 @@ export function MaterialDetailView({
                 ) : (
                   <>
                     <Lock className="h-4 w-4 mr-1.5" />
-                    Unlock for {Number(estimatedCost).toFixed(2)} credits
+                    Unlock for {Math.round(Number(estimatedCost))} credits
                   </>
                 )}
               </Button>
               {balance !== undefined && balance < estimatedCost && (
                 <p className="text-xs text-destructive">
-                  You need {Number(estimatedCost - balance).toFixed(2)} more credits
+                  You need {Math.round(Number(estimatedCost - balance))} more credits
                 </p>
               )}
             </section>

@@ -5,9 +5,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
-import { CONTENT_LIMITS } from '@/src/config/constants';
+import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { sanitizeHtml } from '@/src/security/validation';
 import { grantDiscussionReply } from '@/src/modules/credits';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function POST(
   request: Request,
@@ -17,6 +18,16 @@ export async function POST(
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `discussions:reply:${identifier}`,
+      RATE_LIMITS.WRITE
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const { id: discussionId } = await params;
@@ -61,8 +72,10 @@ export async function POST(
       data: { lastActivityAt: new Date() },
     });
 
-    // Grant 0.02 credits for replying
-    await grantDiscussionReply(userId, discussionId, reply.id);
+    const isDiscussionAuthor = discussion.userId === userId;
+    if (!isDiscussionAuthor) {
+      await grantDiscussionReply(userId, discussionId, reply.id);
+    }
 
     return NextResponse.json({
       id: reply.id,

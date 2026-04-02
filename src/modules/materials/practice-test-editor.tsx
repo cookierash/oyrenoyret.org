@@ -691,7 +691,7 @@ export function PracticeTestEditor({
       }
       const creditsMsg =
         typeof data.creditsGranted === 'number' && data.creditsGranted > 0
-          ? ` +${Number(data.creditsGranted).toFixed(2)} credits`
+          ? ` +${Math.round(Number(data.creditsGranted))} credits`
           : '';
       toast.success(`Published! Your practice test is now visible in the catalog.${creditsMsg}`);
 

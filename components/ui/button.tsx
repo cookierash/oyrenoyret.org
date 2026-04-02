@@ -40,7 +40,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     'bg-primary text-primary-foreground border border-primary/20 hover:bg-primary/90',
   // Secondary: light background, minimal
   secondary:
-    'bg-secondary text-secondary-foreground border border-border hover:bg-secondary/70',
+    'bg-secondary text-secondary-foreground hover:bg-secondary/70',
   // Outline: bordered, minimal
   outline:
     'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
@@ -53,7 +53,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     'bg-destructive text-destructive-foreground border border-destructive/20 hover:bg-destructive/90',
   // Secondary-primary: primary-colored text, pastel primary background (back/catalog nav)
   'secondary-primary':
-    'bg-primary/10 text-primary border border-primary/10 hover:bg-primary/15 dark:bg-primary/15 dark:text-primary dark:hover:bg-primary/20',
+    'bg-primary/10 text-primary hover:bg-primary/15 dark:bg-primary/15 dark:text-primary dark:hover:bg-primary/20',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

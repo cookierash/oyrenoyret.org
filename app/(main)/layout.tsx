@@ -14,8 +14,8 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col">
-      <SiteHeader />
+    <div className="landing-light flex min-h-screen flex-col bg-background text-foreground">
+      <SiteHeader showSeparator showSpacer={false} />
       <div className="flex-1">{children}</div>
       <SiteFooter />
     </div>

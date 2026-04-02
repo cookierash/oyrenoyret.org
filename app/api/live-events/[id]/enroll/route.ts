@@ -7,20 +7,45 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
-import { getBalance, roundCredits, spendSprintEntry } from '@/src/modules/credits';
+import { roundCredits } from '@/src/modules/credits';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
+    const body = await request.json().catch(() => ({} as { liveEventId?: string; eventId?: string }));
+    const paramId = typeof params?.id === 'string' ? params.id.trim() : '';
+    const bodyId =
+      typeof body?.liveEventId === 'string'
+        ? body.liveEventId.trim()
+        : typeof body?.eventId === 'string'
+          ? body.eventId.trim()
+          : '';
+    const eventId = bodyId || paramId;
+    if (!eventId) {
+      return NextResponse.json({ error: 'Live event id is required' }, { status: 400 });
+    }
+
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `live-events:enroll:${identifier}`,
+      RATE_LIMITS.LIVE_EVENT
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const event = await prisma.liveEvent.findFirst({
-      where: { id: params.id, deletedAt: null },
+      where: { id: eventId, deletedAt: null },
       select: {
         id: true,
         creditCost: true,
@@ -33,37 +58,28 @@ export async function POST(
 
     const existing = await prisma.liveEventEnrollment.findUnique({
       where: { liveEventId_userId: { liveEventId: event.id, userId } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, liveEventId: true },
     });
 
     if (existing) {
+      if (existing.status === 'CANCELLED') {
+        const restored = await prisma.liveEventEnrollment.update({
+          where: { id: existing.id },
+          data: { status: 'PENDING', verifiedAt: null },
+          select: { id: true, status: true, liveEventId: true },
+        });
+        return NextResponse.json({
+          status: restored.status,
+          enrollmentId: restored.id,
+          eventId: restored.liveEventId,
+        });
+      }
+
       return NextResponse.json({
         status: existing.status,
         enrollmentId: existing.id,
+        eventId: existing.liveEventId,
       });
-    }
-
-    const cost = roundCredits(event.creditCost);
-    const balance = await getBalance(userId);
-    if (balance < cost) {
-      return NextResponse.json(
-        { error: 'Insufficient credits', required: cost, balance },
-        { status: 402 }
-      );
-    }
-
-    const creditResult = await spendSprintEntry(userId, cost, event.id);
-    if (!creditResult.success) {
-      if (creditResult.error === 'INSUFFICIENT_CREDITS') {
-        return NextResponse.json(
-          { error: 'Insufficient credits', required: cost, balance },
-          { status: 402 }
-        );
-      }
-      return NextResponse.json(
-        { error: creditResult.error ?? 'Failed to register' },
-        { status: 500 }
-      );
     }
 
     const enrollment = await prisma.liveEventEnrollment.create({
@@ -72,14 +88,14 @@ export async function POST(
         userId,
         status: 'PENDING',
       },
-      select: { id: true, status: true },
+      select: { id: true, status: true, liveEventId: true },
     });
 
     return NextResponse.json({
       status: enrollment.status,
       enrollmentId: enrollment.id,
-      balanceAfter: creditResult.balanceAfter,
-      creditsSpent: Math.abs(creditResult.amount),
+      eventId: enrollment.liveEventId,
+      creditCost: roundCredits(event.creditCost),
     });
   } catch (error) {
     console.error('Error registering for live event:', error);

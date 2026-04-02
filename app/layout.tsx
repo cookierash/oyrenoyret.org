@@ -18,9 +18,21 @@ const comfortaa = Comfortaa({
 });
 
 export const metadata: Metadata = {
-  title: 'oyrenoyret.org - NGO EdTech Platform',
+  title: {
+    default: 'oyrenoyret.org',
+    template: '%s - oyrenoyret.org',
+  },
   description: 'A secure educational platform for minors',
   metadataBase: new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000'),
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-oyrenoyret.ico' },
+      { url: '/icon-oyrenoyret.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon-oyrenoyret.ico',
+    apple: '/apple-oyrenoyret.png',
+  },
 };
 
 export default function RootLayout({

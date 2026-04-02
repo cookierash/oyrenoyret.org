@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 
 export function ThemeDebugLogger() {
   useEffect(() => {
+    if (process.env.NEXT_PUBLIC_THEME_DEBUG_INGEST !== 'true') return;
     try {
       const root = document.documentElement;
       const body = document.body;
@@ -57,4 +58,3 @@ export function ThemeDebugLogger() {
 
   return null;
 }
-

@@ -8,15 +8,28 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { spendMaterialUnlock, calcMaterialUnlockCost, getBalance, roundCredits } from '@/src/modules/credits';
+import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ materialId: string }> }
 ) {
   try {
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `materials:unlock:${identifier}`,
+      RATE_LIMITS.UNLOCK
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const { materialId } = await params;
@@ -28,6 +41,7 @@ export async function POST(
         userId: true,
         materialType: true,
         content: true,
+        questionCount: true,
       },
     });
 
@@ -52,19 +66,18 @@ export async function POST(
       return NextResponse.json({ unlocked: true, balance: await getBalance(userId) });
     }
 
-    let questionCount = 0;
-    if (material.materialType === 'PRACTICE_TEST' && material.content) {
-      try {
-        const parsed = JSON.parse(material.content) as { questions?: unknown[] };
-        questionCount = Array.isArray(parsed?.questions) ? parsed.questions.length : 0;
-      } catch {
-        /* ignore */
-      }
+    let questionCount =
+      material.materialType === 'PRACTICE_TEST' ? material.questionCount : 0;
+    if (material.materialType === 'PRACTICE_TEST' && questionCount === 0) {
+      questionCount = getPracticeTestQuestionCount(material.content);
     }
+    const wordCount =
+      material.materialType === 'TEXTUAL' ? getTextWordCount(material.content) : 0;
 
     const params_ = {
       materialType: material.materialType,
       questionCount,
+      wordCount,
     };
     const cost = roundCredits(calcMaterialUnlockCost(params_));
     const balance = await getBalance(userId);

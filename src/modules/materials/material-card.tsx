@@ -62,7 +62,7 @@ export function MaterialCard({
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
-      toast.success(`Unlocked! (−${Number(data.cost ?? estimatedCost).toFixed(2)} credits)`);
+      toast.success(`Unlocked! (−${Math.round(Number(data.cost ?? estimatedCost))} credits)`);
       router.refresh();
       onUnlocked?.();
     } catch {
@@ -104,12 +104,12 @@ export function MaterialCard({
                 {unlocking ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>Unlock for {Number(estimatedCost).toFixed(2)} credits</>
+                  <>Unlock for {Math.round(Number(estimatedCost))} credits</>
                 )}
               </Button>
               {balance !== undefined && balance < estimatedCost && (
                 <p className="text-xs text-destructive mt-2">
-                  You need {Number(estimatedCost - balance).toFixed(2)} more credits
+                  You need {Math.round(Number(estimatedCost - balance))} more credits
                 </p>
               )}
             </>

@@ -16,7 +16,7 @@ export async function GET() {
   }
 
   try {
-    const [replyNotifications, transactions] = await Promise.all([
+    const [replyNotifications, transactions, pendingEnrollments] = await Promise.all([
       prisma.discussionReply.findMany({
         where: {
           userId: { not: userId },
@@ -66,6 +66,32 @@ export async function GET() {
           metadata: true,
         },
       }),
+      prisma.liveEventEnrollment.findMany({
+        where: {
+          userId,
+          status: { in: ['PENDING', 'CANCELLED'] },
+          liveEvent: {
+            deletedAt: null,
+            type: 'PROBLEM_SPRINT',
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          createdAt: true,
+          status: true,
+          liveEvent: {
+            select: {
+              id: true,
+              topic: true,
+              date: true,
+              creditCost: true,
+              durationMinutes: true,
+            },
+          },
+        },
+      }),
     ]);
 
     const items = [
@@ -104,6 +130,17 @@ export async function GET() {
         balanceAfter: roundCredits(tx.balanceAfter),
         label: tx.type,
         createdAt: tx.createdAt.toISOString(),
+      })),
+      ...pendingEnrollments.map((enrollment) => ({
+        type: 'sprint' as const,
+        id: enrollment.id,
+        liveEventId: enrollment.liveEvent.id,
+        topic: enrollment.liveEvent.topic,
+        date: enrollment.liveEvent.date.toISOString(),
+        creditCost: roundCredits(enrollment.liveEvent.creditCost),
+        durationMinutes: enrollment.liveEvent.durationMinutes,
+        status: enrollment.status,
+        createdAt: enrollment.createdAt.toISOString(),
       })),
     ];
 

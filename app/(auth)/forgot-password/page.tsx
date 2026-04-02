@@ -34,7 +34,6 @@ export default function ForgotPasswordPage() {
   return (
     <div className="mx-auto w-full max-w-md space-y-6 animate-fade-up">
       <header className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">Password reset</p>
         <h1 className="text-3xl font-semibold tracking-tight">Reset your password</h1>
         <p className="text-sm text-muted-foreground">
           Enter your email and we&apos;ll send a link to create a new password.
@@ -71,7 +70,7 @@ export default function ForgotPasswordPage() {
         </Button>
       </form>
 
-      <div className="border-t border-border/60 pt-4 text-sm text-muted-foreground">
+      <div className="border-t border-border/60 pt-4 text-center text-sm text-muted-foreground">
         <span>Remembered your password?</span>{' '}
         <Link href="/login" className="text-primary hover:underline font-medium">
           Sign in

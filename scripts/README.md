@@ -9,3 +9,6 @@ Scripts will be added here as needed for:
 - Seed data
 - Deployment tasks
 - Maintenance operations
+
+### Backfills
+- `backfill-material-question-count.mjs`: recomputes `Material.questionCount` from practice test content.

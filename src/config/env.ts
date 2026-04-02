@@ -19,6 +19,9 @@ const envSchema = z.object({
     .string()
     .optional()
     .refine((val) => !val || val.length >= 16, 'CRON_SECRET must be at least 16 characters when set'),
+  /** Optional admin bootstrap credentials */
+  ADMIN_EMAIL: z.string().email().optional(),
+  ADMIN_PASSWORD_HASH: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

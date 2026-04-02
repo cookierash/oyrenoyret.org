@@ -3,11 +3,11 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function MessagesSkeleton() {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-end">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
-          <Skeleton className="h-3 w-10" />
-          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-4 w-14" />
+          <Skeleton className="h-9 w-48" />
         </div>
       </div>
 

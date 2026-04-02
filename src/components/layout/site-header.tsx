@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { ArrowRight, ChevronDown } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/src/components/ui/logo';
@@ -22,41 +22,91 @@ interface HoverDropdownProps {
 }
 
 function HoverDropdown({ label, items }: HoverDropdownProps) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
+      if (!containerRef.current) {
+        return;
+      }
+      if (!containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, [open]);
+
   return (
-    <div className="group relative">
+    <div
+      ref={containerRef}
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
-        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors group-hover:bg-muted/70"
+        className={cn(
+          'flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors',
+          open ? 'bg-muted/70' : 'hover:bg-muted/70',
+        )}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         {label}
-        <ChevronDown className="h-3.5 w-3.5 group-hover:rotate-180" />
+        <ChevronDown className={cn('h-3.5 w-3.5', open && 'rotate-180')} />
       </button>
-      <div className="pointer-events-none invisible absolute left-1/2 top-full z-[100] w-56 -translate-x-1/2 origin-top scale-[0.98] opacity-0 transition-all duration-150 ease-out group-hover:visible group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100">
+      <div
+        className={cn(
+          'pointer-events-none invisible absolute left-1/2 top-full z-[100] w-56 -translate-x-1/2 origin-top scale-[0.98] opacity-0 transition-all duration-150 ease-out',
+          open && 'visible pointer-events-auto scale-100 opacity-100',
+        )}
+      >
         <div className="pt-3" aria-hidden />
-        <div className="card-frame bg-background py-1 px-1.5 backdrop-blur-sm">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="block rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
-            >
-              <div className="font-medium">{item.label}</div>
-              {item.description && (
-                <div className="text-xs text-muted-foreground">
-                  {item.description}
-                </div>
-              )}
-            </Link>
-          ))}
+        <div className="card-frame bg-background px-2 py-2">
+          <div className="flex flex-col gap-1">
+            {items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-col gap-0.5 rounded-md px-3 py-2 text-xs text-foreground transition-colors hover:bg-muted/70"
+                onClick={() => setOpen(false)}
+              >
+                <div className="font-medium">{item.label}</div>
+                {item.description && (
+                  <div className="text-xs text-muted-foreground">
+                    {item.description}
+                  </div>
+                )}
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export function SiteHeader() {
+interface SiteHeaderProps {
+  showSpacer?: boolean;
+  showSeparator?: boolean;
+}
+
+export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHeaderProps) {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -75,109 +125,304 @@ export function SiteHeader() {
       .catch(() => setUser(null));
   }, []);
 
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 768px)');
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setMenuOpen(false);
+      }
+    };
+
+    if (mediaQuery.matches) {
+      setMenuOpen(false);
+    }
+
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 w-full bg-background/70 backdrop-blur transition-colors duration-200',
-        hasScrolled ? 'border-b border-border/40' : 'border-b border-transparent',
-      )}
-    >
-      <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 py-2 sm:px-6">
-        {/* 1. Logo Section */}
-        <div className="flex min-w-0 items-center justify-self-start">
-          <Logo size="sm" showText textSize="lg" />
-        </div>
-
-        {/* 2. Directives Section - Core Navigation (centered) */}
-        <nav className="hidden items-center justify-center gap-3 md:flex">
-          <HoverDropdown
-            label="Resources"
-            items={[
-              {
-                label: 'Documentation',
-                href: '/docs',
-                description: 'Platform guides and API docs',
-              },
-              {
-                label: 'Help Center',
-                href: '/help',
-                description: 'FAQs and support articles',
-              },
-              {
-                label: 'Community',
-                href: '/community',
-                description: 'Join our community forum',
-              },
-              {
-                label: 'Blog',
-                href: '/blog',
-                description: 'Latest updates and insights',
-              },
-            ]}
-          />
-          <HoverDropdown
-            label="Legals"
-            items={[
-              {
-                label: 'Privacy Policy',
-                href: '/privacy',
-                description: 'How we protect your data',
-              },
-              {
-                label: 'Terms of Service',
-                href: '/terms',
-                description: 'Platform usage terms',
-              },
-              {
-                label: 'Cookie Policy',
-                href: '/cookies',
-                description: 'Cookie usage information',
-              },
-              {
-                label: 'GDPR Compliance',
-                href: '/gdpr',
-                description: 'EU data protection compliance',
-              },
-            ]}
-          />
-          <Link
-            href="/contact"
-            className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
+    <>
+      {showSpacer ? <div className="h-14" aria-hidden="true" /> : null}
+      <header
+        className={cn(
+          'fixed top-0 z-40 w-full border-b transition-[background-color,border-color,backdrop-filter,box-shadow] duration-300 will-change-[backdrop-filter,background-color] md:backdrop-blur-0 relative',
+          showSeparator ? 'border-transparent' : 'border-border',
+          showSeparator
+            ? hasScrolled
+              ? 'md:bg-background/70 md:backdrop-blur'
+              : 'md:bg-transparent md:backdrop-blur-0'
+            : hasScrolled
+              ? 'md:border-border/40 md:bg-background/70 md:backdrop-blur'
+              : 'md:border-transparent md:bg-transparent md:backdrop-blur-0',
+        )}
+      >
+        <div className="flex w-full items-center justify-between bg-background px-4 py-3 md:hidden">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(true)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-muted/70"
+            aria-expanded={menuOpen}
+            aria-controls="landing-sidebar"
           >
-            Contact
-          </Link>
-        </nav>
-
-        {/* 3. Interactive Buttons Section */}
-        <div className="flex items-center justify-end gap-3">
-          {user ? (
-            <ProfileAvatar
-              userId={user.id}
-              firstName={user.firstName}
-              lastName={user.lastName}
-              size="sm"
-            />
-          ) : (
-            <>
-              <Link
-                href="/login"
-                className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
-              >
-                Log in
-              </Link>
-              <Button asChild size="sm" variant="primary">
-                <Link
-                  href="/register"
-                  className="group/btn inline-flex items-center gap-1"
-                >
-                  Get started
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
-                </Link>
-              </Button>
-            </>
-          )}
+            <Menu className="h-4 w-4" />
+            <span className="sr-only">Toggle menu</span>
+          </button>
+          <Logo size="sm" showText textSize="lg" />
+          <span className="h-9 w-9" aria-hidden />
         </div>
+        <div className="hidden w-full grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 py-2 sm:px-6 md:grid">
+          {/* 1. Logo Section */}
+          <div className="flex min-w-0 items-center justify-self-start">
+            <Logo size="sm" showText textSize="lg" />
+          </div>
+
+          {/* 2. Directives Section - Core Navigation (centered) */}
+          <nav className="hidden items-center justify-center gap-3 md:flex">
+            <HoverDropdown
+              label="Resources"
+              items={[
+                {
+                  label: 'Documentation',
+                  href: '/docs',
+                  description: 'Platform guides and API docs',
+                },
+                {
+                  label: 'Help Center',
+                  href: '/help',
+                  description: 'FAQs and support articles',
+                },
+                {
+                  label: 'Changelog',
+                  href: '/changelog',
+                  description: 'Audit platform updates and releases',
+                },
+                {
+                  label: 'Blog',
+                  href: '/blog',
+                  description: 'Latest updates and insights',
+                },
+              ]}
+            />
+            <HoverDropdown
+              label="Legals"
+              items={[
+                {
+                  label: 'Privacy Policy',
+                  href: '/legals/privacy-policy',
+                  description: 'How we protect your data',
+                },
+                {
+                  label: 'Terms of Service',
+                  href: '/legals/terms-of-service',
+                  description: 'Platform usage terms',
+                },
+                {
+                  label: 'Cookie Policy',
+                  href: '/legals/cookie-policy',
+                  description: 'Cookie usage information',
+                },
+                {
+                  label: 'GDPR Compliance',
+                  href: '/legals/gdpr',
+                  description: 'EU data protection compliance',
+                },
+              ]}
+            />
+            <Link
+              href="/contact"
+              className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
+            >
+              Contact
+            </Link>
+          </nav>
+
+          {/* 3. Interactive Buttons Section */}
+          <div className="flex items-center justify-end gap-3">
+            <div className="flex items-center gap-3">
+              {user ? (
+                <ProfileAvatar
+                  userId={user.id}
+                  firstName={user.firstName}
+                  lastName={user.lastName}
+                  size="sm"
+                />
+              ) : (
+                <>
+                  <Link
+                    href="/login"
+                    className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
+                  >
+                    Log in
+                  </Link>
+                  <Button asChild size="sm" variant="primary">
+                    <Link
+                      href="/register"
+                      className="group/btn inline-flex items-center gap-1"
+                    >
+                      Get started
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
+                    </Link>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {showSeparator ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent"
+            aria-hidden="true"
+          />
+        ) : null}
+      </header>
+      <div
+        className={cn(
+          'fixed inset-0 z-50 md:hidden transition-opacity duration-300 ease-in-out',
+          menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+        )}
+        role="dialog"
+        aria-modal={menuOpen}
+        aria-hidden={!menuOpen}
+      >
+        <button
+          type="button"
+          className={cn(
+            'absolute inset-0 bg-black/40 transition-opacity duration-300 ease-in-out',
+            menuOpen ? 'opacity-100' : 'opacity-0',
+          )}
+          onClick={() => setMenuOpen(false)}
+          aria-label="Close navigation"
+          tabIndex={menuOpen ? 0 : -1}
+        />
+        <aside
+          id="landing-sidebar"
+          className={cn(
+            'absolute inset-y-0 left-0 w-72 border-r border-border bg-background shadow-xl transition-transform duration-350 ease-in-out will-change-transform',
+            menuOpen ? 'translate-x-0' : '-translate-x-full',
+          )}
+        >
+          <div className="flex h-14 items-center justify-between border-b border-border px-4">
+            <Logo size="sm" showText />
+            <button
+              type="button"
+              onClick={() => setMenuOpen(false)}
+              aria-label="Close navigation"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Resources
+              </span>
+              <Link
+                href="/docs"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Documentation
+              </Link>
+              <Link
+                href="/help"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Help Center
+              </Link>
+              <Link
+                href="/changelog"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Changelog
+              </Link>
+              <Link
+                href="/blog"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Blog
+              </Link>
+            </div>
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Legals
+              </span>
+              <Link
+                href="/legals/privacy-policy"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                href="/legals/terms-of-service"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Terms of Service
+              </Link>
+              <Link
+                href="/legals/cookie-policy"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                Cookie Policy
+              </Link>
+              <Link
+                href="/legals/gdpr"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                onClick={() => setMenuOpen(false)}
+              >
+                GDPR Compliance
+              </Link>
+            </div>
+            <Link
+              href="/contact"
+              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              onClick={() => setMenuOpen(false)}
+            >
+              Contact
+            </Link>
+          </nav>
+          <div className="border-t border-border px-4 py-4">
+            {user ? (
+              <div className="flex items-center gap-3">
+                <ProfileAvatar
+                  userId={user.id}
+                  firstName={user.firstName}
+                  lastName={user.lastName}
+                  size="sm"
+                />
+                <span className="text-xs text-muted-foreground">Signed in</span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Log in
+                </Link>
+                <Button asChild size="sm" variant="primary">
+                  <Link
+                    href="/register"
+                    className="group/btn inline-flex items-center gap-1"
+                    onClick={() => setMenuOpen(false)}
+                  >
+                    Get started
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
-    </header>
+    </>
   );
 }
