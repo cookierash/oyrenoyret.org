@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { TrendingUp } from 'lucide-react';
+import { PiTrendUp as TrendingUp } from 'react-icons/pi';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/src/lib/utils';
 

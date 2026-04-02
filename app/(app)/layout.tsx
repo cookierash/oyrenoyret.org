@@ -32,6 +32,7 @@ export default async function AppLayout({
       email: true,
       credits: true,
       role: true,
+      tutorialCompletedAt: true,
     },
   });
 
@@ -41,6 +42,8 @@ export default async function AppLayout({
 
   const displayName =
     [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email.split('@')[0];
+  const isStaff = user.role === 'ADMIN' || user.role === 'TEACHER';
+  const showTutorial = !isStaff && !user.tutorialCompletedAt;
 
   return (
     <AppShell
@@ -53,6 +56,7 @@ export default async function AppLayout({
         credits: user.credits != null ? roundCredits(user.credits) : undefined,
         role: user.role,
       }}
+      showTutorial={showTutorial}
     >
       {children}
     </AppShell>

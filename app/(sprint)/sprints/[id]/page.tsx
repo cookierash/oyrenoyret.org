@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Calendar, Clock, Coins, ArrowLeft } from 'lucide-react';
+import { PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiArrowLeft as ArrowLeft } from 'react-icons/pi';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';

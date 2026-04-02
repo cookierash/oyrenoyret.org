@@ -54,6 +54,7 @@ model User {
   parentEmail      String? // Parent/guardian email (stored but not trusted until verified)
   parentFirstName  String?
   parentLastName   String?
+  tutorialCompletedAt DateTime? // When the onboarding tutorial is completed
   
   // Credits (gamified economy)
   credits          Float             @default(15)
@@ -68,6 +69,7 @@ model User {
   academicRecords  AcademicRecord[]
   certificates     Certificate[]
   activities       Activity[]
+  userDailyVisits  UserDailyVisit[]
   liveEventsCreated LiveEvent[] @relation("LiveEventsCreated")
   liveEventEnrollments LiveEventEnrollment[]
   liveAnnouncementsCreated LiveAnnouncement[] @relation("LiveAnnouncementsCreated")
@@ -107,6 +109,23 @@ model UserActivityStats {
   updatedAt   DateTime @updatedAt
 
   @@index([userPublicId])
+}
+
+model UserDailyVisit {
+  id        String   @id @default(uuid())
+  userId    String
+  dayNumber Int
+  visitedAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dayNumber])
+  @@index([userId])
+  @@index([dayNumber])
+  @@index([visitedAt])
 }
 
 model GuardianVerification {
@@ -468,6 +487,7 @@ enum CreditTransactionType {
   MATERIAL_PASSIVE
   MATERIAL_UNLOCK
   DISCUSSION_CREATE
+  DISCUSSION_REFUND
   DISCUSSION_HELP
   GROUP_SESSION_PARTICIPATE
   GROUP_SESSION_FACILITATE

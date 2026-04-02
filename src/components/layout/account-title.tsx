@@ -16,7 +16,7 @@ const PAGE_LABELS: Record<string, string> = {
   '/admin/live-activities/announcements': 'Announcements',
   '/admin/live-activities/events': 'Events',
   '/discussions': 'Discussions',
-  '/messages': 'Messages',
+  '/recent-activities': 'Recent Activities',
   '/academic-record': 'Academic record',
   '/settings': 'Settings',
 };
@@ -27,6 +27,7 @@ function getPageLabel(pathname: string): string {
   if (pathname.startsWith('/preview/')) return 'Preview';
   if (pathname.startsWith('/library/')) return 'Library';
   if (pathname.startsWith('/discussions/')) return 'Discussion';
+  if (pathname.startsWith('/recent-activities')) return 'Recent Activities';
   if (pathname.startsWith('/sprints/')) return 'Problem Sprint';
   if (pathname.startsWith('/admin/')) return 'Admin';
   if (pathname.startsWith('/studio/')) return 'Editor';

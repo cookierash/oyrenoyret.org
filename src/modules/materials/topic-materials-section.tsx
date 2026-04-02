@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { PiMagnifyingGlass as Search } from 'react-icons/pi';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { CatalogMaterialsGrid } from './catalog-materials-grid';

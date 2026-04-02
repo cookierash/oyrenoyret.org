@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { MessageSquare, ChevronUp } from 'lucide-react';
+import { PiChatCircle as MessageSquare, PiCaretUp as ChevronUp } from 'react-icons/pi';
 import { PostAvatar } from './post-avatar';
 import { formatRelativeTime } from './relative-time';
 import { SUBJECTS } from '@/src/config/constants';

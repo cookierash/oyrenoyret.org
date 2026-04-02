@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { StudioEditor } from '@/src/modules/materials/studio-editor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { PiArrowLeft as ArrowLeft, PiFileText as FileText } from 'react-icons/pi';
 
 export default function NewDocumentPage() {
   const router = useRouter();

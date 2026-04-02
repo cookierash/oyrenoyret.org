@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { PiCaretDown as ChevronDown } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
 
 export interface SelectProps

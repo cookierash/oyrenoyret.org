@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { SUBJECTS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { SUBJECT_COLORS } from '@/src/config/subject-meta';
-import { BookOpen, ChevronRight } from 'lucide-react';
+import { PiBookOpen as BookOpen, PiCaretRight as ChevronRight } from 'react-icons/pi';
 
 interface SubjectPageProps {
   params: Promise<{ subject: string }>;

@@ -9,7 +9,7 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Award, Calendar, CheckCircle } from 'lucide-react';
+import { PiMedal as Award, PiCalendar as Calendar, PiCheckCircle as CheckCircle } from 'react-icons/pi';
 
 interface CertificatePageProps {
   params: Promise<{ id: string }>;

@@ -1,12 +1,6 @@
 "use client"
 
-import {
-  CircleCheck,
-  Info,
-  LoaderCircle,
-  OctagonX,
-  TriangleAlert,
-} from "lucide-react"
+import { PiCheckCircle as CircleCheck, PiInfo as Info, PiCircleNotch as LoaderCircle, PiXCircle as OctagonX, PiWarning as TriangleAlert } from 'react-icons/pi'
 import { useTheme } from "next-themes"
 import { Toaster as Sonner } from "sonner"
 import { useEffect, useState } from "react"

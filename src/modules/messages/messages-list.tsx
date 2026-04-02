@@ -19,6 +19,7 @@ const TRANSACTION_LABELS: Record<string, string> = {
   MATERIAL_PASSIVE: 'Earned from material unlock',
   MATERIAL_UNLOCK: 'Unlocked material',
   DISCUSSION_CREATE: 'Created discussion',
+  DISCUSSION_REFUND: 'Discussion refund (no replies)',
   DISCUSSION_HELP: 'Helpful reply reward',
   GROUP_SESSION_PARTICIPATE: 'Group session participation',
   GROUP_SESSION_FACILITATE: 'Group session facilitation',
@@ -76,17 +77,17 @@ export function MessagesList({ transactions }: MessagesListProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
           <label
-            htmlFor="messages-sort"
+            htmlFor="recent-activities-sort"
             className="text-sm text-muted-foreground whitespace-nowrap"
           >
             Sort by
           </label>
           <Select
-            id="messages-sort"
+            id="recent-activities-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as SortOrder)}
             className="w-[180px]"
-            aria-label="Sort messages"
+            aria-label="Sort recent activities"
           >
             <SelectItem value="newest">Newest first</SelectItem>
             <SelectItem value="oldest">Oldest first</SelectItem>
@@ -97,8 +98,11 @@ export function MessagesList({ transactions }: MessagesListProps) {
       <Card>
         <CardContent className="p-0">
           <div>
-            {grouped.map((group) => (
-              <div key={group.dateKey}>
+            {grouped.map((group, index) => (
+              <div
+                key={group.dateKey}
+                className={cn(index > 0 && 'border-t border-border/80')}
+              >
                 <div
                   suppressHydrationWarning
                   className={cn(

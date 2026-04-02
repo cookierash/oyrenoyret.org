@@ -7,7 +7,7 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { CheckCircle2 } from 'lucide-react';
+import { PiCheckCircle as CheckCircle2 } from 'react-icons/pi';
 import { useRouter } from 'next/navigation';
 
 interface Step5Props {

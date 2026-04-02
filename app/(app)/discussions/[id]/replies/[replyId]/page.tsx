@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowBigUp, ArrowBigDown, ArrowLeft, MessageSquare } from 'lucide-react';
+import { PiArrowUp as ArrowBigUp, PiArrowDown as ArrowBigDown, PiArrowLeft as ArrowLeft, PiChatCircle as MessageSquare } from 'react-icons/pi';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ interface Reply {
   createdAt: string;
   voteScore: number;
   userVote?: 1 | -1 | null;
+  discussionId?: string;
+  parentReplyId?: string | null;
   childReplies?: Reply[];
 }
 
@@ -52,8 +54,10 @@ export default function ReplyPage() {
   const router = useRouter();
 
   const [parentReply, setParentReply] = useState<Reply | null>(null);
-  const [parentReplyId, setParentReplyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [threadPath, setThreadPath] = useState<string[]>([]);
+  const [childReplies, setChildReplies] = useState<Reply[]>([]);
+  const [childLoading, setChildLoading] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState('');
@@ -65,43 +69,45 @@ export default function ReplyPage() {
   useEffect(() => {
     if (!id || !replyId) return;
     setLoading(true);
-    fetch(`/api/discussions/${id}`)
+    fetch(`/api/discussions/replies/${replyId}?discussionId=${id}`)
       .then((res) => {
         if (!res.ok) throw new Error();
         return res.json();
       })
       .then((data) => {
-        let foundReply: Reply | null = null;
-        let foundParentId: string | null = null;
-        const findReply = (replies: Reply[]) => {
-          for (const r of replies) {
-            if (r.id === replyId) {
-              foundReply = r;
-              foundParentId = null;
-              return;
-            }
-            if (r.childReplies) {
-              for (const child of r.childReplies) {
-                if (child.id === replyId) {
-                  foundReply = child;
-                  foundParentId = r.id;
-                  return;
-                }
-              }
-              findReply(r.childReplies);
-            }
-          }
-        };
-        findReply(data.replies || []);
-        setParentReply(foundReply);
-        setParentReplyId(foundParentId);
+        if (!data?.reply || data.reply.discussionId !== id) {
+          throw new Error('Reply not found');
+        }
+        setParentReply(data.reply);
+        setThreadPath(Array.isArray(data.threadPath) ? data.threadPath : [replyId]);
       })
       .catch(() => {
         toast.error('Failed to load reply');
         setParentReply(null);
+        setThreadPath([]);
       })
       .finally(() => setLoading(false));
   }, [id, replyId]);
+
+  const loadChildReplies = useCallback(async () => {
+    if (!id || !replyId) return;
+    setChildLoading(true);
+    try {
+      const res = await fetch(`/api/discussions/${id}/replies?parentReplyId=${replyId}`);
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setChildReplies(data.replies ?? []);
+    } catch {
+      toast.error('Failed to load replies');
+      setChildReplies([]);
+    } finally {
+      setChildLoading(false);
+    }
+  }, [id, replyId]);
+
+  useEffect(() => {
+    loadChildReplies();
+  }, [loadChildReplies]);
 
   const handleVote = async (value: 1 | -1) => {
     if (!parentReply || voteLoading) return;
@@ -151,9 +157,7 @@ export default function ReplyPage() {
       setDialogContent('');
       setDialogOpen(false);
       router.refresh();
-      if (created?.id) {
-        router.push(`/discussions/${id}/replies/${created.id}`);
-      }
+      await loadChildReplies();
     } catch {
       toast.error('Failed to post reply');
     } finally {
@@ -164,12 +168,12 @@ export default function ReplyPage() {
   if (loading) {
     return (
       <DashboardShell>
-        <main className="min-w-0 space-y-6">
+        <main className="min-w-0 space-y-6 pb-12">
             <div className="border-b border-border/60 py-2">
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back to discussions
+                  Back
                 </Link>
               </Button>
             </div>
@@ -205,7 +209,7 @@ export default function ReplyPage() {
             <Button size="sm" variant="ghost" asChild>
               <Link href="/discussions" className="inline-flex items-center gap-1">
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back to discussions
+                Back
               </Link>
             </Button>
           </div>
@@ -215,14 +219,21 @@ export default function ReplyPage() {
     );
   }
 
-  const backHref = parentReplyId
-    ? `/discussions/${id}/replies/${parentReplyId}`
-    : `/discussions/${id}`;
+  const pathIds = threadPath.length ? threadPath : replyId ? [replyId] : [];
+  const backHref =
+    pathIds.length > 1 ? `/discussions/${id}/replies/${pathIds[pathIds.length - 2]}` : `/discussions/${id}`;
+  const threadSteps = [
+    { label: 'Post', href: `/discussions/${id}` },
+    ...pathIds.map((stepId, index) => ({
+      label: `Reply ${index + 1}`,
+      href: `/discussions/${id}/replies/${stepId}`,
+    })),
+  ];
 
   return (
     <DashboardShell>
       <main className="lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
-          <div className="space-y-6 min-w-0 lg:overflow-y-auto">
+          <div className="space-y-6 min-w-0 pb-12 lg:overflow-y-auto">
             <div className="border-b border-border/60 py-2">
               <Button size="sm" variant="ghost" asChild>
                 <Link href={backHref} className="inline-flex items-center gap-1">
@@ -231,22 +242,58 @@ export default function ReplyPage() {
                 </Link>
               </Button>
             </div>
+            <div className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {threadSteps.map((step, index) => (
+                  <div
+                    key={step.href}
+                    className="flex items-center gap-2 shrink-0 text-[11px] text-muted-foreground"
+                  >
+                    <span
+                      className={cn(
+                        'h-2.5 w-2.5 rounded-full border border-border/70',
+                        index === threadSteps.length - 1
+                          ? 'bg-foreground/70'
+                          : 'bg-background'
+                      )}
+                    />
+                    <Link
+                      href={step.href}
+                      className={cn(
+                        'font-medium transition-colors',
+                        index === threadSteps.length - 1
+                          ? 'text-foreground'
+                          : 'text-foreground/70 hover:text-foreground'
+                      )}
+                    >
+                      {step.label}
+                    </Link>
+                    {index < threadSteps.length - 1 && (
+                      <span className="h-px w-6 bg-border/60" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="space-y-3 min-w-0">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <PostAvatar
                   userId={parentReply.authorId}
                   authorName={parentReply.authorName}
-                  size="sm"
+                  size="xs"
                 />
-                <span className="text-sm font-semibold text-foreground">{parentReply.authorName}</span>
+                <div className="text-[11px] text-muted-foreground">
+                  <span className="font-semibold text-foreground/70">
+                    {parentReply.authorName}
+                  </span>
+                  <span className="px-1">·</span>
+                  <span>{formatDateTime(parentReply.createdAt)}</span>
+                </div>
               </div>
-              <p className="text-[15px] text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
+              <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
                 {parentReply.content}
               </p>
-              <div className="text-xs text-muted-foreground">
-                {formatDateTime(parentReply.createdAt)}
-              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
@@ -302,29 +349,78 @@ export default function ReplyPage() {
 
             <div className="border-t border-border/60 pt-6">
               <div className="space-y-3">
-                <textarea
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="Write a reply"
-                  className="w-full min-h-[88px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-b border-border/60 pb-3"
-                  maxLength={MAX_REPLY_LENGTH}
-                />
-                {replyRemaining <= 100 ? (
-                  <div className="mt-1 text-right text-xs text-muted-foreground">
-                    {replyRemaining} characters left
+                <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
+                  <div className="space-y-3">
+                    <textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Write a reply"
+                      className="w-full min-h-[96px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                      maxLength={MAX_REPLY_LENGTH}
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        {replyRemaining <= 100 ? `${replyRemaining} characters left` : ''}
+                      </div>
+                      <Button size="sm" onClick={() => submitReply(replyContent)} disabled={submitting || !replyContent.trim()}>
+                        Reply
+                      </Button>
+                    </div>
                   </div>
-                ) : null}
-                <div className="flex justify-end">
-                  <Button size="sm" onClick={() => submitReply(replyContent)} disabled={submitting || !replyContent.trim()}>
-                    Reply
-                  </Button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground">Replies</h2>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-foreground">Replies</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Replies to this reply appear below.
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Replies open in their own pages.
-                </p>
+                {childLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="flex items-start gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-3 w-32" />
+                          <Skeleton className="h-3 w-full" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : childReplies.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No replies yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {childReplies.map((reply) => (
+                      <Link
+                        key={reply.id}
+                        href={`/discussions/${id}/replies/${reply.id}`}
+                        className="block rounded-lg border border-border/60 bg-muted/10 p-3 transition-colors hover:bg-muted/20"
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <PostAvatar
+                              userId={reply.authorId}
+                              authorName={reply.authorName}
+                              size="xs"
+                            />
+                            <div className="text-[11px] text-muted-foreground">
+                              <span className="font-semibold text-foreground/70">
+                                {reply.authorName}
+                              </span>
+                              <span className="px-1">·</span>
+                              <span>{formatDateTime(reply.createdAt)}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                            {reply.content}
+                          </p>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

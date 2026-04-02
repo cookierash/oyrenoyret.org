@@ -15,31 +15,16 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';
-import {
-  BookOpen,
-  Check,
-  ChevronRight,
-  Clock,
-  Flame,
-  Video,
-} from 'lucide-react';
-
-const STREAK_OFFSET_HOURS = 4;
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function toDayNumber(date: Date) {
-  return Math.floor((date.getTime() + STREAK_OFFSET_HOURS * 60 * 60 * 1000) / DAY_MS);
-}
+import { STREAK_OFFSET_HOURS, toDayNumber } from '@/src/lib/streak';
+import { recordDailyVisit } from '@/src/modules/visits';
+import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiFire as Flame, PiVideoCamera as Video } from 'react-icons/pi';
 
 function formatDayCount(count: number) {
   return `${count} day${count === 1 ? '' : 's'}`;
 }
 
-function calcStreakStats(dates: Date[]) {
-  const daySet = new Set<number>();
-  for (const date of dates) {
-    daySet.add(toDayNumber(date));
-  }
+function calcStreakStats(dayNumbers: number[]) {
+  const daySet = new Set<number>(dayNumbers);
 
   const today = toDayNumber(new Date());
   const hasToday = daySet.has(today);
@@ -98,13 +83,14 @@ function calcStreakStats(dates: Date[]) {
 }
 
 function buildWeekDays(daySet: Set<number>, today: number) {
+  const labels = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
   return Array.from({ length: 7 }).map((_, idx) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - idx));
     const dayNumber = toDayNumber(date);
     return {
       key: `${dayNumber}-${idx}`,
-      label: date.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, 1),
+      label: labels[date.getDay()],
       isActive: daySet.has(dayNumber),
       isToday: dayNumber === today,
     };
@@ -123,9 +109,10 @@ export default async function DashboardPage() {
   if (!userId) redirect('/login');
 
   const now = new Date();
+  await recordDailyVisit(userId, now);
 
   // Fetch user info + upcoming activities + recent purchases in parallel
-  const [user, upcomingActivities, recentPurchases, streakActivity] = await Promise.all([
+  const [user, upcomingActivities, recentPurchases, dailyVisits] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { firstName: true, lastName: true, role: true },
@@ -155,11 +142,11 @@ export default async function DashboardPage() {
         },
       },
     }),
-    prisma.creditTransaction.findMany({
+    prisma.userDailyVisit.findMany({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { dayNumber: 'desc' },
       take: 365,
-      select: { createdAt: true },
+      select: { dayNumber: true },
     }),
   ]);
 
@@ -169,65 +156,83 @@ export default async function DashboardPage() {
 
   const displayName = user?.firstName || 'there';
   const greeting = getGreeting();
-  const streakStats = calcStreakStats(streakActivity.map((entry) => entry.createdAt));
+  const streakStats = calcStreakStats(dailyVisits.map((entry) => entry.dayNumber));
+  const streakMessage = streakStats.hasToday
+    ? 'Keep it up!'
+    : streakStats.hasYesterday
+      ? 'Keep it alive today'
+      : 'Start a streak today!';
 
   return (
     <DashboardShell>
       <main className="space-y-6">
-        <section className="card-frame bg-card p-4">
+        <section>
           <div className="space-y-4">
             <div className="space-y-1">
-              <h1 className="text-xl font-semibold text-foreground">
+              <h1 className="text-3xl font-semibold text-foreground">
                 {greeting}, {displayName}
               </h1>
+              <p className="text-sm text-muted-foreground">
+                Here is your learning snapshot for today.
+              </p>
             </div>
 
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border/60 bg-muted/20 px-4 py-3">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-400/90 text-white shadow-sm">
-                    <Flame className="h-5 w-5" />
-                  </div>
-                  <div className="leading-tight">
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatDayCount(streakStats.current)} streak
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {streakStats.hasToday
-                        ? 'Streak updated today'
-                        : streakStats.hasYesterday
-                          ? 'Last chance!'
-                          : 'Start a streak today'}
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-7 gap-2">
-                  {streakStats.weekDays.map((day) => (
-                    <div key={day.key} className="flex flex-col items-center gap-1">
-                      <span className="text-[10px] font-medium text-muted-foreground">
-                        {day.label}
-                      </span>
-                      <div
-                        className={`flex h-7 w-7 items-center justify-center rounded-full border text-[10px] ${
-                          day.isActive
-                            ? 'border-amber-300 bg-amber-400 text-white'
-                            : 'border-border/60 bg-muted/40 text-muted-foreground'
-                        } ${day.isToday ? 'ring-2 ring-amber-300/60' : ''}`}
-                      >
-                        {day.isActive ? <Check className="h-3.5 w-3.5" /> : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-amber-50 via-orange-50/70 to-rose-50 px-4 py-4 sm:px-6 sm:py-5 dark:border-white/10 dark:from-amber-500/10 dark:via-orange-500/10 dark:to-rose-500/10">
+              <div className="pointer-events-none absolute -top-12 right-6 h-32 w-32 rounded-full bg-amber-300/40 blur-3xl dark:bg-amber-400/20" />
+              <div className="pointer-events-none absolute -bottom-12 left-6 h-32 w-32 rounded-full bg-rose-300/40 blur-3xl dark:bg-rose-400/20" />
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.7),transparent_65%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(15,23,42,0.55),transparent_70%)]" />
 
-              <div className="hidden items-end sm:flex" aria-hidden="true">
-                <div className="relative h-16 w-16 rounded-2xl bg-emerald-400/90">
-                  <div className="absolute left-3.5 top-4 h-4 w-4 rounded-full bg-white" />
-                  <div className="absolute right-3.5 top-4 h-4 w-4 rounded-full bg-white" />
-                  <div className="absolute left-[18px] top-5.5 h-1.5 w-1.5 rounded-full bg-emerald-700" />
-                  <div className="absolute right-[18px] top-5.5 h-1.5 w-1.5 rounded-full bg-emerald-700" />
-                  <div className="absolute bottom-3.5 left-1/2 h-2.5 w-5 -translate-x-1/2 rounded-full bg-emerald-300" />
+              <div className="relative grid gap-6 md:grid-cols-[1fr_3fr_1fr] md:items-center">
+                <div className="flex items-center gap-4 md:flex-col md:items-start">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                      Today
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-3xl font-semibold text-foreground">
+                        {streakStats.current}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {streakStats.current === 1 ? 'day' : 'days'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{streakMessage}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center gap-4">
+                  <div className="grid grid-cols-7 gap-2 sm:gap-3">
+                    {streakStats.weekDays.map((day) => (
+                      <div key={day.key} className="flex flex-col items-center gap-2">
+                        <span className="text-xs font-semibold text-muted-foreground/70">
+                          {day.label}
+                        </span>
+                        <div
+                          className={`flex h-10 w-10 items-center justify-center rounded-full border sm:h-11 sm:w-11 ${
+                            day.isActive
+                              ? 'border-amber-200/80 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md shadow-amber-500/30 ring-1 ring-white/40 dark:border-amber-200/50 dark:ring-white/20'
+                              : 'border-border/60 bg-white/70 text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white/60'
+                          }`}
+                        >
+                          <Check className={`h-4 w-4 sm:h-5 sm:w-5 ${day.isActive ? '' : 'opacity-50'}`} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 md:flex-col md:items-end md:text-right">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                      Best streak
+                    </p>
+                    <div className="flex items-baseline gap-2 md:justify-end">
+                      <span className="text-2xl font-semibold text-foreground">
+                        {streakStats.best}
+                      </span>
+                      <span className="text-xs text-muted-foreground">days</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

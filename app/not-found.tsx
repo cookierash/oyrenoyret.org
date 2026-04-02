@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Home, LayoutDashboard, LogIn } from 'lucide-react';
+import { PiHouse as Home, PiSquaresFour as LayoutDashboard, PiSignIn as LogIn } from 'react-icons/pi';
 import { Button } from '@/components/ui/button';
 
 export default function NotFound() {

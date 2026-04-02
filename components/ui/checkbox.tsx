@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check } from 'lucide-react';
+import { PiCheck as Check } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
 
 export interface CheckboxProps

@@ -117,6 +117,8 @@ export async function PATCH(
           : 0;
     }
     const isPublishing = body.status === 'PUBLISHED' && material.status !== 'PUBLISHED';
+    let publishQuestionCount: number | undefined;
+    let publishWordCount: number | undefined;
     if (isPublishing) {
       const effectiveObjectives =
         body.objectives !== undefined
@@ -127,6 +129,36 @@ export async function PATCH(
           { error: 'Lesson objectives are required to publish' },
           { status: 400 }
         );
+      }
+
+      const effectiveContent = updates.content ?? material.content ?? '';
+      if (material.materialType === 'TEXTUAL') {
+        const wordCount = getTextWordCount(effectiveContent);
+        if (wordCount < CREDITS_MATERIAL.TEXTUAL_MIN_WORDS) {
+          return NextResponse.json(
+            {
+              error: `Textual materials must be at least ${CREDITS_MATERIAL.TEXTUAL_MIN_WORDS} words to publish`,
+            },
+            { status: 400 }
+          );
+        }
+        publishWordCount = wordCount;
+      }
+      if (material.materialType === 'PRACTICE_TEST') {
+        let questionCount = updates.questionCount ?? material.questionCount;
+        if (questionCount === 0) {
+          questionCount = getPracticeTestQuestionCount(effectiveContent);
+        }
+        if (questionCount < CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS) {
+          return NextResponse.json(
+            {
+              error: `Practice tests must include at least ${CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS} questions to publish`,
+            },
+            { status: 400 }
+          );
+        }
+        publishQuestionCount = questionCount;
+        updates.questionCount = questionCount;
       }
     }
     if (body.status === 'PUBLISHED') {
@@ -161,43 +193,12 @@ export async function PATCH(
     let balanceAfter: number | undefined;
     let creditsGranted: number | undefined;
     if (isPublishing) {
-      const effectiveContent = updates.content ?? material.content;
-      let questionCount =
-        material.materialType === 'PRACTICE_TEST'
-          ? updates.questionCount ?? material.questionCount
-          : 0;
-      if (material.materialType === 'PRACTICE_TEST' && questionCount === 0) {
-        questionCount = getPracticeTestQuestionCount(effectiveContent);
-      }
-      const wordCount =
-        material.materialType === 'TEXTUAL' ? getTextWordCount(effectiveContent) : 0;
-
-      if (material.materialType === 'TEXTUAL') {
-        if (wordCount < CREDITS_MATERIAL.TEXTUAL_MIN_WORDS) {
-          return NextResponse.json(
-            {
-              error: `Textual materials must be at least ${CREDITS_MATERIAL.TEXTUAL_MIN_WORDS} words to publish`,
-            },
-            { status: 400 }
-          );
-        }
-      }
-      if (material.materialType === 'PRACTICE_TEST') {
-        if (questionCount < CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS) {
-          return NextResponse.json(
-            {
-              error: `Practice tests must include at least ${CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS} questions to publish`,
-            },
-            { status: 400 }
-          );
-        }
-      }
       const result = await grantMaterialPublish(
         userId,
         {
           materialType: material.materialType,
-          questionCount,
-          wordCount,
+          questionCount: publishQuestionCount ?? 0,
+          wordCount: publishWordCount ?? 0,
         },
         materialId
       );

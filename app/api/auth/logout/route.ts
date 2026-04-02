@@ -9,5 +9,7 @@ import { deleteSession } from '@/src/modules/auth/utils/session';
 
 export async function POST(request: Request) {
   await deleteSession();
-  return NextResponse.redirect(new URL('/', request.url));
+  const response = NextResponse.redirect(new URL('/', request.url));
+  response.cookies.delete('session_token');
+  return response;
 }

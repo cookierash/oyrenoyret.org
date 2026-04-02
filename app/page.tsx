@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs';
+import path from 'node:path';
 import Link from 'next/link';
 import Image from 'next/image';
 import { redirect } from 'next/navigation';
@@ -16,6 +18,73 @@ export const metadata = {
   },
 };
 
+interface PartnerLogo {
+  src: string;
+  name: string;
+}
+
+function getPartnerLogos(): PartnerLogo[] {
+  const publicDir = path.join(process.cwd(), 'public');
+  let files: string[] = [];
+  try {
+    files = readdirSync(publicDir, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+
+  const allowedExtensions = new Set(['.png', '.jpg', '.jpeg', '.svg', '.webp']);
+
+  return files
+    .map((file) => {
+      if (!file.toLowerCase().startsWith('partner')) return null;
+
+      const ext = path.extname(file);
+      if (ext && !allowedExtensions.has(ext.toLowerCase())) {
+        return null;
+      }
+
+      const baseName = ext ? file.slice(0, -ext.length) : file;
+      const match = /^partner(?:(\d+)[-_])?(.+)?$/i.exec(baseName);
+      if (!match) return null;
+      const order = match[1] ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+      const rawName = (match[2] ?? '').trim();
+      const name = rawName
+        ? rawName
+            .replace(/[-_]+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, (char) => char.toUpperCase())
+        : match[1]
+          ? `Partner ${order}`
+          : 'Partner';
+
+      return {
+        order,
+        name,
+        src: `/${file}`,
+        sortKey: rawName.toLowerCase(),
+      };
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        order: number;
+        src: string;
+        name: string;
+        sortKey: string;
+      } => Boolean(entry),
+    )
+    .sort(
+      (a, b) =>
+        a.order - b.order ||
+        a.sortKey.localeCompare(b.sortKey) ||
+        a.src.localeCompare(b.src),
+    )
+    .map(({ order: _order, sortKey: _sortKey, ...rest }) => rest);
+}
+
 export default async function HomePage() {
   const userId = await getCurrentSession();
   if (userId) {
@@ -28,6 +97,8 @@ export default async function HomePage() {
     }
     redirect(isStaff(user.role) ? '/admin/dashboard' : '/dashboard');
   }
+
+  const partnerLogos = getPartnerLogos();
 
   return (
     <div className="landing-light relative flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
@@ -115,7 +186,7 @@ export default async function HomePage() {
                 </div>
               </div>
             </div>
-            <StickyPartnersBar />
+            <StickyPartnersBar partners={partnerLogos} />
           </section>
         </main>
         <SiteFooter />

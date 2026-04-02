@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Sparkles, BookOpen, Library, CalendarDays, MessageSquare, GraduationCap, LogOut, Settings, Receipt, X, ShieldCheck } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiBookOpen as BookOpen, PiBooks as Library, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck } from 'react-icons/pi';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
 import { Logo } from '@/src/components/ui/logo';
 import { ThemeToggle } from '@/src/components/theme-toggle';
@@ -30,7 +30,7 @@ const navItems = [
   { href: '/library', label: 'Library', icon: Library },
   { href: '/live-activities', label: 'Live Activities', icon: CalendarDays },
   { href: '/discussions', label: 'Discussions', icon: MessageSquare },
-  { href: '/messages', label: 'Messages', icon: Receipt },
+  { href: '/recent-activities', label: 'Recent Activities', icon: Receipt },
   { href: '/academic-record', label: 'Academic record', icon: GraduationCap },
 ];
 
@@ -38,8 +38,10 @@ import { CREDITS_UPDATED_EVENT } from '@/src/lib/credits-events';
 
 export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [credits, setCredits] = useState<number | null>(user.credits ?? null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [logoutPending, setLogoutPending] = useState(false);
   const lastBalanceFetchRef = useRef(0);
   const fetchInFlightRef = useRef(false);
   const isStaff = user.role === 'ADMIN' || user.role === 'TEACHER';
@@ -104,6 +106,18 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   }, [fetchBalance]);
 
   const displayCredits = credits ?? user.credits ?? 0;
+
+  const handleLogout = useCallback(async () => {
+    if (logoutPending) return;
+    setLogoutPending(true);
+    setProfileMenuOpen(false);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } finally {
+      router.replace('/');
+      router.refresh();
+    }
+  }, [logoutPending, router]);
 
   return (
     <aside
@@ -289,15 +303,15 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                 <Settings className="h-4 w-4" />
                 Settings
               </Link>
-              <form action="/api/auth/logout" method="POST">
-                <button
-                  type="submit"
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Log out
-                </button>
-              </form>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={logoutPending}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <LogOut className="h-4 w-4" />
+                {logoutPending ? 'Logging out...' : 'Log out'}
+              </button>
             </div>
           </HoverCardContent>
         </HoverCard>

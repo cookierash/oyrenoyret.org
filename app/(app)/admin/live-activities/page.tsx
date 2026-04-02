@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { CalendarDays, MessageSquare, Sparkles } from 'lucide-react';
+import { PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiSparkle as Sparkles } from 'react-icons/pi';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { isStaff } from '@/src/lib/permissions';

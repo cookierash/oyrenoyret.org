@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PracticeTestEditor } from '@/src/modules/materials/practice-test-editor';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ClipboardList } from 'lucide-react';
+import { PiArrowLeft as ArrowLeft, PiClipboardText as ClipboardList } from 'react-icons/pi';
 
 export default function NewPracticeTestPage() {
   const router = useRouter();
@@ -41,7 +41,7 @@ export default function NewPracticeTestPage() {
           </Button>
         </div>
       </header>
-      <main className="flex-1 overflow-auto px-4 py-6 max-w-4xl mx-auto w-full">
+      <main className="flex-1 overflow-auto px-4 pt-6 pb-12 max-w-4xl mx-auto w-full">
         <PracticeTestEditor
           mode="create"
           onSaved={() => router.push('/studio')}

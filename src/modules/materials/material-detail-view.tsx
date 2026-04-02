@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Lock, Loader2 } from 'lucide-react';
+import { PiLock as Lock, PiCircleNotch as Loader2 } from 'react-icons/pi';
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { PracticeTestView } from './practice-test-view';
 import { toast } from 'sonner';

@@ -10,29 +10,7 @@ import SubscriptExtension from '@tiptap/extension-subscript';
 import SuperscriptExtension from '@tiptap/extension-superscript';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Strikethrough,
-  Subscript as SubscriptIcon,
-  Superscript as SuperscriptIcon,
-  Code,
-  Code2,
-  Quote,
-  Minus,
-  List,
-  ListOrdered,
-  Heading1,
-  Heading2,
-  Heading3,
-  Type,
-  Undo,
-  Redo,
-  Highlighter,
-  Palette,
-  Eraser,
-} from 'lucide-react';
+import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextStrikethrough as Strikethrough, PiTextAa as SubscriptIcon, PiTextH as SuperscriptIcon, PiCode as Code, PiCodeSimple as Code2, PiQuotes as Quote, PiMinus as Minus, PiList as List, PiListNumbers as ListOrdered, PiTextHOne as Heading1, PiTextHTwo as Heading2, PiTextHThree as Heading3, PiTextT as Type, PiArrowCounterClockwise as Undo, PiArrowClockwise as Redo, PiHighlighterCircle as Highlighter, PiPalette as Palette, PiEraser as Eraser } from 'react-icons/pi';
 
 const TEXT_COLORS = [
   { name: 'Default', value: '' },

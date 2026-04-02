@@ -7,7 +7,7 @@
 
 import { prisma } from '@/src/db/client';
 import { recordUserActivity } from '@/src/modules/activity-stats';
-import type { CreditTransactionType } from '@prisma/client';
+import type { CreditTransactionType, Prisma } from '@prisma/client';
 import type { CreditResult, MaterialCreditParams } from './credits.types';
 import {
   DEFAULT_CREDITS,
@@ -55,6 +55,17 @@ async function executeTransaction(
     return { balanceAfter: updated.credits, transactionId: txRecord.id };
   });
   return { balanceAfter: roundCredits(result.balanceAfter), transactionId: result.transactionId };
+}
+
+async function getBalanceWithClient(
+  client: Prisma.TransactionClient | typeof prisma,
+  userId: string
+): Promise<number> {
+  const user = await client.user.findUnique({
+    where: { id: userId },
+    select: { credits: true },
+  });
+  return user ? roundCredits(user.credits) : 0;
 }
 
 /** Get current balance */
@@ -304,6 +315,71 @@ export async function spendDiscussionCreate(
       success: false,
       amount: 0,
       balanceAfter: await getBalance(userId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+/** Refund credits for discussions with no replies */
+export async function refundDiscussionCreate(
+  userId: string,
+  discussionId: string,
+  tx?: Prisma.TransactionClient
+): Promise<CreditResult> {
+  const refundAmount = roundCredits(calcDiscussionCreateCost());
+  const client = tx ?? prisma;
+  const run = async (): Promise<CreditResult> => {
+    const existing = await client.creditTransaction.findFirst({
+      where: {
+        type: 'DISCUSSION_REFUND',
+        referenceId: discussionId,
+      },
+      select: { id: true },
+    });
+
+    if (existing) {
+      return {
+        success: true,
+        amount: 0,
+        balanceAfter: await getBalanceWithClient(client, userId),
+      };
+    }
+
+    const updated = await client.user.update({
+      where: { id: userId },
+      data: { credits: { increment: refundAmount } },
+      select: { credits: true },
+    });
+
+    await client.creditTransaction.create({
+      data: {
+        userId,
+        amount: refundAmount,
+        balanceAfter: updated.credits,
+        type: 'DISCUSSION_REFUND',
+        referenceId: discussionId,
+        metadata: { discussionId, reason: 'no_replies' },
+      },
+    });
+
+    return {
+      success: true,
+      amount: refundAmount,
+      balanceAfter: roundCredits(updated.credits),
+    };
+  };
+
+  if (tx) {
+    return run();
+  }
+
+  try {
+    return await run();
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalanceWithClient(client, userId),
       error: e instanceof Error ? e.message : 'Transaction failed',
     };
   }

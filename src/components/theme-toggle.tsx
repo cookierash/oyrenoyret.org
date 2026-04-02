@@ -1,7 +1,7 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { Moon, Sun } from 'lucide-react';
+import { PiMoon as Moon, PiSun as Sun } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
 
 interface ThemeToggleProps {

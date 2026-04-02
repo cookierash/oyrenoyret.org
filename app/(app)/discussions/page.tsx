@@ -4,12 +4,12 @@
 
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Input } from '@/components/ui/input';
-import { Search, X } from 'lucide-react';
+import { PiMagnifyingGlass as Search, PiX as X } from 'react-icons/pi';
 import { CreateDiscussionDialog } from '@/src/modules/discussions/create-discussion-dialog';
 import { DiscussionList } from '@/src/modules/discussions/discussion-list';
 import { SUBJECTS } from '@/src/config/constants';
@@ -20,6 +20,25 @@ export default function DiscussionsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') return;
+    let active = true;
+    const runCleanup = async () => {
+      try {
+        await fetch('/api/cron/archive-discussions', { cache: 'no-store' });
+      } catch {
+        return;
+      }
+      if (active) {
+        setRefreshKey((prev) => prev + 1);
+      }
+    };
+    runCleanup();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const tagMatch = useMemo(() => searchQuery.match(/(?:^|\s)#([a-z0-9-]*)$/i), [searchQuery]);
   const tagQuery = tagMatch?.[1]?.toLowerCase() ?? '';

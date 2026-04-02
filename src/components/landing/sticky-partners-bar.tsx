@@ -5,7 +5,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/src/lib/utils';
 import { PartnersMarquee } from '@/src/components/landing/partners-marquee';
 
-export function StickyPartnersBar() {
+interface PartnerLogo {
+  src: string;
+  name: string;
+}
+
+interface StickyPartnersBarProps {
+  partners: PartnerLogo[];
+}
+
+export function StickyPartnersBar({ partners }: StickyPartnersBarProps) {
   const barRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const [barHeight, setBarHeight] = useState(0);
@@ -64,7 +73,7 @@ export function StickyPartnersBar() {
       >
         <div className="w-full bg-background py-4">
           <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
-            <PartnersMarquee />
+            <PartnersMarquee partners={partners} />
           </div>
         </div>
       </div>
