@@ -151,7 +151,7 @@ export default function ReplyPage() {
           parentReplyId: replyId,
         }),
       });
-      const created = await res.json();
+      await res.json();
       if (!res.ok) throw new Error('Failed to reply');
       setReplyContent('');
       setDialogContent('');

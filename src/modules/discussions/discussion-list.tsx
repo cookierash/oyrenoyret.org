@@ -104,6 +104,15 @@ export function DiscussionList({
             <p className="text-xs text-muted-foreground/60 mt-1">
               Try a different keyword or remove the subject filter.
             </p>
+            {onClearSearch ? (
+              <button
+                type="button"
+                onClick={onClearSearch}
+                className="mt-3 inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+              >
+                Clear search
+              </button>
+            ) : null}
           </>
         ) : (
           <>
