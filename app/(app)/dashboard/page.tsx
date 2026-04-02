@@ -17,11 +17,7 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';
 import { STREAK_OFFSET_HOURS, toDayNumber } from '@/src/lib/streak';
 import { recordDailyVisit } from '@/src/modules/visits';
-import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiFire as Flame, PiVideoCamera as Video } from 'react-icons/pi';
-
-function formatDayCount(count: number) {
-  return `${count} day${count === 1 ? '' : 's'}`;
-}
+import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiVideoCamera as Video } from 'react-icons/pi';
 
 function calcStreakStats(dayNumbers: number[]) {
   const daySet = new Set<number>(dayNumbers);

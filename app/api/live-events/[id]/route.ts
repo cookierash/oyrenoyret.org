@@ -13,11 +13,12 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: paramIdRaw } = await params;
     const body = await request.json().catch(() => ({} as { id?: string; eventId?: string }));
-    const paramId = typeof params?.id === 'string' ? params.id.trim() : '';
+    const paramId = typeof paramIdRaw === 'string' ? paramIdRaw.trim() : '';
     const bodyId =
       typeof body?.id === 'string'
         ? body.id.trim()

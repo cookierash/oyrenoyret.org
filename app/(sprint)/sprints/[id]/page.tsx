@@ -12,15 +12,16 @@ import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';
 export default async function SprintWorkspacePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const userId = await getCurrentSession();
   if (!userId) {
     redirect('/login');
   }
 
   const event = await prisma.liveEvent.findFirst({
-    where: { id: params.id, deletedAt: null },
+    where: { id, deletedAt: null },
     select: {
       id: true,
       topic: true,

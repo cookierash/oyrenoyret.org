@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import type { LiveEventType } from '@prisma/client';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
@@ -19,8 +20,9 @@ export async function GET(request: Request) {
     const takeParam = Number(searchParams.get('take') ?? 100);
     const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : 100;
     const typeParam = searchParams.get('type');
-    const allowedTypes = ['PROBLEM_SPRINT', 'EVENT'];
-    const type = typeParam && allowedTypes.includes(typeParam) ? typeParam : null;
+    const isLiveEventType = (value: string | null): value is LiveEventType =>
+      value === 'PROBLEM_SPRINT' || value === 'EVENT';
+    const type = isLiveEventType(typeParam) ? typeParam : null;
 
     const events = await prisma.liveEvent.findMany({
       where: { deletedAt: null, ...(type ? { type } : {}) },
@@ -95,11 +97,9 @@ export async function POST(request: Request) {
     const date = body.date ? new Date(body.date) : null;
     const durationMinutes = Number(body.durationMinutes);
     const creditCost = Number(body.creditCost);
-    const allowedTypes = ['PROBLEM_SPRINT', 'EVENT'];
-    const type =
-      typeof body.type === 'string' && allowedTypes.includes(body.type)
-        ? body.type
-        : 'PROBLEM_SPRINT';
+    const isLiveEventType = (value: string | null): value is LiveEventType =>
+      value === 'PROBLEM_SPRINT' || value === 'EVENT';
+    const type = isLiveEventType(body?.type ?? null) ? body.type : 'PROBLEM_SPRINT';
     const allowedDifficulties = ['BASIC', 'INTERMEDIATE', 'ADVANCED'];
     const difficulty =
       typeof body.difficulty === 'string' && allowedDifficulties.includes(body.difficulty)

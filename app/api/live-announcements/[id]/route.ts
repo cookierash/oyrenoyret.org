@@ -13,9 +13,10 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -41,7 +42,7 @@ export async function DELETE(
     }
 
     const updated = await prisma.liveAnnouncement.updateMany({
-      where: { id: params.id, deletedAt: null },
+      where: { id, deletedAt: null },
       data: { deletedAt: new Date() },
     });
 

@@ -13,9 +13,10 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: paramIdRaw } = await params;
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -36,8 +37,8 @@ export async function POST(
     const eventId =
       typeof body?.liveEventId === 'string' && body.liveEventId.trim().length > 0
         ? body.liveEventId.trim()
-        : typeof params?.id === 'string' && params.id.trim().length > 0
-          ? params.id
+        : typeof paramIdRaw === 'string' && paramIdRaw.trim().length > 0
+          ? paramIdRaw
           : '';
 
     if (!eventId) {
