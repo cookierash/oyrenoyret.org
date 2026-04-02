@@ -21,6 +21,14 @@ export const RATE_LIMITS = {
     maxRequests: 5,
     windowMs: 15 * 60 * 1000, // 15 minutes
   },
+  AUTH_REGISTRATION: {
+    maxRequests: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  },
+  AUTH_VERIFICATION: {
+    maxRequests: 3,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+  },
   GENERAL: {
     maxRequests: 100,
     windowMs: 15 * 60 * 1000, // 15 minutes

@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
     const connectSrc = isDev
       ? "connect-src 'self' ws: wss: http://127.0.0.1:3000 http://localhost:3000 http://127.0.0.1:7242 http://localhost:7242"
       : "connect-src 'self'";
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
+      : "script-src 'self' 'unsafe-inline'";
 
     return [
       {
@@ -51,7 +54,7 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // 'unsafe-eval' needed for Next.js in dev
+              scriptSrc, // 'unsafe-eval' needed for Next.js in dev
               "style-src 'self' 'unsafe-inline'", // 'unsafe-inline' needed for Tailwind
               "img-src 'self' data: https:",
               "font-src 'self' data:",

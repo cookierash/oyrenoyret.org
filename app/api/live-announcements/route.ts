@@ -11,10 +11,18 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
 import { sanitizeInput } from '@/src/security/validation';
 import { RATE_LIMITS } from '@/src/config/constants';
+import { getPublicCacheHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(request: Request) {
   try {
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`live-announcements:list:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { searchParams } = new URL(request.url);
     const takeParam = Number(searchParams.get('take') ?? 20);
     const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : 20;
@@ -31,7 +39,7 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json(announcements);
+    return NextResponse.json(announcements, { headers: getPublicCacheHeaders() });
   } catch (error) {
     console.error('Error fetching announcements:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

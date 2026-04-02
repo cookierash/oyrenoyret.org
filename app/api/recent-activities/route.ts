@@ -8,14 +8,24 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { roundCredits } from '@/src/modules/credits';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
-export async function GET() {
+export async function GET(request: Request) {
   const userId = await getCurrentSession();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(`recent-activities:read:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const [replyNotifications, transactions, pendingEnrollments] = await Promise.all([
       prisma.discussionReply.findMany({
         where: {
@@ -144,7 +154,7 @@ export async function GET() {
       })),
     ];
 
-    return NextResponse.json({ items });
+    return NextResponse.json({ items }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching recent activities:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

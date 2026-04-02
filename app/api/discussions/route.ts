@@ -10,11 +10,19 @@ import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { spendDiscussionCreate, getBalance, calcDiscussionCreateCost, roundCredits } from '@/src/modules/credits';
 import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders, getPublicCacheHeaders } from '@/src/lib/http-cache';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(request: Request) {
   try {
+    const identifier = getRateLimitIdentifier(request);
+    const rateLimit = await checkRateLimit(`discussions:list:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
@@ -114,7 +122,8 @@ export async function GET(request: Request) {
       userVote: includeVotes ? currentUserVoteMap[d.id] ?? null : null,
     }));
 
-    return NextResponse.json(result);
+    const headers = includeVotes ? getPrivateNoStoreHeaders() : getPublicCacheHeaders();
+    return NextResponse.json(result, { headers });
   } catch (error) {
     console.error('Error fetching discussions:', error);
     return NextResponse.json(

@@ -61,6 +61,8 @@ Optional variables:
 - `DISCUSSION_INACTIVITY_HOURS` - Override archive window for discussions.
 - `SESSION_CACHE_TTL_MS` - Session cache TTL in milliseconds.
 - `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` - Path to mocked Google Fonts responses.
+- `REGISTRATION_TOKEN_SECRET` - Optional; defaults to `NEXTAUTH_SECRET`. Use a separate secret for registration tokens.
+- `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` - Recommended in production for distributed rate limiting.
 - `ADMIN_EMAIL` and `ADMIN_PASSWORD_HASH` - Optional admin bootstrap credentials.
 
 ## 4. Production Launch on Vercel
@@ -72,6 +74,8 @@ Optional variables:
    - `NEXTAUTH_SECRET`
    - `NEXTAUTH_URL` (your production domain)
    - `CRON_SECRET` (required if using cron endpoints)
+   - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (recommended for rate limiting)
+   - `REGISTRATION_TOKEN_SECRET` (optional; defaults to `NEXTAUTH_SECRET`)
 
 3. Run migrations with Vercel CLI:
    ```bash

@@ -40,6 +40,18 @@
 - **Value**: `https://your-app.vercel.app` (your actual domain)
 - **Environment**: Production ✅
 
+- **Name**: `UPSTASH_REDIS_REST_URL`
+- **Value**: Your Upstash Redis REST URL (recommended for rate limiting)
+- **Environment**: Production ✅
+
+- **Name**: `UPSTASH_REDIS_REST_TOKEN`
+- **Value**: Your Upstash Redis REST token
+- **Environment**: Production ✅
+
+- **Name**: `REGISTRATION_TOKEN_SECRET`
+- **Value**: Optional; defaults to `NEXTAUTH_SECRET` if unset
+- **Environment**: Production ✅
+
 #### For Preview/Development:
 - Add the same variables for **Preview** and **Development** environments
 - Use different `NEXTAUTH_SECRET` for each environment

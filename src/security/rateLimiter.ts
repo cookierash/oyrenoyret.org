@@ -4,10 +4,13 @@
  * Provides rate limiting functionality to prevent abuse and DoS attacks.
  *
  * Implementation Notes:
- * - In-memory fixed-window limiter (sufficient for single-instance deployments)
- * - For distributed deployments, replace with Redis or a dedicated rate-limit service
+ * - Uses Upstash Redis (distributed) when configured
+ * - Falls back to in-memory fixed-window limiter in dev/test
  * - Use unique keys per endpoint + identifier (user ID or IP)
  */
+
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
 export interface RateLimitConfig {
   maxRequests: number;
@@ -29,6 +32,28 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 let lastCleanupAt = 0;
 const CLEANUP_INTERVAL_MS = 60_000;
 
+const hasUpstashConfig =
+  Boolean(process.env.UPSTASH_REDIS_REST_URL) &&
+  Boolean(process.env.UPSTASH_REDIS_REST_TOKEN);
+
+const ratelimitCache = new Map<string, Ratelimit>();
+
+function getRatelimiter(config: RateLimitConfig): Ratelimit | null {
+  if (!hasUpstashConfig) return null;
+  const key = `${config.maxRequests}:${config.windowMs}`;
+  const existing = ratelimitCache.get(key);
+  if (existing) return existing;
+
+  const windowSeconds = Math.max(1, Math.ceil(config.windowMs / 1000));
+  const limiter = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.fixedWindow(config.maxRequests, `${windowSeconds} s`),
+    prefix: 'oyrenoyret:ratelimit',
+  });
+  ratelimitCache.set(key, limiter);
+  return limiter;
+}
+
 function cleanupExpiredEntries(now: number) {
   if (now - lastCleanupAt < CLEANUP_INTERVAL_MS) return;
   lastCleanupAt = now;
@@ -39,13 +64,23 @@ function cleanupExpiredEntries(now: number) {
   }
 }
 
-export function getRateLimitIdentifier(request: Request, userId?: string | null): string {
+export function getRateLimitIdentifierFromHeaders(
+  headers: Headers,
+  userId?: string | null
+): string {
   if (userId) {
     return `user:${userId}`;
   }
-  const forwarded = request.headers.get('x-forwarded-for');
-  const ip = forwarded ? forwarded.split(',')[0]?.trim() : request.headers.get('x-real-ip');
+  const forwarded =
+    headers.get('x-forwarded-for') ||
+    headers.get('x-vercel-forwarded-for') ||
+    headers.get('x-real-ip');
+  const ip = forwarded ? forwarded.split(',')[0]?.trim() : null;
   return `ip:${ip || 'unknown'}`;
+}
+
+export function getRateLimitIdentifier(request: Request, userId?: string | null): string {
+  return getRateLimitIdentifierFromHeaders(request.headers, userId);
 }
 
 export function buildRateLimitResponse(result: RateLimitResult) {
@@ -80,6 +115,20 @@ export async function checkRateLimit(
   identifier: string,
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
+  const ratelimiter = getRatelimiter(config);
+  if (ratelimiter) {
+    try {
+      const result = await ratelimiter.limit(identifier);
+      return {
+        allowed: result.success,
+        remaining: Math.max(result.remaining ?? 0, 0),
+        resetAt: new Date(result.reset),
+      };
+    } catch (error) {
+      console.warn('Rate limiter fallback to in-memory:', error);
+    }
+  }
+
   const now = Date.now();
   cleanupExpiredEntries(now);
 

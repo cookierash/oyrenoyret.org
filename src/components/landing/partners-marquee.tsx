@@ -16,15 +16,15 @@ export function PartnersMarquee({ partners }: PartnersMarqueeProps) {
 
   return (
     <div className="w-full">
-      <div className="flex flex-col gap-4 text-left sm:flex-row sm:items-center sm:gap-6">
+      <div className="mx-auto flex w-full flex-row flex-wrap items-center justify-center gap-4 text-center sm:gap-6 lg:max-w-4xl lg:flex-nowrap">
         <p className="text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
           our partners
         </p>
-        <div className="flex flex-1 flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           {partners.map((partner) => (
             <div
               key={partner.src}
-              className="flex h-10 items-center justify-center rounded-full bg-background/70 px-4"
+              className="flex h-10 items-center justify-center px-4"
             >
               <Image
                 src={partner.src}

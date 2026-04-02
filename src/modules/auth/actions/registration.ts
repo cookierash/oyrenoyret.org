@@ -28,6 +28,11 @@ import {
 } from '../utils/verification';
 import { sendVerificationCode } from '../services/email';
 import { createSession } from '../utils/session';
+import {
+  issueRegistrationToken,
+  requireRegistrationToken,
+  clearRegistrationToken,
+} from '../utils/registration-token';
 import { ensureDefaultCredits } from '@/src/modules/credits';
 import { CONSENT_VERSION } from '@/src/config/constants';
 import { headers } from 'next/headers';
@@ -38,6 +43,17 @@ import { recordDailyVisit } from '@/src/modules/visits';
  */
 export async function registerStudentInfo(data: StudentInfoInput) {
   try {
+    const { checkRegistrationRateLimit } = await import('./rate-limit');
+    const rateLimit = await checkRegistrationRateLimit();
+    if (!rateLimit.allowed) {
+      return {
+        success: false,
+        error: `Too many registration attempts. Please wait ${Math.ceil(
+          (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
+        )} minutes.`,
+      };
+    }
+
     // Validate input
     const validated = studentInfoSchema.parse(data);
 
@@ -79,6 +95,7 @@ export async function registerStudentInfo(data: StudentInfoInput) {
       },
     });
     await getOrCreatePublicId(user.id);
+    await issueRegistrationToken(user.id);
 
     return {
       success: true,
@@ -103,6 +120,14 @@ export async function registerStudentInfo(data: StudentInfoInput) {
  */
 export async function registerParentInfo(userId: string, data: ParentInfoInput) {
   try {
+    const tokenCheck = await requireRegistrationToken(userId);
+    if (!tokenCheck.ok) {
+      return {
+        success: false,
+        error: tokenCheck.error,
+      };
+    }
+
     // Validate input
     const validated = parentInfoSchema.parse(data);
 
@@ -136,6 +161,7 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
         registrationStep: 3, // Move to step 3
       },
     });
+    await issueRegistrationToken(userId);
 
     return {
       success: true,
@@ -159,6 +185,14 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
  */
 export async function sendParentVerificationCode(userId: string) {
   try {
+    const tokenCheck = await requireRegistrationToken(userId);
+    if (!tokenCheck.ok) {
+      return {
+        success: false,
+        error: tokenCheck.error,
+      };
+    }
+
     // Check rate limit (server-side)
     const { checkVerificationResendRateLimit } = await import('./rate-limit');
     const rateLimit = await checkVerificationResendRateLimit();
@@ -234,6 +268,14 @@ export async function sendParentVerificationCode(userId: string) {
  */
 export async function verifyParentEmail(userId: string, data: VerificationCodeInput) {
   try {
+    const tokenCheck = await requireRegistrationToken(userId);
+    if (!tokenCheck.ok) {
+      return {
+        success: false,
+        error: tokenCheck.error,
+      };
+    }
+
     // Validate input
     const validated = verificationCodeSchema.parse(data);
 
@@ -312,6 +354,7 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
         registrationStep: 4, // Move to step 4
       },
     });
+    await issueRegistrationToken(userId);
 
     return {
       success: true,
@@ -335,6 +378,14 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
  */
 export async function grantParentalConsent(userId: string, data: ConsentInput) {
   try {
+    const tokenCheck = await requireRegistrationToken(userId);
+    if (!tokenCheck.ok) {
+      return {
+        success: false,
+        error: tokenCheck.error,
+      };
+    }
+
     // Validate input
     const validated = consentSchema.parse(data);
 
@@ -403,6 +454,7 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
 
     await createSession(userId, ipAddress, userAgent);
     await recordDailyVisit(userId);
+    await clearRegistrationToken();
 
     return {
       success: true,

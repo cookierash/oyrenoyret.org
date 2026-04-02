@@ -12,18 +12,26 @@ import { grantMaterialPublish } from '@/src/modules/credits';
 import { CREDITS_MATERIAL } from '@/src/config/credits';
 import { recordUserActivity } from '@/src/modules/activity-stats';
 import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ materialId: string }> }
 ) {
   try {
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(`materials:read:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const { materialId } = await params;
@@ -51,7 +59,7 @@ export async function GET(
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });
     }
 
-    return NextResponse.json(material);
+    return NextResponse.json(material, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching material:', error);
     return NextResponse.json(
