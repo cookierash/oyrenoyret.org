@@ -16,7 +16,8 @@ export default function SettingsPage() {
       />
       <main className="space-y-4 pt-2">
         <p className="text-sm text-muted-foreground">
-          Settings options will be available here.
+          This page is under construction. If you need any assistance, please
+          contact our team.
         </p>
       </main>
     </DashboardShell>

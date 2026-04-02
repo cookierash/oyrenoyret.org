@@ -32,7 +32,7 @@ export default async function AuthLayout({
               alt="oyrenoyret illustration"
               width={240}
               height={240}
-              className="h-auto w-full max-w-[220px]"
+              className="h-auto w-full max-w-[220px] animate-figure-drift motion-reduce:animate-none"
               priority
             />
             <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl font-comfortaa lowercase">
