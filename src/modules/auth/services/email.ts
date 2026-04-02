@@ -14,19 +14,44 @@
  * @returns Promise that resolves when email is sent
  */
 export async function sendVerificationCode(email: string, code: string): Promise<void> {
-  // TODO: Integrate with email service provider
-  // For now, log to console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[EMAIL SERVICE] Verification code for ${email}: ${code}`);
-    console.log(`[EMAIL SERVICE] In production, this would be sent via email service`);
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const fromAddress = process.env.EMAIL_FROM;
+  const isDev = process.env.NODE_ENV === 'development';
+
+  if (!resendApiKey || !fromAddress) {
+    if (isDev) {
+      console.log(`[EMAIL SERVICE] Missing RESEND_API_KEY/EMAIL_FROM; skipping send.`);
+      console.log(`[EMAIL SERVICE] Verification code for ${email}: ${code}`);
+      return;
+    }
+    throw new Error('Email service not configured. Set RESEND_API_KEY and EMAIL_FROM.');
   }
 
-  // In production, implement actual email sending:
-  // await emailProvider.send({
-  //   to: email,
-  //   subject: 'Verify Your Email - oyrenoyret.org',
-  //   html: generateVerificationEmailHtml(code),
-  // });
+  if (isDev) {
+    console.log(`[EMAIL SERVICE] Sending verification code to ${email}`);
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: fromAddress,
+      to: email,
+      subject: 'Your oyrenoyret.org verification code',
+      html: generateVerificationEmailHtml(code),
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
+    if (isDev) {
+      console.error(`[EMAIL SERVICE] Failed to send email: ${errorText}`);
+    }
+    throw new Error('Failed to send verification email');
+  }
 }
 
 /**
