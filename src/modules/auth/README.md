@@ -176,6 +176,8 @@ Required environment variables:
 - `NODE_ENV`: Environment (development/production)
 - `ADMIN_EMAIL` (optional): Admin login email for bootstrap
 - `ADMIN_PASSWORD_HASH` (optional): bcrypt hash for admin password
+- `RESEND_API_KEY` (required for email): Resend API key
+- `EMAIL_FROM` (required for email): Verified sender address in Resend (e.g., `oyrenoyret <no-reply@oyrenoyret.org>`)
 
 ## Email Service
 
@@ -186,7 +188,7 @@ The email service (`services/email.ts`) currently logs verification codes to the
 - Resend
 - Nodemailer with SMTP
 
-Update `sendVerificationCode()` function to use your email provider.
+The email service uses Resend by default. Set `RESEND_API_KEY` and `EMAIL_FROM` in production.
 
 ## Future Extensibility
 
