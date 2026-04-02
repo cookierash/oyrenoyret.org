@@ -83,7 +83,7 @@ export function Step2ParentInfo({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Please provide the information of a parent or legal guardian who will verify your registration.
+            Please provide the information of a parent or legal guardian who will review your registration.
           </p>
 
           <div className="grid grid-cols-2 gap-4">
@@ -127,7 +127,7 @@ export function Step2ParentInfo({
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
-                This email must be different from your student email. A verification code will be sent to this address.
+                This email must be different from your student email.
               </p>
             </FormItem>
           )}
@@ -151,7 +151,7 @@ export function Step2ParentInfo({
             className="h-10 flex-1 text-sm font-semibold"
             disabled={isSubmitting || !form.formState.isValid}
           >
-            {isSubmitting ? 'Saving...' : 'Next: Verify Email'}
+            {isSubmitting ? 'Saving...' : 'Next: Review Consent'}
           </Button>
         </div>
       </form>

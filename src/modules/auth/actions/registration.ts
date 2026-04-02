@@ -158,7 +158,7 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
         parentEmail: validated.parentEmail,
         parentFirstName: validated.parentFirstName,
         parentLastName: validated.parentLastName,
-        registrationStep: 3, // Move to step 3
+        registrationStep: 4, // Move to consent step
       },
     });
     await issueRegistrationToken(userId);
@@ -404,23 +404,6 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
       return {
         success: false,
         error: 'User or parent email not found',
-      };
-    }
-
-    // Check if parent email is verified
-    const verified = await prisma.guardianVerification.findFirst({
-      where: {
-        userId,
-        parentEmail: user.parentEmail,
-        verifiedAt: { not: null },
-        used: true,
-      },
-    });
-
-    if (!verified) {
-      return {
-        success: false,
-        error: 'Parent email must be verified before granting consent',
       };
     }
 

@@ -20,13 +20,13 @@ export default async function AuthLayout({
       <LandingThemeLock />
       {/* Left panel (lg+ only) */}
       <div className="grid min-h-[100dvh] grid-cols-1 lg:grid-cols-2">
-        <aside className="relative hidden lg:flex items-center justify-center border-r border-border overflow-hidden bg-gradient-to-br from-primary/10 via-background to-muted/40">
+        <aside className="relative hidden lg:flex lg:sticky lg:top-0 lg:h-[100dvh] items-center justify-center border-r border-border overflow-hidden bg-gradient-to-br from-primary/10 via-background to-muted/40">
           <div className="pointer-events-none absolute inset-0" aria-hidden="true">
             <div className="absolute -top-24 right-8 h-64 w-64 rounded-full bg-primary/20 blur-3xl opacity-70" />
             <div className="absolute -bottom-24 left-8 h-64 w-64 rounded-full bg-primary/10 blur-3xl opacity-70" />
             <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-border to-transparent" />
           </div>
-          <div className="relative z-10 flex w-full flex-col items-center justify-center gap-4 px-12 text-center xl:px-16">
+          <div className="relative z-10 flex w-full flex-col items-center justify-center gap-4 px-12 text-center xl:px-16 scale-[1.2] origin-center">
             <Image
               src="/auth-pages-image.svg"
               alt="oyrenoyret illustration"
