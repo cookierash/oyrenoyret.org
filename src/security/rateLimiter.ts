@@ -45,13 +45,18 @@ function getRatelimiter(config: RateLimitConfig): Ratelimit | null {
   if (existing) return existing;
 
   const windowSeconds = Math.max(1, Math.ceil(config.windowMs / 1000));
-  const limiter = new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.fixedWindow(config.maxRequests, `${windowSeconds} s`),
-    prefix: 'oyrenoyret:ratelimit',
-  });
-  ratelimitCache.set(key, limiter);
-  return limiter;
+  try {
+    const limiter = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.fixedWindow(config.maxRequests, `${windowSeconds} s`),
+      prefix: 'oyrenoyret:ratelimit',
+    });
+    ratelimitCache.set(key, limiter);
+    return limiter;
+  } catch (error) {
+    console.warn('Rate limiter disabled due to invalid Upstash config:', error);
+    return null;
+  }
 }
 
 function cleanupExpiredEntries(now: number) {
