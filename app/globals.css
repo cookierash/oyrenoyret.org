@@ -233,6 +233,10 @@
     animation: figure-float 6s ease-in-out infinite;
   }
 
+  .animate-figure-drift {
+    animation: figure-drift 8s ease-in-out infinite;
+  }
+
   .animate-box-float {
     animation: box-float 7.5s ease-in-out infinite;
   }
@@ -324,6 +328,22 @@
   }
   50% {
     transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes figure-drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(-6px, -4px, 0);
+  }
+  50% {
+    transform: translate3d(4px, -8px, 0);
+  }
+  75% {
+    transform: translate3d(6px, 2px, 0);
   }
 }
 

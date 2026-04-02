@@ -35,27 +35,31 @@ interface Step4Props {
 const BUTTON_CLASS = 'h-10 text-sm font-semibold';
 
 const CONSENT_TEXT = `
-By checking the box below, I acknowledge that:
+By checking the box below, I confirm that:
 
-1. I am the parent or legal guardian of the student registering for this platform.
+1. I am the parent or legal guardian of the student registering for OyrenOyret.
 
-2. I understand that this platform collects and processes personal information including:
-   - Student's name, email address, and grade level
-   - Academic progress and learning data
-   - Usage analytics and interaction data
+2. I give permission for my child to:
+   - Create and use an account on OyrenOyret
+   - Participate in online learning and teaching activities
+   - Interact with other students on the platform
 
-3. I consent to the collection, storage, and use of this information for educational purposes.
+3. I understand the platform may collect:
+   - Basic personal information (name, email address, grade level)
+   - Learning activity data (lessons attended or taught, progress)
+   - Usage and interaction data
 
-4. I understand that the platform is designed for educational use and that student data will be:
-   - Used to personalize learning experiences
-   - Protected according to applicable privacy laws
-   - Not shared with third parties without explicit consent
+4. I consent to the collection and use of this data for educational and platform-related purposes.
 
-5. I have the right to revoke this consent at any time by contacting the platform administrators.
+5. I understand that OyrenOyret provides a moderated environment, but cannot guarantee complete supervision.
+   - My child is responsible for their behavior and interactions
+   - I will guide my child to use the platform responsibly
 
-6. I understand that the student's account will remain active as long as this consent is valid.
+6. I understand that the platform uses a credit system only and that no real money transactions are involved.
 
-This consent is required for students under 18 years of age to use the platform in accordance with applicable data protection regulations.
+7. I may request deletion of my child's account and withdraw consent at any time by contacting the platform.
+
+This consent is required for students under 18 years of age to use the platform.
 `;
 
 export function Step4Consent({

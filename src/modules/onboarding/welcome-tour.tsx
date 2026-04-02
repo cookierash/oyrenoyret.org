@@ -65,7 +65,7 @@ const steps: TourStep[] = [
       },
     ],
     cta: {
-      label: 'Open catalog',
+      label: 'Catalog',
       href: '/catalog',
     },
   },
@@ -90,7 +90,7 @@ const steps: TourStep[] = [
       },
     ],
     cta: {
-      label: 'View live activities',
+      label: 'Live activities',
       href: '/live-activities',
     },
   },
@@ -115,7 +115,7 @@ const steps: TourStep[] = [
       },
     ],
     cta: {
-      label: 'Go to discussions',
+      label: 'Discussions',
       href: '/discussions',
     },
   },
@@ -163,7 +163,7 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
       <AlertDialogContent className="max-w-2xl px-6 pb-6 pt-7">
         <div className="space-y-6">
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.25em] text-muted-foreground">
+            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground">
               <span>Quick tour</span>
               <span>
                 Step {stepIndex + 1} of {totalSteps}
@@ -172,9 +172,11 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
             <Progress value={progressValue} max={totalSteps} />
           </div>
 
-          <AlertDialogHeader className="mb-0">
+          <AlertDialogHeader className="mb-0 space-y-2">
             <AlertDialogTitle className="text-2xl">{step.title}</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm">{step.description}</AlertDialogDescription>
+            <AlertDialogDescription className="text-sm mb-2">
+              {step.description}
+            </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="grid gap-3 md:grid-cols-3">
@@ -183,10 +185,10 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
               return (
                 <div
                   key={item.title}
-                  className="rounded-xl border border-border/60 bg-muted/30 p-3 text-sm text-foreground shadow-sm"
+                  className="rounded-xl border border-border/60 bg-muted/30 p-3 text-sm text-foreground"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-foreground shadow-inner">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-foreground">
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="font-semibold">{item.title}</span>
@@ -202,12 +204,11 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
               <Button asChild variant="secondary-primary" size="sm">
                 <Link href={step.cta.href}>{step.cta.label}</Link>
               </Button>
-              <span className="text-xs text-muted-foreground">You can always return to this later.</span>
             </div>
           ) : null}
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="ghost" size="sm" onClick={handleSkip}>
+            <Button variant="outline" size="sm" onClick={handleSkip}>
               Skip for now
             </Button>
             <div className="flex items-center gap-2">
