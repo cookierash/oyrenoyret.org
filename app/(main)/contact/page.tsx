@@ -12,8 +12,16 @@ export default function ContactPage() {
         </p>
       </div>
       <div className="mt-8 rounded-lg border border-border/60 bg-muted/20 p-6 text-sm text-muted-foreground">
-        The contact form will be available soon. In the meantime, check the Help Center for
-        quick answers.
+        We are working to expand our contact options. For now, please reach us on Instagram at{' '}
+        <a
+          href="https://www.instagram.com/oyrenoyret.hzt/"
+          className="font-medium text-foreground underline underline-offset-4"
+          target="_blank"
+          rel="noreferrer"
+        >
+          @oyrenoyret.hzt
+        </a>
+        .
       </div>
     </main>
   );

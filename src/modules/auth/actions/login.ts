@@ -137,25 +137,6 @@ export async function login(data: LoginInput) {
 
     const requiresGuardianChecks = !isAdminCredentials && user.role === 'STUDENT';
 
-    // Check if parent email is verified (students only)
-    if (requiresGuardianChecks && user.parentEmail) {
-      const verified = await prisma.guardianVerification.findFirst({
-        where: {
-          userId: user.id,
-          parentEmail: user.parentEmail,
-          verifiedAt: { not: null },
-          used: true,
-        },
-      });
-
-      if (!verified) {
-        return {
-          success: false,
-          error: 'Parent email verification required. Please complete your registration.',
-        };
-      }
-    }
-
     // Check if consent is granted (students only)
     if (requiresGuardianChecks) {
       const consent = await prisma.parentalConsent.findFirst({

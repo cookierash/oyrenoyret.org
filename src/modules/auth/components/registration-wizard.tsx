@@ -10,13 +10,12 @@
 import { useEffect, useState } from 'react';
 import { Step1StudentInfo } from '../steps/step-1-student-info';
 import { Step2ParentInfo } from '../steps/step-2-parent-info';
-import { Step3Verification } from '../steps/step-3-verification';
 import { Step4Consent } from '../steps/step-4-consent';
 import { Step5Complete } from '../steps/step-5-complete';
 import { cn } from '@/src/lib/utils';
 import type { ConsentInput, ParentInfoInput, StudentInfoInput } from '../schemas/registration';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 const REGISTRATION_STORAGE_KEY = 'oyrenoyret_registration_progress_v1';
 
 export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: number) => void }) {
@@ -103,10 +102,6 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
     setCurrentStep(4);
   };
 
-  const handleStep4Success = () => {
-    setCurrentStep(5);
-  };
-
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
@@ -120,10 +115,8 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
       case 2:
         return 'Add a trusted adult';
       case 3:
-        return 'Verify parent or guardian';
-      case 4:
         return 'Review parental consent';
-      case 5:
+      case 4:
         return 'You are ready to start';
       default:
         return 'Registration';
@@ -137,10 +130,8 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
       case 2:
         return 'We need a parent or legal guardian so everyone stays informed.';
       case 3:
-        return 'We’ve sent a secure, one-time code to your parent or guardian’s email.';
-      case 4:
         return 'Your parent or guardian confirms how we can use and protect your data.';
-      case 5:
+      case 4:
         return 'Your account is active. You can now explore lessons and activities.';
       default:
         return '';
@@ -200,24 +191,16 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
             onValuesChange={setStep2Values}
           />
         )}
-        {currentStep === 3 && userId && parentEmail && (
-          <Step3Verification
-            userId={userId}
-            parentEmail={parentEmail}
-            onSuccess={handleStep3Success}
-            onPrevious={handlePrevious}
-          />
-        )}
-        {currentStep === 4 && userId && (
+        {currentStep === 3 && userId && (
           <Step4Consent
             userId={userId}
-            onSuccess={handleStep4Success}
+            onSuccess={handleStep3Success}
             onPrevious={handlePrevious}
             initialValues={step4Values}
             onValuesChange={setStep4Values}
           />
         )}
-        {currentStep === 5 && (
+        {currentStep === 4 && (
           <Step5Complete studentName={studentName || undefined} />
         )}
       </section>

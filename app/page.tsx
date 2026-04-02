@@ -165,11 +165,11 @@ export default async function HomePage() {
                 </p>
               </div>
 
-              <div className="mt-4 flex w-full max-w-3xl flex-col items-center justify-center gap-3 sm:flex-row">
-                <Button asChild size="lg" variant="primary">
+              <div className="mt-4 flex w-full max-w-3xl flex-row items-center justify-center gap-3">
+                <Button asChild size="lg" variant="primary" className="flex-1 sm:flex-none">
                   <Link href="/register">Get started for free</Link>
                 </Button>
-                <Button asChild size="lg" variant="secondary-primary">
+                <Button asChild size="lg" variant="secondary-primary" className="flex-1 sm:flex-none">
                   <Link href="/learn-more">Learn more about us</Link>
                 </Button>
               </div>
