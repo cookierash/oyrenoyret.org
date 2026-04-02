@@ -13,24 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { cn } from '@/src/lib/utils';
 import { SUBJECTS } from '@/src/config/constants';
+import { CREDITS_MATERIAL } from '@/src/config/credits';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { toast } from 'sonner';
-import {
-  Bold,
-  Italic,
-  Underline as UnderlineIcon,
-  Subscript as SubscriptIcon,
-  Superscript as SuperscriptIcon,
-  Code,
-  Eraser,
-  Sigma,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextAa as SubscriptIcon, PiTextH as SuperscriptIcon, PiCode as Code, PiEraser as Eraser, PiFunction as Sigma, PiPlus as Plus, PiTrash as Trash2 } from 'react-icons/pi';
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
+  AlertDialogFooter,
   AlertDialogTitle,
   AlertDialogHeader,
 } from '@/components/ui/alert-dialog';
@@ -451,6 +444,7 @@ export function PracticeTestEditor({
   const [difficulty, setDifficulty] = useState<'BASIC' | 'INTERMEDIATE' | 'ADVANCED'>(initialDifficulty);
   const initialQuestions = parseInitialQuestions(initialContent);
   const [questions, setQuestions] = useState<PracticeQuestion[]>(initialQuestions);
+  const [draftId, setDraftId] = useState<string | undefined>(materialId);
 
   const [savedTitle, setSavedTitle] = useState(initialTitle);
   const [savedDifficulty, setSavedDifficulty] = useState(initialDifficulty);
@@ -471,6 +465,10 @@ export function PracticeTestEditor({
   const [deleting, setDeleting] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [questionToRemove, setQuestionToRemove] = useState<{
+    id: string;
+    index: number;
+  } | null>(null);
 
   const topics = subjectId
     ? (CURRICULUM_TOPICS as Record<string, { id: string; name: string }[]>)[subjectId] ?? []
@@ -562,7 +560,8 @@ export function PracticeTestEditor({
 
     setSaving(true);
     try {
-      if (mode === 'create') {
+      const targetId = mode === 'create' ? draftId : materialId;
+      if (mode === 'create' && !draftId) {
         const res = await fetch('/api/materials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -581,6 +580,7 @@ export function PracticeTestEditor({
         }
         const created = await res.json();
 
+        setDraftId(created.id);
         setSavedTitle(title);
         setSavedDifficulty(difficulty);
         setSavedObjectives(objectiveSlots.join('\n').trim());
@@ -592,8 +592,8 @@ export function PracticeTestEditor({
           if (created.id) router.push(`/studio/${created.id}`);
         }
         return created.id;
-      } else if (materialId) {
-        const res = await fetch(`/api/materials/${materialId}`, {
+      } else if (targetId) {
+        const res = await fetch(`/api/materials/${targetId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -614,17 +614,20 @@ export function PracticeTestEditor({
 
         if (!andPublish && !skipRedirect) {
           toast.success('Saved');
+          if (mode === 'create') {
+            router.push(`/studio/${targetId}`);
+          }
         }
         router.refresh();
-        onSaved?.();
-        return materialId;
+        onSaved?.(targetId);
+        return targetId;
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
-  }, [mode, materialId, subjectId, topicId, title, objectiveSlots, difficulty, questions, router, onSaved]);
+  }, [mode, materialId, draftId, subjectId, topicId, title, objectiveSlots, difficulty, questions, router, onSaved]);
 
   const publish = useCallback(async (confirmed = false) => {
     if (!subjectId || !topicId || !title.trim()) {
@@ -635,6 +638,10 @@ export function PracticeTestEditor({
     const publishCheck = validateQuestions(questions, true);
     if (!publishCheck.ok) {
       toast.error(publishCheck.error ?? 'Please complete the questions before publishing.');
+      return;
+    }
+    if ((publishCheck.normalized?.length ?? 0) < CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS) {
+      toast.error(`Practice tests must include at least ${CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS} questions to publish`);
       return;
     }
 
@@ -814,7 +821,7 @@ export function PracticeTestEditor({
                 value={subjectId}
                 onChange={(e) => { setSubjectId(e.target.value); setTopicId(''); }}
                 placeholder="Select subject"
-                disabled={mode === 'edit'}
+                disabled={mode === 'edit' || Boolean(draftId)}
               >
                 {SUBJECTS.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
@@ -826,7 +833,7 @@ export function PracticeTestEditor({
               <Select
                 value={topicId}
                 onChange={(e) => setTopicId(e.target.value)}
-                disabled={!subjectId || mode === 'edit'}
+                disabled={!subjectId || mode === 'edit' || Boolean(draftId)}
                 placeholder="Select topic"
               >
                 {topics.map((t) => (
@@ -893,7 +900,7 @@ export function PracticeTestEditor({
                     variant="ghost"
                     size="icon"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => removeQuestion(q.id)}
+                    onClick={() => setQuestionToRemove({ id: q.id, index: i })}
                     aria-label={`Remove question ${i + 1}`}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -978,7 +985,7 @@ export function PracticeTestEditor({
           </div>
         )}
 
-        <div className="flex justify-center">
+        <div className="flex justify-center pb-8">
           <Button variant="outline" size="sm" onClick={addQuestion}>
             <Plus className="h-4 w-4 mr-1" />
             Add another question
@@ -1076,6 +1083,38 @@ export function PracticeTestEditor({
               {deleting ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(questionToRemove)}
+        onOpenChange={(open) => {
+          if (!open) setQuestionToRemove(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove question?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will delete the selected question and its options.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="pt-4">
+            <AlertDialogCancel onClick={() => setQuestionToRemove(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (questionToRemove) {
+                  removeQuestion(questionToRemove.id);
+                  setQuestionToRemove(null);
+                }
+              }}
+            >
+              Remove question
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

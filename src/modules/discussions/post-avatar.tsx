@@ -22,7 +22,7 @@ function getAvatarIndex(id: string): number {
 interface PostAvatarProps {
   userId?: string;
   authorName: string;
-  size?: 'sm' | 'md';
+  size?: 'xs' | 'sm' | 'md';
   className?: string;
 }
 
@@ -35,7 +35,12 @@ export function PostAvatar({ userId, authorName, size = 'md', className }: PostA
     .toUpperCase()
     .slice(0, 2) || '?';
 
-  const sizeClass = size === 'sm' ? 'h-8 w-8 text-xs' : 'h-10 w-10 text-sm';
+  const sizeClass =
+    size === 'xs'
+      ? 'h-5 w-5 text-[9px]'
+      : size === 'sm'
+        ? 'h-8 w-8 text-xs'
+        : 'h-10 w-10 text-sm';
 
   return (
     <div

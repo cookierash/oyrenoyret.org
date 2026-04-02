@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react';
+import { PiArrowRight as ArrowRight, PiCaretDown as ChevronDown, PiList as Menu, PiX as X } from 'react-icons/pi';
 
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/src/components/ui/logo';

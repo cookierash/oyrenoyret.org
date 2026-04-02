@@ -13,7 +13,7 @@ import { StudioEditor } from '@/src/modules/materials/studio-editor';
 import { PracticeTestEditor } from '@/src/modules/materials/practice-test-editor';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, FileText, ClipboardList } from 'lucide-react';
+import { PiArrowLeft as ArrowLeft, PiFileText as FileText, PiClipboardText as ClipboardList } from 'react-icons/pi';
 
 export default function EditMaterialPage() {
   const router = useRouter();
@@ -132,7 +132,7 @@ export default function EditMaterialPage() {
   return (
     <div className="flex flex-col h-full">
       {renderHeader(headerTitle, headerDescription)}
-      <main className="flex-1 overflow-auto px-4 py-6 max-w-4xl mx-auto w-full">
+      <main className="flex-1 overflow-auto px-4 pt-6 pb-12 max-w-4xl mx-auto w-full">
         {material.materialType === 'PRACTICE_TEST' ? (
           <PracticeTestEditor
             mode="edit"

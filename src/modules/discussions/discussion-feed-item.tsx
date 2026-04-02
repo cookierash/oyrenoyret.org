@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { MessageSquare, ArrowBigUp, ArrowBigDown } from 'lucide-react';
+import { PiChatCircle as MessageSquare, PiArrowUp as ArrowBigUp, PiArrowDown as ArrowBigDown } from 'react-icons/pi';
 import { PostAvatar } from './post-avatar';
 import { formatRelativeTime } from './relative-time';
 import { cn } from '@/src/lib/utils';

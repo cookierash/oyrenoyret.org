@@ -7,7 +7,7 @@ import { PageHeader } from '@/src/components/ui/page-header';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectItem } from '@/components/ui/select';
-import { BookOpen, Search } from 'lucide-react';
+import { PiBookOpen as BookOpen, PiMagnifyingGlass as Search } from 'react-icons/pi';
 
 interface PurchasedMaterial {
     purchasedAt: string;

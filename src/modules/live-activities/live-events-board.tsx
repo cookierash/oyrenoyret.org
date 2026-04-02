@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Calendar, Clock, Coins, CheckCircle2, AlertCircle } from 'lucide-react';
+import { PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiCheckCircle as CheckCircle2, PiWarningCircle as AlertCircle } from 'react-icons/pi';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/difficulty-bars';
@@ -121,7 +121,7 @@ export function LiveEventsBoard() {
       toast.success(
         nextStatus === 'CONFIRMED'
           ? 'You are already enrolled in this sprint.'
-          : 'Registration started. Check your messages to complete.'
+          : 'Registration started. Check your recent activities to complete.'
       );
       fetchEvents();
     } catch (error) {
@@ -282,7 +282,7 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
         {isPending ? (
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <AlertCircle className="h-4 w-4 text-amber-500" />
-            A confirmation request was sent to your messages inbox.
+            A confirmation request was sent to your recent activities inbox.
           </div>
         ) : isCancelled ? (
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -300,7 +300,7 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
             </Button>
           ) : isPending ? (
             <Button asChild size="sm" variant="secondary" disabled={isBusy}>
-              <Link href="/messages">Complete registration</Link>
+              <Link href="/recent-activities">Complete registration</Link>
             </Button>
           ) : (
             <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy}>

@@ -1,9 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import { PiList as Menu, PiTrendUp as TrendingUp, PiMegaphone as Megaphone } from 'react-icons/pi';
 import { AppSidebar } from '@/src/components/layout/app-sidebar';
 import { AccountTitle } from '@/src/components/layout/account-title';
 import { DiscussionsRightSidebar } from '@/src/components/layout/discussions-right-sidebar';
@@ -11,6 +11,7 @@ import { LiveActivitiesRightSidebar } from '@/src/components/layout/live-activit
 import { TrendingDiscussions } from '@/src/modules/discussions/trending-discussions';
 import { LiveAnnouncementsList } from '@/src/modules/live-activities/live-announcements-list';
 import { Logo } from '@/src/components/ui/logo';
+import { WelcomeTour } from '@/src/modules/onboarding/welcome-tour';
 import { cn } from '@/src/lib/utils';
 
 interface AppShellProps {
@@ -24,11 +25,14 @@ interface AppShellProps {
     credits?: number;
     role?: string;
   };
+  showTutorial?: boolean;
 }
 
-export function AppShell({ children, displayName, user }: AppShellProps) {
+export function AppShell({ children, displayName, user, showTutorial = false }: AppShellProps) {
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(showTutorial);
+  const tutorialCompleteRef = useRef(false);
   const isDiscussionsRoute = pathname === '/discussions' || pathname.startsWith('/discussions/');
   const isLiveActivitiesRoute =
     pathname === '/live-activities' || pathname.startsWith('/live-activities/');
@@ -49,6 +53,17 @@ export function AppShell({ children, displayName, user }: AppShellProps) {
     prevPathnameRef.current = pathname;
     return;
   }, [pathname, mobileNavOpen]);
+
+  const handleTutorialComplete = useCallback(async () => {
+    if (tutorialCompleteRef.current) return;
+    tutorialCompleteRef.current = true;
+    setTutorialOpen(false);
+    try {
+      await fetch('/api/onboarding/complete', { method: 'POST' });
+    } catch {
+      // Ignore network errors; tutorial will show again next visit if not saved.
+    }
+  }, []);
 
   return (
     <div className="h-[100dvh] overflow-hidden bg-background">
@@ -74,11 +89,16 @@ export function AppShell({ children, displayName, user }: AppShellProps) {
           >
             {children}
             {showRight ? (
-              <section className="mt-6 lg:hidden">
+              <section className="mt-6 mb-6 lg:mb-0 lg:hidden">
                 <div className="card-frame bg-card overflow-hidden">
-                  <div className="flex h-12 items-center px-4 text-sm font-semibold text-foreground">
+                <div className="flex h-12 items-center gap-2 px-4 text-sm font-semibold text-foreground">
+                    {isDiscussionsRoute ? (
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Megaphone className="h-4 w-4 text-muted-foreground" />
+                    )}
                     {isDiscussionsRoute ? 'Trending discussions' : 'Announcements'}
-                  </div>
+                </div>
                   <div className="h-px w-full bg-border/70" />
                   <div className="p-4">
                     {isDiscussionsRoute ? (
@@ -98,6 +118,10 @@ export function AppShell({ children, displayName, user }: AppShellProps) {
           ) : null}
         </div>
       </div>
+
+      {showTutorial ? (
+        <WelcomeTour open={tutorialOpen} onComplete={handleTutorialComplete} />
+      ) : null}
 
       <div
         className={cn(

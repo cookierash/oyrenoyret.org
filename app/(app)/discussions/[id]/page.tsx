@@ -12,8 +12,7 @@ import Link from 'next/link';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { PostAvatar } from '@/src/modules/discussions/post-avatar';
-import { formatRelativeTime } from '@/src/modules/discussions/relative-time';
-import { ArrowBigUp, ArrowBigDown, MessageSquare, ArrowLeft } from 'lucide-react';
+import { PiArrowUp as ArrowBigUp, PiArrowDown as ArrowBigDown, PiChatCircle as MessageSquare, PiArrowLeft as ArrowLeft } from 'react-icons/pi';
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -71,7 +70,6 @@ export default function DiscussionDetailPage() {
   const id = params.id as string;
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const currentUserName = 'You';
   const [loading, setLoading] = useState(true);
   const [acceptingReplyId, setAcceptingReplyId] = useState<string | null>(null);
   const [inlineReply, setInlineReply] = useState('');
@@ -212,7 +210,7 @@ export default function DiscussionDetailPage() {
   if (loading) {
     return (
       <DashboardShell>
-        <main className="min-w-0 space-y-6">
+        <main className="min-w-0 space-y-6 pb-12">
             <div className="border-b border-border/60 py-2">
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
@@ -269,7 +267,7 @@ export default function DiscussionDetailPage() {
   return (
     <DashboardShell>
       <main className="lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
-          <div className="space-y-6 min-w-0 lg:overflow-y-auto">
+          <div className="space-y-6 min-w-0 pb-12 lg:overflow-y-auto">
             <div className="border-b border-border/60 py-2">
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
@@ -280,19 +278,26 @@ export default function DiscussionDetailPage() {
             </div>
 
             <div className="space-y-3 min-w-0">
-              <h1 className="text-xl font-semibold text-foreground break-words">{discussion.title}</h1>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <PostAvatar
                   userId={discussion.authorId}
                   authorName={discussion.authorName}
-                  size="sm"
+                  size="xs"
                 />
-                <span className="text-sm font-semibold text-foreground">{discussion.authorName}</span>
+                <div className="text-[11px] text-muted-foreground">
+                  <span className="font-semibold text-foreground/70">
+                    {discussion.authorName}
+                  </span>
+                  <span className="px-1">·</span>
+                  <span>{formatDateTime(discussion.createdAt)}</span>
+                </div>
               </div>
-              <p className="text-[15px] text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
+              <h1 className="text-[15px] font-semibold text-foreground break-words">
+                {discussion.title}
+              </h1>
+              <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
                 {discussion.content}
               </p>
-              <div className="text-xs text-muted-foreground">{formatDateTime(discussion.createdAt)}</div>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
@@ -348,26 +353,19 @@ export default function DiscussionDetailPage() {
 
             <div className="border-t border-border/60 pt-6">
               <div className="space-y-4">
-                <div className="flex gap-3 items-start">
-                  <PostAvatar
-                    userId={currentUserId || 'current-user'}
-                    authorName={currentUserName}
-                    size="sm"
-                  />
-                  <div className="flex-1 min-w-0">
+                <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
+                  <div className="space-y-3">
                     <textarea
                       value={inlineReply}
                       onChange={(e) => setInlineReply(e.target.value)}
                       placeholder="Write a reply"
-                      className="w-full min-h-[88px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none border-b border-border/60 pb-3"
+                      className="w-full min-h-[96px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                       maxLength={MAX_REPLY_LENGTH}
                     />
-                    {inlineRemaining <= 100 ? (
-                      <div className="mt-1 text-right text-xs text-muted-foreground">
-                        {inlineRemaining} characters left
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        {inlineRemaining <= 100 ? `${inlineRemaining} characters left` : ''}
                       </div>
-                    ) : null}
-                    <div className="flex justify-end pt-2">
                       <Button
                         size="sm"
                         onClick={() => submitReply(inlineReply)}
@@ -378,18 +376,21 @@ export default function DiscussionDetailPage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground">Replies</h2>
-                  <span className="text-xs text-muted-foreground">{replyCount}</span>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-foreground">Replies</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Replies to this discussion appear below.
+                  </p>
                 </div>
 
                 {replyCount > 0 ? (
-                  <div className="space-y-5">
+                  <div className="space-y-3">
                     {discussion.replies.map((reply) => (
                       <div
                         key={reply.id}
-                        className="flex gap-3 cursor-pointer"
+                        className="rounded-lg border border-border/60 bg-muted/10 p-3 transition-colors hover:bg-muted/20 cursor-pointer"
                         role="button"
                         tabIndex={0}
                         onClick={() => router.push(`/discussions/${id}/replies/${reply.id}`)}
@@ -400,41 +401,28 @@ export default function DiscussionDetailPage() {
                           }
                         }}
                       >
-                        <PostAvatar
-                          userId={reply.authorId}
-                          authorName={reply.authorName}
-                          size="sm"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-semibold text-foreground">
-                              {reply.authorName}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {formatRelativeTime(reply.createdAt)}
-                            </span>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <PostAvatar
+                              userId={reply.authorId}
+                              authorName={reply.authorName}
+                              size="xs"
+                            />
+                            <div className="text-[11px] text-muted-foreground">
+                              <span className="font-semibold text-foreground/70">
+                                {reply.authorName}
+                              </span>
+                              <span className="px-1">·</span>
+                              <span>{formatDateTime(reply.createdAt)}</span>
+                            </div>
                           </div>
-                          <p className="text-sm text-foreground/90 mt-1 whitespace-pre-wrap break-words">
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
                             {reply.content}
                           </p>
-                          <div className="flex flex-wrap items-center gap-2 mt-2">
-                            {!discussion.archivedAt && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openReplyDialog(reply.id);
-                                }}
-                                className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
-                              >
-                                <MessageSquare className="h-3.5 w-3.5" />
-                                Reply
-                              </Button>
-                            )}
-                            {currentUserId === discussion?.authorId &&
-                              reply.authorId !== discussion.authorId &&
-                              !discussion?.archivedAt && (
+                          {currentUserId === discussion?.authorId &&
+                            reply.authorId !== discussion.authorId &&
+                            !discussion?.archivedAt && (
+                              <div className="pt-1">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -452,54 +440,8 @@ export default function DiscussionDetailPage() {
                                     ? '✓ Best answer'
                                     : 'Accept as best answer'}
                                 </button>
-                              )}
-                            <div className="flex items-center overflow-hidden rounded-md border border-border/60 bg-muted/40">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleVote('reply', reply.id, 1);
-                                }}
-                                disabled={voteLoading === reply.id}
-                                aria-label="Upvote"
-                                className={cn(
-                                  'h-7 w-7 rounded-none text-muted-foreground hover:bg-muted/60',
-                                  reply.userVote === 1 && 'text-primary bg-primary/10'
-                                )}
-                              >
-                                <ArrowBigUp className={cn('h-4 w-4', reply.userVote === 1 && 'fill-current')} />
-                              </Button>
-                              <span
-                                className={cn(
-                                  'min-w-[1.75rem] px-2 text-center text-xs font-semibold',
-                                  reply.voteScore > 0
-                                    ? 'text-primary'
-                                    : reply.voteScore < 0
-                                      ? 'text-destructive'
-                                      : 'text-muted-foreground'
-                                )}
-                              >
-                                {reply.voteScore}
-                              </span>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleVote('reply', reply.id, -1);
-                                }}
-                                disabled={voteLoading === reply.id}
-                                aria-label="Downvote"
-                                className={cn(
-                                  'h-7 w-7 rounded-none text-muted-foreground hover:bg-muted/60',
-                                  reply.userVote === -1 && 'text-destructive bg-destructive/10'
-                                )}
-                              >
-                                <ArrowBigDown className={cn('h-4 w-4', reply.userVote === -1 && 'fill-current')} />
-                              </Button>
-                            </div>
-                          </div>
+                              </div>
+                            )}
                         </div>
                       </div>
                     ))}

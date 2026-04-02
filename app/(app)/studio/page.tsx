@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
-import { FileText, ClipboardList } from 'lucide-react';
+import { PiFileText as FileText, PiClipboardText as ClipboardList } from 'react-icons/pi';
 
 export default function StudioPage() {
   const [refreshKey, setRefreshKey] = useState(0);

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/form';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ShieldCheck } from 'lucide-react';
+import { PiShieldCheck as ShieldCheck } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
 
 interface Step4Props {

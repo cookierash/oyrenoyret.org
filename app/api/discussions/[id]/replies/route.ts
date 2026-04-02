@@ -10,6 +10,95 @@ import { sanitizeHtml } from '@/src/security/validation';
 import { grantDiscussionReply } from '@/src/modules/credits';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: discussionId } = await params;
+    const { searchParams } = new URL(request.url);
+    const parentReplyId = searchParams.get('parentReplyId');
+    if (!parentReplyId) {
+      return NextResponse.json({ error: 'parentReplyId is required' }, { status: 400 });
+    }
+
+    const discussion = await prisma.discussion.findFirst({
+      where: { id: discussionId, archivedAt: null },
+      select: { id: true },
+    });
+
+    if (!discussion) {
+      return NextResponse.json({ error: 'Discussion not found or archived' }, { status: 404 });
+    }
+
+    const currentUserId = await getCurrentSession();
+
+    const replies = await prisma.discussionReply.findMany({
+      where: { discussionId, parentReplyId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        content: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    const replyIds = replies.map((reply) => reply.id);
+
+    const [replyVoteScores, currentUserReplyVotes] = await Promise.all([
+      replyIds.length
+        ? prisma.replyVote.groupBy({
+          by: ['replyId'],
+          where: { replyId: { in: replyIds } },
+          _sum: { value: true },
+        })
+        : Promise.resolve([]),
+      currentUserId && replyIds.length
+        ? prisma.replyVote.findMany({
+          where: { userId: currentUserId, replyId: { in: replyIds } },
+          select: { replyId: true, value: true },
+        })
+        : Promise.resolve([]),
+    ]);
+
+    const replyScoreMap = Object.fromEntries(
+      replyVoteScores.map((v) => [v.replyId, v._sum.value ?? 0])
+    );
+    const currentUserReplyVoteMap = Object.fromEntries(
+      currentUserReplyVotes.map((v) => [v.replyId, v.value])
+    );
+
+    const formatted = replies.map((reply) => ({
+      id: reply.id,
+      content: reply.content,
+      createdAt: reply.createdAt,
+      authorId: reply.user.id,
+      authorName:
+        [reply.user.firstName, reply.user.lastName].filter(Boolean).join(' ') ||
+        reply.user.email.split('@')[0],
+      voteScore: replyScoreMap[reply.id] ?? 0,
+      userVote: currentUserReplyVoteMap[reply.id] ?? null,
+      parentReplyId,
+    }));
+
+    return NextResponse.json({ replies: formatted });
+  } catch (error) {
+    console.error('Error fetching replies:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

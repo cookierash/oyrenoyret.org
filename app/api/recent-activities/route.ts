@@ -1,5 +1,5 @@
 /**
- * Messages API
+ * Recent Activities API
  *
  * GET: Combined notifications + credit activity for the current user.
  */
@@ -146,7 +146,7 @@ export async function GET() {
 
     return NextResponse.json({ items });
   } catch (error) {
-    console.error('Error fetching messages:', error);
+    console.error('Error fetching recent activities:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

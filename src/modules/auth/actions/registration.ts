@@ -31,6 +31,7 @@ import { createSession } from '../utils/session';
 import { ensureDefaultCredits } from '@/src/modules/credits';
 import { CONSENT_VERSION } from '@/src/config/constants';
 import { headers } from 'next/headers';
+import { recordDailyVisit } from '@/src/modules/visits';
 
 /**
  * Step 1: Create student account with basic information
@@ -401,6 +402,7 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
     const userAgent = headersList.get('user-agent') || undefined;
 
     await createSession(userId, ipAddress, userAgent);
+    await recordDailyVisit(userId);
 
     return {
       success: true,

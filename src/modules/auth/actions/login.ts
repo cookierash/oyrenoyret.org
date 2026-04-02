@@ -12,6 +12,7 @@ import { verifyPassword } from '../utils/password';
 import { loginSchema, type LoginInput } from '../schemas/registration';
 import { createSession } from '../utils/session';
 import { headers } from 'next/headers';
+import { recordDailyVisit } from '@/src/modules/visits';
 
 /**
  * Authenticates a user and creates a session
@@ -178,6 +179,7 @@ export async function login(data: LoginInput) {
     const userAgent = headersList.get('user-agent') || undefined;
 
     await createSession(user.id, ipAddress, userAgent);
+    await recordDailyVisit(user.id);
 
     // Redirect handled by client component
     return {

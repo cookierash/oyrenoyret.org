@@ -81,8 +81,8 @@ export function SiteFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/messages" className="transition-colors hover:text-foreground">
-                    Messages
+                  <Link href="/recent-activities" className="transition-colors hover:text-foreground">
+                    Recent Activities
                   </Link>
                 </li>
                 <li>
@@ -157,6 +157,8 @@ export function SiteFooter() {
                   <Link
                     href="https://www.instagram.com/oyrenoyret.hzt/"
                     className="transition-colors hover:text-foreground"
+                    target="_blank"
+                    rel="noreferrer"
                   >
                     Instagram
                   </Link>
@@ -165,6 +167,8 @@ export function SiteFooter() {
                   <Link
                     href="https://www.youtube.com/channel/UCMU20z2ObBxXPQf-4HHVbwA?si=bH0jtN767G6eKkhD&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQMMjU2MjgxMDQwNTU4AAGno7RDhaTQhvmLP0kaadxkCFD6R2qCye864CXGLhBGvwUlYmH0AubrlRC797k_aem__04v0gkdBHBrYU-sNtGU1A"
                     className="transition-colors hover:text-foreground"
+                    target="_blank"
+                    rel="noreferrer"
                   >
                     YouTube
                   </Link>

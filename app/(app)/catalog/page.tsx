@@ -10,7 +10,7 @@ import { PageHeader } from '@/src/components/ui/page-header';
 import { SUBJECTS } from '@/src/config/constants';
 import { SUBJECT_ICONS, SUBJECT_COLORS } from '@/src/config/subject-meta';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
-import { ChevronRight } from 'lucide-react';
+import { PiCaretRight as ChevronRight } from 'react-icons/pi';
 
 export default function CatalogPage() {
   return (

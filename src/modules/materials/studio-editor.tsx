@@ -65,6 +65,7 @@ export function StudioEditor({
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentStatus, setCurrentStatus] = useState<'DRAFT' | 'PUBLISHED'>(initialStatus);
+  const [draftId, setDraftId] = useState<string | undefined>(materialId);
 
   const isModified =
     title !== savedTitle ||
@@ -93,7 +94,8 @@ export function StudioEditor({
 
     setSaving(true);
     try {
-      if (mode === 'create') {
+      const targetId = mode === 'create' ? draftId : materialId;
+      if (mode === 'create' && !draftId) {
         const res = await fetch('/api/materials', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -105,6 +107,7 @@ export function StudioEditor({
         }
         const created = await res.json();
 
+        setDraftId(created.id);
         setSavedTitle(title);
         setSavedContent(content);
         setSavedObjectives(objectiveSlots.join('\n').trim());
@@ -116,8 +119,8 @@ export function StudioEditor({
           if (created.id) router.push(`/studio/${created.id}`);
         }
         return created.id;
-      } else if (materialId) {
-        const res = await fetch(`/api/materials/${materialId}`, {
+      } else if (targetId) {
+        const res = await fetch(`/api/materials/${targetId}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -138,17 +141,20 @@ export function StudioEditor({
 
         if (!andPublish && !skipRedirect) {
           toast.success('Saved');
+          if (mode === 'create') {
+            router.push(`/studio/${targetId}`);
+          }
         }
         router.refresh();
-        onSaved?.();
-        return materialId;
+        onSaved?.(targetId);
+        return targetId;
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(false);
     }
-  }, [mode, materialId, subjectId, topicId, title, objectiveSlots, content, difficulty, router, onSaved]);
+  }, [mode, materialId, draftId, subjectId, topicId, title, objectiveSlots, content, difficulty, router, onSaved]);
 
   const publish = useCallback(async (confirmed = false) => {
     if (!subjectId || !topicId || !title.trim()) {
@@ -327,7 +333,7 @@ export function StudioEditor({
                 setTopicId('');
               }}
               placeholder="Select subject"
-              disabled={mode === 'edit'}
+              disabled={mode === 'edit' || Boolean(draftId)}
             >
               {SUBJECTS.map((s) => (
                 <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
@@ -339,7 +345,7 @@ export function StudioEditor({
             <Select
               value={topicId}
               onChange={(e) => setTopicId(e.target.value)}
-              disabled={!subjectId || mode === 'edit'}
+              disabled={!subjectId || mode === 'edit' || Boolean(draftId)}
               placeholder="Select topic"
             >
               {topics.map((t) => (

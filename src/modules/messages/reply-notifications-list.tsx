@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { MessageSquare } from 'lucide-react';
+import { PiChatCircle as MessageSquare } from 'react-icons/pi';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/src/lib/utils';
 
@@ -70,8 +70,11 @@ export function ReplyNotificationsList({ notifications }: ReplyNotificationsList
     <Card>
       <CardContent className="p-0">
         <div>
-          {grouped.map((group) => (
-            <div key={group.dateKey}>
+          {grouped.map((group, index) => (
+            <div
+              key={group.dateKey}
+              className={cn(index > 0 && 'border-t border-border/80')}
+            >
               <div
                 suppressHydrationWarning
                 className={cn(

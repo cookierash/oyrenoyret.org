@@ -189,6 +189,16 @@ export async function POST(request: Request) {
       },
     });
 
+    if (creditResult.transactionId) {
+      await prisma.creditTransaction.updateMany({
+        where: { id: creditResult.transactionId },
+        data: {
+          referenceId: discussion.id,
+          metadata: { discussionId: discussion.id },
+        },
+      });
+    }
+
     return NextResponse.json({
       ...discussion,
       creditsSpent: Math.abs(creditResult.amount),

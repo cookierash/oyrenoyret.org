@@ -2,7 +2,7 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MessagesSkeleton } from '@/src/modules/messages/messages-skeleton';
 
-export default function MessagesLoading() {
+export default function RecentActivitiesLoading() {
   return (
     <DashboardShell>
       <div className="space-y-3">

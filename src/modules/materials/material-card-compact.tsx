@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lock, Loader2, Users, ExternalLink, User } from 'lucide-react';
+import { PiLock as Lock, PiCircleNotch as Loader2, PiUsers as Users, PiArrowSquareOut as ExternalLink, PiUser as User } from 'react-icons/pi';
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { toast } from 'sonner';
 

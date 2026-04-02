@@ -3,20 +3,8 @@
  * Icons and colors for engaging, distinct cards.
  */
 
-import type { LucideIcon } from 'lucide-react';
-import {
-  Calculator,
-  Atom,
-  FlaskConical,
-  Leaf,
-  BookOpen,
-  BookText,
-  Languages,
-  Landmark,
-  Globe,
-  Cpu,
-  Scale,
-} from 'lucide-react';
+import type { IconType as LucideIcon } from 'react-icons';
+import { PiCalculator as Calculator, PiAtom as Atom, PiFlask as FlaskConical, PiLeaf as Leaf, PiBookOpen as BookOpen, PiBook as BookText, PiTranslate as Languages, PiBank as Landmark, PiGlobe as Globe, PiCpu as Cpu, PiScales as Scale } from 'react-icons/pi';
 import type { SubjectId } from './curriculum';
 
 export const SUBJECT_ICONS: Record<SubjectId, LucideIcon> = {
