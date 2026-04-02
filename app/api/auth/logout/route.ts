@@ -7,7 +7,7 @@
 import { NextResponse } from 'next/server';
 import { deleteSession } from '@/src/modules/auth/utils/session';
 
-export async function POST() {
+export async function POST(request: Request) {
   await deleteSession();
-  return NextResponse.redirect(new URL('/', process.env.NEXTAUTH_URL || 'http://localhost:3000'));
+  return NextResponse.redirect(new URL('/', request.url));
 }

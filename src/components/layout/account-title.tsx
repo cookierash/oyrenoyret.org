@@ -9,7 +9,12 @@ const PAGE_LABELS: Record<string, string> = {
   '/catalog': 'Catalog',
   '/library': 'Library',
   '/live-activities': 'Live Activities',
-  '/admin/live-activities': 'Live Activities Admin',
+  '/admin': 'Admin',
+  '/admin/dashboard': 'Admin Dashboard',
+  '/admin/live-activities': 'Manage Live Activities',
+  '/admin/live-activities/problem-sprints': 'Problem Sprints',
+  '/admin/live-activities/announcements': 'Announcements',
+  '/admin/live-activities/events': 'Events',
   '/discussions': 'Discussions',
   '/messages': 'Messages',
   '/academic-record': 'Academic record',
@@ -33,19 +38,19 @@ interface AccountTitleProps {
 }
 
 /**
- * Sets document.title to include account identity so multi-tab,
- * multi-account usage is clear. Format: "Page · Account - oyrenoyret.org"
+ * Sets document.title based on the current route.
+ * Format: "{pagename} - oyrenoyret.org"
  */
-export function AccountTitle({ displayName }: AccountTitleProps) {
+export function AccountTitle({ displayName: _displayName }: AccountTitleProps) {
   const pathname = usePathname();
 
   useEffect(() => {
     const pageLabel = getPageLabel(pathname);
-    document.title = `${pageLabel} · ${displayName} - oyrenoyret.org`;
+    document.title = `${pageLabel} - oyrenoyret.org`;
     return () => {
-      document.title = 'oyrenoyret.org - NGO EdTech Platform';
+      document.title = 'oyrenoyret.org';
     };
-  }, [pathname, displayName]);
+  }, [pathname, _displayName]);
 
   return null;
 }

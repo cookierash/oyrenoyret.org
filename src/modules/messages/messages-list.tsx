@@ -73,23 +73,23 @@ export function MessagesList({ transactions }: MessagesListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
           <label
             htmlFor="messages-sort"
-            className="text-xs text-muted-foreground whitespace-nowrap"
+            className="text-sm text-muted-foreground whitespace-nowrap"
           >
-            Sort
+            Sort by
           </label>
           <Select
             id="messages-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as SortOrder)}
-            className="w-[160px] text-xs"
+            className="w-[180px]"
             aria-label="Sort messages"
           >
-            <SelectItem value="newest">Newest to oldest</SelectItem>
-            <SelectItem value="oldest">Oldest to newest</SelectItem>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
           </Select>
         </div>
       </div>
@@ -145,10 +145,10 @@ export function MessagesList({ transactions }: MessagesListProps) {
                             )}
                           >
                             {isGain ? '+' : '−'}
-                            {absAmount.toFixed(2)} credits
+                            {Math.round(absAmount)} credits
                           </span>
                           <p className="text-[10px] text-muted-foreground">
-                            Balance: {tx.balanceAfter.toFixed(2)}
+                            Balance: {Math.round(tx.balanceAfter)}
                           </p>
                         </div>
                       </li>

@@ -15,7 +15,7 @@ export async function GET(
     const currentUserId = await getCurrentSession();
 
     const discussion = await prisma.discussion.findUnique({
-      where: { id, archivedAt: null },
+      where: { id },
       select: {
         id: true,
         title: true,
@@ -67,40 +67,48 @@ export async function GET(
             },
           },
         },
-        votes: true,
       },
     });
 
-    if (!discussion) {
+    if (!discussion || discussion.archivedAt) {
       return NextResponse.json({ error: 'Discussion not found' }, { status: 404 });
     }
-
-    const discussionVoteScore = discussion.votes.reduce((s, v) => s + v.value, 0);
 
     const allReplyIds = [
       ...discussion.replies.map((r) => r.id),
       ...discussion.replies.flatMap((r) => r.childReplies.map((c) => c.id)),
     ];
-    const replyVoteScores = allReplyIds.length
-      ? await prisma.replyVote.groupBy({
-        by: ['replyId'],
-        where: { replyId: { in: allReplyIds } },
+
+    const [discussionVoteSum, currentUserVote, replyVoteScores, currentUserReplyVotes] = await Promise.all([
+      prisma.discussionVote.aggregate({
+        where: { discussionId: id },
         _sum: { value: true },
-      })
-      : [];
+      }),
+      currentUserId
+        ? prisma.discussionVote.findUnique({
+          where: { discussionId_userId: { discussionId: id, userId: currentUserId } },
+          select: { value: true },
+        })
+        : Promise.resolve(null),
+      allReplyIds.length
+        ? prisma.replyVote.groupBy({
+          by: ['replyId'],
+          where: { replyId: { in: allReplyIds } },
+          _sum: { value: true },
+        })
+        : Promise.resolve([]),
+      currentUserId && allReplyIds.length
+        ? prisma.replyVote.findMany({
+          where: { userId: currentUserId, replyId: { in: allReplyIds } },
+          select: { replyId: true, value: true },
+        })
+        : Promise.resolve([]),
+    ]);
+
     const replyScoreMap = Object.fromEntries(
       replyVoteScores.map((v) => [v.replyId, v._sum.value ?? 0])
     );
 
-    const currentUserVote =
-      currentUserId && discussion.votes.find((v) => v.userId === currentUserId)?.value;
-
-    const currentUserReplyVotes = currentUserId && allReplyIds.length
-      ? await prisma.replyVote.findMany({
-        where: { userId: currentUserId, replyId: { in: allReplyIds } },
-        select: { replyId: true, value: true },
-      })
-      : [];
     const currentUserReplyVoteMap = Object.fromEntries(
       currentUserReplyVotes.map((v) => [v.replyId, v.value])
     );
@@ -142,8 +150,8 @@ export async function GET(
       authorName:
         [discussion.user.firstName, discussion.user.lastName].filter(Boolean).join(' ') ||
         discussion.user.email.split('@')[0],
-      voteScore: discussionVoteScore,
-      userVote: currentUserVote ?? null,
+      voteScore: discussionVoteSum._sum.value ?? 0,
+      userVote: currentUserVote?.value ?? null,
       replies: discussion.replies.map(formatReply),
       currentUserId: currentUserId ?? null,
     });

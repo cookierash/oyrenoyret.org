@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/src/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -67,7 +68,16 @@ const AlertDialogTrigger = React.forwardRef<
 });
 AlertDialogTrigger.displayName = 'AlertDialogTrigger';
 
-const AlertDialogPortal = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+const AlertDialogPortal = ({ children }: { children: React.ReactNode }) => {
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+  return createPortal(children, document.body);
+};
 
 const AlertDialogOverlay = React.forwardRef<
   HTMLDivElement,
@@ -76,16 +86,18 @@ const AlertDialogOverlay = React.forwardRef<
   const { open, onOpenChange } = useAlertDialog();
   if (!open) return null;
   return (
-    <div
-      ref={ref}
-      className={cn(
-        'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
-        'data-[state=open]:animate-in data-[state=closed]:animate-out',
-        className
-      )}
-      onClick={() => onOpenChange(false)}
-      {...props}
-    />
+    <AlertDialogPortal>
+      <div
+        ref={ref}
+        className={cn(
+          'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
+          'data-[state=open]:animate-in data-[state=closed]:animate-out',
+          className
+        )}
+        onClick={() => onOpenChange(false)}
+        {...props}
+      />
+    </AlertDialogPortal>
   );
 });
 AlertDialogOverlay.displayName = 'AlertDialogOverlay';
@@ -97,25 +109,27 @@ const AlertDialogContent = React.forwardRef<
   const { open, onOpenChange } = useAlertDialog();
   if (!open) return null;
   return (
-    <>
-      <div
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm cursor-pointer"
-        aria-hidden
-        onClick={() => onOpenChange(false)}
-      />
-      <div
-        ref={ref}
-        role="alertdialog"
-        className={cn(
-          'fixed left-[50%] top-[50%] z-[51] w-full max-w-md -translate-x-1/2 -translate-y-1/2',
-          'rounded-lg bg-background px-4 pt-8 pb-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)]',
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    </>
+    <AlertDialogPortal>
+      <>
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm cursor-pointer"
+          aria-hidden
+          onClick={() => onOpenChange(false)}
+        />
+        <div
+          ref={ref}
+          role="alertdialog"
+          className={cn(
+            'fixed left-[50%] top-[50%] z-[51] w-full max-w-md -translate-x-1/2 -translate-y-1/2',
+            'rounded-lg bg-background px-4 pt-8 pb-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)]',
+            className
+          )}
+          {...props}
+        >
+          {children}
+        </div>
+      </>
+    </AlertDialogPortal>
   );
 });
 AlertDialogContent.displayName = 'AlertDialogContent';

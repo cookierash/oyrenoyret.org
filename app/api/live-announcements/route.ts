@@ -10,6 +10,8 @@ import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
 import { sanitizeInput } from '@/src/security/validation';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function GET(request: Request) {
   try {
@@ -50,6 +52,16 @@ export async function POST(request: Request) {
 
     if (!user || !isStaff(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(
+      `live-announcements:create:${identifier}`,
+      RATE_LIMITS.ADMIN_WRITE
+    );
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const body = await request.json();

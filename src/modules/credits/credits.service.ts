@@ -16,7 +16,7 @@ import {
 } from '@/src/config/credits';
 
 export function roundCredits(value: number): number {
-  return Math.round(value * 100) / 100;
+  return Math.round(value);
 }
 
 /** Execute transaction: update balance and log. Returns new balance or throws. */
@@ -66,34 +66,33 @@ export async function getBalance(userId: string): Promise<number> {
   return user ? roundCredits(user.credits) : 0;
 }
 
-/** Calculate material publish reward. Textual: 0.5. Practice test: 0.5 + 0.05/question (cap 20). */
-export function calcMaterialPublishCredit(params: MaterialCreditParams): number {
-  const { materialType, questionCount = 0 } = params;
-  if (materialType === 'PRACTICE_TEST') {
-    const q = Math.min(questionCount, CREDITS_MATERIAL.PRACTICE_QUESTION_CAP_PUBLISH);
-    return CREDITS_MATERIAL.BASE_PUBLISH + CREDITS_MATERIAL.PRACTICE_QUESTION_BONUS_PUBLISH * q;
+function calcMaterialCreditValue(params: MaterialCreditParams): number {
+  const base = CREDITS_MATERIAL.BASE_VALUE;
+  if (params.materialType === 'PRACTICE_TEST') {
+    const questionCount = params.questionCount ?? 0;
+    const extra = Math.max(0, questionCount - CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS);
+    const steps = Math.floor(extra / CREDITS_MATERIAL.PRACTICE_STEP_QUESTIONS);
+    return base + steps;
   }
-  return CREDITS_MATERIAL.BASE_PUBLISH;
+  const wordCount = params.wordCount ?? 0;
+  const extra = Math.max(0, wordCount - CREDITS_MATERIAL.TEXTUAL_MIN_WORDS);
+  const steps = Math.floor(extra / CREDITS_MATERIAL.TEXTUAL_STEP_WORDS);
+  return base + steps;
 }
 
-/** Calculate material passive earning per unlock. Textual: 0.15. Practice test: 0.15 + 0.02/question (cap 15). */
-export function calcMaterialPassiveCredit(params: MaterialCreditParams): number {
-  const { materialType, questionCount = 0 } = params;
-  if (materialType === 'PRACTICE_TEST') {
-    const q = Math.min(questionCount, CREDITS_MATERIAL.PRACTICE_QUESTION_CAP_PASSIVE);
-    return CREDITS_MATERIAL.BASE_PASSIVE + CREDITS_MATERIAL.PRACTICE_QUESTION_BONUS_PASSIVE * q;
-  }
-  return CREDITS_MATERIAL.BASE_PASSIVE;
+/** Calculate material publish reward (integer). */
+export function calcMaterialPublishCredit(_params: MaterialCreditParams): number {
+  return CREDITS_MATERIAL.PUBLISH_REWARD;
 }
 
-/** Calculate material unlock cost. Textual: 2.0. Practice test: 2.0 + 0.03/question (cap 25). */
+/** Calculate material passive earning per unlock (integer). */
+export function calcMaterialPassiveCredit(_params: MaterialCreditParams): number {
+  return CREDITS_MATERIAL.PASSIVE_REWARD;
+}
+
+/** Calculate material unlock cost based on content size. */
 export function calcMaterialUnlockCost(params: MaterialCreditParams): number {
-  const { materialType, questionCount = 0 } = params;
-  if (materialType === 'PRACTICE_TEST') {
-    const q = Math.min(questionCount, CREDITS_MATERIAL.PRACTICE_QUESTION_CAP_UNLOCK);
-    return CREDITS_MATERIAL.BASE_UNLOCK + CREDITS_MATERIAL.PRACTICE_QUESTION_BONUS_UNLOCK * q;
-  }
-  return CREDITS_MATERIAL.BASE_UNLOCK;
+  return calcMaterialCreditValue(params);
 }
 
 /** Calculate discussion create cost */

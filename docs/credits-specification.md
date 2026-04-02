@@ -9,6 +9,7 @@
 - **Default balance**: 15 credits on registration — enough to try each feature once (except special academic events)
 - **Earn by contributing**: Host sessions, publish materials, perform in sprints, help in discussions
 - **Spend to consume**: Join sessions, unlock materials, enter sprints, create discussions
+- **Integer credits**: All credit amounts are whole numbers
 - **Engagement design**: Variable rewards, near-miss effects, streaks, and loss-aversion nudges
 
 ---
@@ -63,113 +64,60 @@ Where:
 
 ## 2. Publish Materials
 
-### 2.1 Publisher: Initial Publication Bonus
+### 2.1 Minimum Content
 
-One-time credit when material is published. AI evaluates alignment with publisher-defined objectives. Target: **~0.5 credits**.
-
-```
-G_initial = BASE_PUBLISH × ALIGNMENT_SCORE × TYPE_MULTIPLIER × (1 + ε)
-
-Where:
-  BASE_PUBLISH = 0.5
-  ALIGNMENT_SCORE = AI_rating in [0.5, 1.0]  // 0.5 = weak, 1.0 = excellent
-  TYPE_MULTIPLIER = { TEXTUAL → 1.0, PRACTICE_TEST → 1.0 + 0.05 × min(N_questions, 20) }
-  ε = random in [-0.1, 0.1]
-```
-
-**Typical range:** 0.25–0.6 credits. Practice test adds up to +0.5 for 20 questions.
-
-*Engagement hook: Small initial reward — main earnings come from passive use over time.*
+- **Textual**: at least **300 words**
+- **Practice tests**: at least **5 questions**
 
 ---
 
-### 2.2 Publisher: Passive Earnings (Per Use)
+### 2.2 Credit Value (Unlock Cost)
 
-Small credits each time someone benefits from the material.
+Material credit value is integer and based on size.
 
 ```
-G_passive = BASE_PASSIVE × ALIGNMENT_SCORE × TYPE_FACTOR
-
-Where:
-  BASE_PASSIVE = 0.15
-  ALIGNMENT_SCORE = same as above
-  TYPE_FACTOR = { TEXTUAL → 1.0, PRACTICE_TEST → 1.0 + 0.02 × min(N_questions, 15) }
+C_textual = 3 + floor(max(words - 300, 0) / 200)
+C_practice = 3 + floor(max(questions - 5, 0) / 5)
 ```
 
-**Typical:** 0.08–0.20 credits per consumer use.
-
-*Engagement hook: "Your material earned 0.12 credits" — drip rewards create checking habit.*
+**Examples:**
+- 300 words → 3 credits
+- 500 words → 4 credits
+- 700 words → 5 credits
+- 5 questions → 3 credits
+- 10 questions → 4 credits
+- 15 questions → 5 credits
 
 ---
 
-### 2.3 Consumer Cost (Unlock Material)
+### 2.3 Publisher Rewards
 
-Users pay based on material quality (alignment) and type.
-
-```
-C_material = BASE_UNLOCK × ALIGNMENT_SCORE × TYPE_FACTOR × (1 + ε)
-
-Where:
-  BASE_UNLOCK = 2.0
-  ALIGNMENT_SCORE = AI_rating in [0.5, 1.0]
-  TYPE_FACTOR = { TEXTUAL → 1.0, PRACTICE_TEST → 1.0 + 0.03 × min(N_questions, 25) }
-  ε = random in [-0.08, 0.08]
-```
-
-**Typical range:** 1.0–3.5 credits per unlock.
-
-*Engagement hook: Higher quality costs more — creates "premium" perception.*
+- **Publish bonus**: 1 credit (one-time, on publish)
+- **Passive earnings**: 1 credit per unlock
 
 ---
 
 ## 3. Problem-Solving Sprints
 
-10–15 minute competitive contests. Entry is expensive; top performers earn net positive.
+10–15 minute competitive contests with fixed entry and payouts.
 
 ### 3.1 Entry Cost
 
 ```
-C_sprint = BASE_SPRINT × DURATION_FACTOR
-
-Where:
-  BASE_SPRINT = 5.0
-  DURATION_FACTOR = { 10 min → 1.0, 12 min → 1.1, 15 min → 1.2 }
+C_sprint = 3
 ```
-
-**Typical:** 5–6 credits to enter.
 
 ---
 
-### 3.2 Payout (Winner Multiplier)
+### 3.2 Payouts
 
-Only **top 5** earn. Ranks 6–20 receive nothing.
+Only **top 3** earn. Ranks 4+ receive nothing.
 
-```
-Payout_rank = C_sprint × MULTIPLIER_rank × (1 + ε)
-
-Where:
-  MULTIPLIER_rank = {
-    1st  → 2.0
-    2nd  → 1.75
-    3rd  → 1.5
-    4th  → 1.25
-    5th  → 1.0
-    6–20 → 0
-  }
-  ε = random in [-0.05, 0.05]
-```
-
-**Net outcome (entry 5 credits):**
-| Rank | Payout | Net |
-|------|--------|-----|
-| 1st  | ~10    | +5  |
-| 2nd  | ~8.75  | +3.75 |
-| 3rd  | ~7.5   | +2.5 |
-| 4th  | ~6.25  | +1.25 |
-| 5th  | ~5     | 0 (break-even) |
-| 6–20 | 0      | -5  |
-
-*Engagement hook: Top 5 net positive or break-even; only winners earn.*
+| Rank | Payout |
+|------|--------|
+| 1st  | 9      |
+| 2nd  | 7      |
+| 3rd  | 5      |
 
 ---
 
@@ -178,38 +126,33 @@ Where:
 ### 4.1 Create Discussion (Cost)
 
 ```
-C_create = BASE_CREATE × (1 + ε)
-
-Where:
-  BASE_CREATE = 1.0
-  ε = random in [-0.1, 0.1]
+C_create = 1
 ```
-
-**Typical:** 0.9–1.1 credits.
 
 ---
 
-### 4.2 Help Others (Earn)
+### 4.2 Reply Reward
+
+- **Reply prize**: 1 credit
+- **No credits** for replies by the discussion author in their own thread
+
+---
+
+### 4.3 Help Others (Earn)
 
 Only rewarded when help is validated (e.g., accepted by asker or upvoted by others).
 
 ```
-G_help = BASE_HELP × VALIDATION_STRENGTH × (1 + ε)
-
-Where:
-  BASE_HELP = 0.5
-  VALIDATION_STRENGTH = {
-    accepted_by_asker → 1.5
-    upvoted (net ≥ 2) → 1.2
-    upvoted (net ≥ 1) → 1.0
-    otherwise         → 0
-  }
-  ε = random in [-0.1, 0.1]
+G_help =
+  accepted_by_asker → 3
+  upvoted (net ≥ 2) → 2
+  upvoted (net ≥ 1) → 1
+  otherwise         → 0
 ```
 
 **Minimum threshold:** Reply must be accepted OR have net upvotes ≥ 1 to earn anything.
 
-*Engagement hook: "Your help was accepted — +0.75 credits" — social validation + reward.*
+*Engagement hook: "Your help was accepted — +3 credits" — social validation + reward.*
 
 ---
 
@@ -218,12 +161,11 @@ Where:
 High-cost, high-prestige events. Not covered by default 15 credits.
 
 ```
-C_event = BASE_EVENT × TIER × (1 + ε)
+C_event = BASE_EVENT × TIER
 
 Where:
   BASE_EVENT = 100.0
   TIER = { standard → 1.0, premium → 1.25, elite → 1.5 }
-  ε = random in [-0.05, 0.05]
 ```
 
 **Typical:** 100–150 credits. Requires significant prior earning through other activities.
@@ -242,7 +184,7 @@ Where:
 
 ### 6.2 Winner-Only Sprints
 
-- **Top 5 only**: Ranks 6–20 receive nothing
+- **Top 3 only**: Ranks 4+ receive nothing
 - **Effect**: Clear stakes; only skill is rewarded
 
 ### 6.3 Streak Bonuses (Optional Future)
@@ -265,7 +207,7 @@ STREAK_BONUS = 1 + 0.05 × min(consecutive_days_active, 7)
 
 ### 6.6 Sunk Cost in Sprints
 
-- **Entry cost**: 5 credits feels significant
+- **Entry cost**: 3 credits feels significant
 - **Effect**: "I've already paid — I'll give it my best shot"
 
 ---
@@ -275,12 +217,12 @@ STREAK_BONUS = 1 + 0.05 × min(consecutive_days_active, 7)
 | Activity              | Typical Cost | Fits in 15? |
 |-----------------------|--------------|-------------|
 | 1× short session (30m)| ~1           | ✓           |
-| 1× material unlock    | ~2           | ✓           |
-| 1× sprint entry      | ~5           | ✓           |
-| 1× discussion create  | ~1           | ✓           |
+| 1× material unlock    | ~3           | ✓           |
+| 1× sprint entry       | 3            | ✓           |
+| 1× discussion create  | 1            | ✓           |
 | 1× special event     | 100–150      | ✗ (aspirational) |
 
-**Remaining after one of each:** ~6 credits — buffer for another session or material.
+**Remaining after one of each:** ~7 credits — buffer for another session or material.
 
 ---
 
@@ -291,12 +233,12 @@ STREAK_BONUS = 1 + 0.05 × min(consecutive_days_active, 7)
 | DEFAULT_CREDITS | 15    | New user balance           |
 | BASE_SESSION    | 1.0   | Participant cost base     |
 | BASE_HOST       | 1.2   | Facilitator gain base (2–4 range) |
-| BASE_PUBLISH    | 0.5   | Initial material publish   |
-| BASE_PASSIVE    | 0.15  | Per-use material passive   |
-| BASE_UNLOCK     | 2.0   | Material consumer cost     |
-| BASE_SPRINT     | 5.0   | Sprint entry cost          |
-| BASE_CREATE     | 1.0   | Discussion creation cost   |
-| BASE_HELP       | 0.5   | Help reward base           |
+| BASE_PUBLISH    | 1     | Initial material publish   |
+| BASE_PASSIVE    | 1     | Per-use material passive   |
+| BASE_UNLOCK     | 3     | Material consumer cost     |
+| BASE_SPRINT     | 3     | Sprint entry cost          |
+| BASE_CREATE     | 1     | Discussion creation cost   |
+| BASE_HELP       | 1     | Help reward base           |
 | BASE_EVENT      | 100.0 | Special event base (100–150) |
 
 ---
@@ -306,5 +248,5 @@ STREAK_BONUS = 1 + 0.05 × min(consecutive_days_active, 7)
 1. **Credit transactions**: Log every credit change (CreditTransaction model) for audit and analytics
 2. **Idempotency**: Prevent double-spend (e.g., joining same session twice)
 3. **Negative balance**: Block actions when credits < required cost
-4. **AI alignment**: Material alignment score requires AI evaluation pipeline before publish
+4. **Content minimums**: Enforce 300-word textual minimum and 5-question practice test minimum before publish
 5. **Rating system**: Group session objectives + participant ratings need UI and storage

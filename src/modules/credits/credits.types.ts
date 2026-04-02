@@ -17,5 +17,6 @@ export interface CreditResult {
 export interface MaterialCreditParams {
   materialType: 'TEXTUAL' | 'PRACTICE_TEST';
   questionCount?: number;
+  wordCount?: number;
   alignmentScore?: number;
 }

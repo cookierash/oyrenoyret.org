@@ -81,7 +81,7 @@ export function MaterialCardCompact({
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
-      toast.success(`Unlocked! (−${Number(data.cost ?? estimatedCost).toFixed(2)} credits)`);
+      toast.success(`Unlocked! (−${Math.round(Number(data.cost ?? estimatedCost))} credits)`);
       router.refresh();
       onUnlocked?.();
     } catch {
@@ -137,7 +137,7 @@ export function MaterialCardCompact({
               {unlocking ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <>Unlock ({Number(estimatedCost).toFixed(2)} credits)</>
+                <>Unlock ({Math.round(Number(estimatedCost))} credits)</>
               )}
             </Button>
           )}
@@ -150,7 +150,7 @@ export function MaterialCardCompact({
         </div>
 
         {!isOwn && balance !== undefined && balance < estimatedCost && !unlocked && (
-          <p className="text-[10px] text-destructive">Need {Number(estimatedCost - balance).toFixed(2)} more credits</p>
+          <p className="text-[10px] text-destructive">Need {Math.round(Number(estimatedCost - balance))} more credits</p>
         )}
       </CardContent>
     </Card>

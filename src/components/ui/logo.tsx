@@ -37,7 +37,7 @@ export function Logo({ className, size = 'sm', showText = false, textSize = 'sm'
           alt="oyrenoyret"
           width={w}
           height={h}
-          className="h-[1.5em] w-[1.5em] shrink-0 dark:invert"
+          className="logo-mark h-[1.5em] w-[1.5em] shrink-0"
         />
         <span className="font-semibold font-comfortaa">oyrenoyret</span>
       </Link>
@@ -55,7 +55,7 @@ export function Logo({ className, size = 'sm', showText = false, textSize = 'sm'
         alt="oyrenoyret"
         width={w}
         height={h}
-        className="shrink-0 dark:invert"
+        className="logo-mark shrink-0"
       />
     </Link>
   );

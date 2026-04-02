@@ -14,6 +14,7 @@ interface MessagesClientProps {
 export function MessagesClient({ refreshKey = 0 }: MessagesClientProps) {
   const [items, setItems] = useState<CombinedItems>([]);
   const [loading, setLoading] = useState(true);
+  const [localRefresh, setLocalRefresh] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -36,11 +37,16 @@ export function MessagesClient({ refreshKey = 0 }: MessagesClientProps) {
     return () => {
       active = false;
     };
-  }, [refreshKey]);
+  }, [refreshKey, localRefresh]);
 
   if (loading) {
     return <MessagesSkeleton />;
   }
 
-  return <CombinedMessagesList items={items} />;
+  return (
+    <CombinedMessagesList
+      items={items}
+      onRefresh={() => setLocalRefresh((value) => value + 1)}
+    />
+  );
 }

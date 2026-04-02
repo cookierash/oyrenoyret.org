@@ -5,7 +5,7 @@ import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { CatalogMaterialsGrid } from './catalog-materials-grid';
-import { TopicMaterialsListSkeleton } from './topic-materials-skeleton';
+import { TopicMaterialsSkeleton } from './topic-materials-skeleton';
 
 export type TopicMaterialWithCost = {
   id: string;
@@ -95,6 +95,10 @@ export function TopicMaterialsSection({
     return sorted;
   }, [materials, search, sort]);
 
+  if (loading) {
+    return <TopicMaterialsSkeleton />;
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -131,9 +135,7 @@ export function TopicMaterialsSection({
         </div>
       </div>
 
-      {loading ? (
-        <TopicMaterialsListSkeleton />
-      ) : filteredAndSorted.length === 0 ? (
+      {filteredAndSorted.length === 0 ? (
         <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-muted-foreground">
             {search.trim()

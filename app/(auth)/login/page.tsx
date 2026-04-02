@@ -9,6 +9,10 @@ import { LoginForm } from '@/src/modules/auth/components/login-form';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { redirect } from 'next/navigation';
 
+export const metadata = {
+  title: 'Login',
+};
+
 export default async function LoginPage() {
   const userId = await getCurrentSession();
   if (userId) {

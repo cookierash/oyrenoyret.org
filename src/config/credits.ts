@@ -21,7 +21,7 @@ export type SprintDuration = (typeof SPRINT_DURATIONS)[number];
 
 /** Sprint pool size */
 export const SPRINT_POOL_SIZE = 20;
-export const SPRINT_TOP_COUNT = 5;
+export const SPRINT_TOP_COUNT = 3;
 
 // ─── Group Sessions ─────────────────────────────────────────────────────────
 
@@ -43,54 +43,51 @@ export const CREDITS_GROUP_SESSION = {
 // ─── Materials ──────────────────────────────────────────────────────────────
 
 export const CREDITS_MATERIAL = {
-  /** Base initial publish reward (textual document) */
-  BASE_PUBLISH: 0.5,
-  /** Base passive earning per consumer unlock */
-  BASE_PASSIVE: 0.15,
-  /** Base consumer unlock cost */
-  BASE_UNLOCK: 2.0,
-  /** Practice test: +0.05 per question for publish, cap 20 */
-  PRACTICE_QUESTION_BONUS_PUBLISH: 0.05,
-  PRACTICE_QUESTION_CAP_PUBLISH: 20,
-  /** Practice test: +0.02 per question for passive, cap 15 */
-  PRACTICE_QUESTION_BONUS_PASSIVE: 0.02,
-  PRACTICE_QUESTION_CAP_PASSIVE: 15,
-  /** Practice test: +0.03 per question for unlock, cap 25 */
-  PRACTICE_QUESTION_BONUS_UNLOCK: 0.03,
-  PRACTICE_QUESTION_CAP_UNLOCK: 25,
+  /** Base credit value for materials (used for unlock cost) */
+  BASE_VALUE: 3,
+  /** Minimum textual content (words) */
+  TEXTUAL_MIN_WORDS: 300,
+  /** Words per +1 credit */
+  TEXTUAL_STEP_WORDS: 200,
+  /** Minimum practice test questions */
+  PRACTICE_MIN_QUESTIONS: 5,
+  /** Questions per +1 credit */
+  PRACTICE_STEP_QUESTIONS: 5,
+  /** Publish reward (integer credits) */
+  PUBLISH_REWARD: 1,
+  /** Passive reward per unlock (integer credits) */
+  PASSIVE_REWARD: 1,
 } as const;
 
 // ─── Problem-Solving Sprints ────────────────────────────────────────────────
 
 export const CREDITS_SPRINT = {
   /** Base entry cost */
-  BASE_ENTRY: 5.0,
-  /** Duration factors for entry cost */
-  DURATION_FACTOR: { 10: 1.0, 12: 1.1, 15: 1.2 } as Record<SprintDuration, number>,
-  /** Payout multipliers by rank. Only top 5 earn. */
-  RANK_MULTIPLIERS: {
-    1: [2.0, 2.0],
-    2: [1.75, 1.75],
-    3: [1.5, 1.5],
-    4: [1.25, 1.25],
-    5: [1.0, 1.0],
-    // 6–20: 0
-  } as Record<number, [number, number]>,
+  BASE_ENTRY: 3,
+  /** Duration factors (kept at 1 to preserve integer entry cost) */
+  DURATION_FACTOR: { 10: 1, 12: 1, 15: 1 } as Record<SprintDuration, number>,
+  /** Payouts by rank (credits). Only top 3 earn. */
+  RANK_PAYOUTS: {
+    1: 9,
+    2: 7,
+    3: 5,
+    // 4+ : 0
+  } as Record<number, number>,
 } as const;
 
 // ─── Discussions ────────────────────────────────────────────────────────────
 
 export const CREDITS_DISCUSSION = {
   /** Cost to create a discussion */
-  BASE_CREATE: 0.1,
+  BASE_CREATE: 1,
   /** Reward for posting a reply */
-  BASE_REPLY: 0.02,
+  BASE_REPLY: 1,
   /** Base reward for helpful reply */
-  BASE_HELP: 0.5,
+  BASE_HELP: 1,
   /** Validation strength multipliers */
-  VALIDATION_ACCEPTED: 1.5,
-  VALIDATION_UPVOTES_2: 1.2,
-  VALIDATION_UPVOTES_1: 1.0,
+  VALIDATION_ACCEPTED: 3,
+  VALIDATION_UPVOTES_2: 2,
+  VALIDATION_UPVOTES_1: 1,
 } as const;
 
 // ─── Special Academic Events ────────────────────────────────────────────────

@@ -25,6 +25,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { PasswordInput } from '@/src/modules/auth/components/password-input';
+import { isStaff } from '@/src/lib/permissions';
 
 export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +46,8 @@ export function LoginForm() {
 
       if (result.success) {
         toast.success('Login successful!');
-        router.push('/dashboard');
+        const destination = result.role && isStaff(result.role) ? '/admin/dashboard' : '/dashboard';
+        router.push(destination);
         router.refresh();
       } else {
         toast.error(result.error || 'Login failed');

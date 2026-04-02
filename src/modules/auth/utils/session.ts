@@ -141,7 +141,20 @@ export async function getCurrentSession(): Promise<string | null> {
     return null;
   }
 
-  return validateSession(token);
+  const userId = await validateSession(token);
+
+  if (!userId) {
+    // Best-effort cleanup of stale cookies to avoid redirect loops from edge proxy.
+    try {
+      cookieStore.delete('session_token');
+    } catch {
+      // Cookie mutation may be disallowed in some render phases; ignore if so.
+    }
+
+    return null;
+  }
+
+  return userId;
 }
 
 /**

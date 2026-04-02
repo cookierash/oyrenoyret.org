@@ -128,7 +128,7 @@ export default async function DashboardPage() {
   const [user, upcomingActivities, recentPurchases, streakActivity] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { firstName: true, lastName: true },
+      select: { firstName: true, lastName: true, role: true },
     }),
     prisma.activity.findMany({
       where: {
@@ -162,6 +162,10 @@ export default async function DashboardPage() {
       select: { createdAt: true },
     }),
   ]);
+
+  if (user?.role === 'ADMIN' || user?.role === 'TEACHER') {
+    redirect('/admin/dashboard');
+  }
 
   const displayName = user?.firstName || 'there';
   const greeting = getGreeting();

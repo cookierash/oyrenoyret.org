@@ -61,7 +61,7 @@ export function sanitizeInput(input: string): string {
 /**
  * Sanitizes HTML content to prevent XSS while preserving safe formatting.
  * Use for rich text (e.g. material content, discussion content from TipTap).
- * Allows safe tags: p, br, strong, em, u, ul, ol, li, a (with href), etc.
+ * Links are stripped by default for safety (anchor tags are forbidden).
  *
  * @param input Raw HTML string
  * @returns Sanitized HTML string

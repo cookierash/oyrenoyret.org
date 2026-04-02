@@ -11,7 +11,7 @@ export function DiscussionsRightSidebar({ className }: DiscussionsRightSidebarPr
   return (
     <aside
       className={cn(
-        'sticky top-0 z-40 flex h-screen w-full flex-col border-l border-border bg-background',
+        'sticky top-0 z-40 flex h-[100dvh] w-full flex-col border-l border-border bg-background',
         className,
       )}
     >
