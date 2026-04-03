@@ -12,7 +12,6 @@
  */
 
 import { z } from 'zod';
-import DOMPurify from 'isomorphic-dompurify';
 
 /**
  * Validates email format
@@ -55,12 +54,7 @@ export const dateOfBirthSchema = z.date().refine(
  */
 export function sanitizeInput(input: string): string {
   const trimmed = input.trim();
-  try {
-    return DOMPurify.sanitize(trimmed, { ALLOWED_TAGS: [] });
-  } catch (error) {
-    console.warn('sanitizeInput fallback:', error);
-    return trimmed.replace(/<[^>]*>/g, '').trim();
-  }
+  return trimmed.replace(/<[^>]*>/g, '').trim();
 }
 
 /**
@@ -73,10 +67,10 @@ export function sanitizeInput(input: string): string {
  */
 export function sanitizeHtml(input: string): string {
   const trimmed = input.trim();
-  try {
-    return DOMPurify.sanitize(trimmed, { FORBID_TAGS: ['a'] });
-  } catch (error) {
-    console.warn('sanitizeHtml fallback:', error);
-    return trimmed.replace(/<[^>]*>/g, '').trim();
-  }
+  const withBreaks = trimmed
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6)>/gi, '\n');
+  const stripped = withBreaks.replace(/<[^>]*>/g, '');
+  const normalized = stripped.replace(/\n{3,}/g, '\n\n').trim();
+  return normalized.replace(/\n/g, '<br>');
 }
