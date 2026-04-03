@@ -55,7 +55,12 @@ export const dateOfBirthSchema = z.date().refine(
  */
 export function sanitizeInput(input: string): string {
   const trimmed = input.trim();
-  return DOMPurify.sanitize(trimmed, { ALLOWED_TAGS: [] });
+  try {
+    return DOMPurify.sanitize(trimmed, { ALLOWED_TAGS: [] });
+  } catch (error) {
+    console.warn('sanitizeInput fallback:', error);
+    return trimmed.replace(/<[^>]*>/g, '').trim();
+  }
 }
 
 /**
@@ -68,5 +73,10 @@ export function sanitizeInput(input: string): string {
  */
 export function sanitizeHtml(input: string): string {
   const trimmed = input.trim();
-  return DOMPurify.sanitize(trimmed, { FORBID_TAGS: ['a'] });
+  try {
+    return DOMPurify.sanitize(trimmed, { FORBID_TAGS: ['a'] });
+  } catch (error) {
+    console.warn('sanitizeHtml fallback:', error);
+    return trimmed.replace(/<[^>]*>/g, '').trim();
+  }
 }
