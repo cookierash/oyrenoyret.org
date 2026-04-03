@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   try {
     const { prisma } = await import('@/src/db/client');
     const { RATE_LIMITS } = await import('@/src/config/constants');
-    const { getPrivateNoStoreHeaders, getPublicCacheHeaders } = await import('@/src/lib/http-cache');
+    const { getPrivateNoStoreHeaders } = await import('@/src/lib/http-cache');
     const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
     const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
 
@@ -122,7 +122,7 @@ export async function GET(request: Request) {
       userVote: includeVotes ? currentUserVoteMap[d.id] ?? null : null,
     }));
 
-    const headers = includeVotes ? getPrivateNoStoreHeaders() : getPublicCacheHeaders();
+    const headers = getPrivateNoStoreHeaders();
     return NextResponse.json(result, { headers });
   } catch (error) {
     console.error('Error fetching discussions:', error);
