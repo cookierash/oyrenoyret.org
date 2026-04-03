@@ -6,16 +6,16 @@
  */
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/src/db/client';
-import { getCurrentSession } from '@/src/modules/auth/utils/session';
-import { spendDiscussionCreate, getBalance, calcDiscussionCreateCost, roundCredits } from '@/src/modules/credits';
-import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
-import { getPrivateNoStoreHeaders, getPublicCacheHeaders } from '@/src/lib/http-cache';
-import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
-import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+// NOTE: Keep heavy dependencies inside handlers to avoid module-init crashes.
 
 export async function GET(request: Request) {
   try {
+    const { prisma } = await import('@/src/db/client');
+    const { RATE_LIMITS } = await import('@/src/config/constants');
+    const { getPrivateNoStoreHeaders, getPublicCacheHeaders } = await import('@/src/lib/http-cache');
+    const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
+    const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
+
     const identifier = getRateLimitIdentifier(request);
     const rateLimit = await checkRateLimit(`discussions:list:${identifier}`, RATE_LIMITS.GENERAL);
     if (!rateLimit.allowed) {
@@ -135,6 +135,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const { prisma } = await import('@/src/db/client');
+    const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
+    const { spendDiscussionCreate, getBalance, calcDiscussionCreateCost, roundCredits } = await import('@/src/modules/credits');
+    const { CONTENT_LIMITS, RATE_LIMITS } = await import('@/src/config/constants');
+    const { sanitizeInput, sanitizeHtml } = await import('@/src/security/validation');
+    const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
+
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -150,7 +157,15 @@ export async function POST(request: Request) {
       return NextResponse.json(body, { status, headers });
     }
 
-    const body = await request.json();
+    let body: { title?: unknown; content?: unknown; subjectId?: unknown; topicId?: unknown } = {};
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid JSON body' },
+        { status: 400 }
+      );
+    }
     const { title, content, subjectId, topicId } = body;
 
     if (!title || typeof title !== 'string' || !content || typeof content !== 'string') {
@@ -180,13 +195,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: creditResult.error ?? 'Failed to create' }, { status: 500 });
     }
 
+    const safeSubjectId = subjectId && String(subjectId).trim()
+      ? String(subjectId).trim()
+      : null;
+    const safeTopicId = topicId && String(topicId).trim()
+      ? String(topicId).trim()
+      : null;
+
     const discussion = await prisma.discussion.create({
       data: {
         userId,
         title: sanitizeInput(String(title)).slice(0, CONTENT_LIMITS.DISCUSSION_TITLE_MAX),
         content: sanitizeHtml(String(content)).slice(0, CONTENT_LIMITS.DISCUSSION_CONTENT_MAX),
-        subjectId: subjectId && String(subjectId).trim() ? subjectId : null,
-        topicId: topicId && String(topicId).trim() ? topicId : null,
+        subjectId: safeSubjectId,
+        topicId: safeTopicId,
       },
       select: {
         id: true,
