@@ -239,7 +239,10 @@ export async function POST(request: Request) {
     console.error('Error creating discussion:', error);
     const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
-      { error: process.env.NODE_ENV === 'development' ? message : 'Internal server error' },
+      {
+        error: message || 'Internal server error',
+        code: 'DISCUSSION_CREATE_FAILED',
+      },
       { status: 500 }
     );
   }
