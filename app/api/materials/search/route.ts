@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       },
     });
 
-    const subjectMap = new Map(SUBJECTS.map((s) => [s.id, s.name]));
+    const subjectMap = new Map<string, string>(SUBJECTS.map((s) => [s.id, s.name]));
     const topicMap = new Map<string, string>();
     Object.entries(CURRICULUM_TOPICS).forEach(([subjectId, topics]) => {
       topics.forEach((topic) => {

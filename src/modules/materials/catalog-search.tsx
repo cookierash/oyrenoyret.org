@@ -185,7 +185,6 @@ export function CatalogSearch({
   const showMenu = focused && query.trim().length > 0 && !showTagSuggestions;
 
   const isTopicMode = tagMode === 'topic';
-  const tagLabel = isTopicMode ? 'topic' : 'subject';
   const placeholder = isTopicMode
     ? 'Search materials or use #topic (e.g., #fractions)'
     : 'Search materials or use #subject (e.g., #mathematics)';
