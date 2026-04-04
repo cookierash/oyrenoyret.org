@@ -17,6 +17,7 @@ interface Discussion {
   authorName: string;
   replyCount: number;
   voteScore: number;
+  totalPopularity: number;
   createdAt: string;
   lastActivityAt: string;
   subjectId?: string | null;
@@ -129,17 +130,19 @@ export function DiscussionList({
   return (
     <section className="card-frame bg-card overflow-hidden">
       <div className="divide-y divide-border">
-        {discussions.map((d) => (
-          <Link
-            key={d.id}
-            href={`/discussions/${d.id}`}
-            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/20 group"
-          >
+        {discussions.map((d) => {
+          const popularity = d.totalPopularity ?? d.voteScore;
+          return (
+            <Link
+              key={d.id}
+              href={`/discussions/${d.id}`}
+              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/20 group"
+            >
             {/* Vote score pill */}
             <div className="flex flex-col items-center shrink-0 w-10 text-center">
               <ChevronUp className="h-3.5 w-3.5 text-muted-foreground/50" />
-              <span className={`text-xs font-bold leading-none ${d.voteScore > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
-                {d.voteScore}
+              <span className={`text-xs font-bold leading-none ${popularity > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+                {popularity}
               </span>
             </div>
 
@@ -161,8 +164,9 @@ export function DiscussionList({
                 </span>
               </div>
             </div>
-          </Link>
-        ))}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );

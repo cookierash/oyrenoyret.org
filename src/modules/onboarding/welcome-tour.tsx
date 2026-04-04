@@ -64,10 +64,6 @@ const steps: TourStep[] = [
         icon: Library,
       },
     ],
-    cta: {
-      label: 'Catalog',
-      href: '/catalog',
-    },
   },
   {
     title: 'Learn by doing',
@@ -89,10 +85,6 @@ const steps: TourStep[] = [
         icon: Sparkles,
       },
     ],
-    cta: {
-      label: 'Live activities',
-      href: '/live-activities',
-    },
   },
   {
     title: 'Learn with the community',
@@ -114,10 +106,6 @@ const steps: TourStep[] = [
         icon: Sparkles,
       },
     ],
-    cta: {
-      label: 'Discussions',
-      href: '/discussions',
-    },
   },
 ];
 

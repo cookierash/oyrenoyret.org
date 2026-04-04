@@ -89,6 +89,29 @@ export async function GET(request: Request) {
       voteScores.map((v) => [v.discussionId, v._sum.value ?? 0])
     );
 
+    const replyRows = discussionIds.length
+      ? await prisma.discussionReply.findMany({
+        where: { discussionId: { in: discussionIds } },
+        select: { id: true, discussionId: true },
+      })
+      : [];
+    const replyIds = replyRows.map((r) => r.id);
+    const replyVoteScores = replyIds.length
+      ? await prisma.replyVote.groupBy({
+        by: ['replyId'],
+        where: { replyId: { in: replyIds } },
+        _sum: { value: true },
+      })
+      : [];
+    const replyScoreMap = Object.fromEntries(
+      replyVoteScores.map((v) => [v.replyId, v._sum.value ?? 0])
+    );
+    const replyTotalsByDiscussion = replyRows.reduce<Record<string, number>>((acc, reply) => {
+      const score = replyScoreMap[reply.id] ?? 0;
+      acc[reply.discussionId] = (acc[reply.discussionId] ?? 0) + score;
+      return acc;
+    }, {});
+
     const currentUserId = includeVotes ? await getCurrentSession() : null;
     const currentUserVotes =
       includeVotes && currentUserId && discussionIds.length
@@ -119,6 +142,8 @@ export async function GET(request: Request) {
         d.user.email.split('@')[0],
       replyCount: d._count.replies,
       voteScore: scoreMap[d.id] ?? 0,
+      replyVoteScore: replyTotalsByDiscussion[d.id] ?? 0,
+      totalPopularity: (scoreMap[d.id] ?? 0) + (replyTotalsByDiscussion[d.id] ?? 0),
       userVote: includeVotes ? currentUserVoteMap[d.id] ?? null : null,
     }));
 

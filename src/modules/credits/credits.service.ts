@@ -13,6 +13,7 @@ import {
   DEFAULT_CREDITS,
   CREDITS_MATERIAL,
   CREDITS_DISCUSSION,
+  CREDITS_SPRINT,
 } from '@/src/config/credits';
 
 export function roundCredits(value: number): number {
@@ -78,22 +79,21 @@ export async function getBalance(userId: string): Promise<number> {
 }
 
 function calcMaterialCreditValue(params: MaterialCreditParams): number {
-  const base = CREDITS_MATERIAL.BASE_VALUE;
   if (params.materialType === 'PRACTICE_TEST') {
     const questionCount = params.questionCount ?? 0;
     const extra = Math.max(0, questionCount - CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS);
     const steps = Math.floor(extra / CREDITS_MATERIAL.PRACTICE_STEP_QUESTIONS);
-    return base + steps;
+    return CREDITS_MATERIAL.PRACTICE_BASE_VALUE + steps;
   }
   const wordCount = params.wordCount ?? 0;
   const extra = Math.max(0, wordCount - CREDITS_MATERIAL.TEXTUAL_MIN_WORDS);
   const steps = Math.floor(extra / CREDITS_MATERIAL.TEXTUAL_STEP_WORDS);
-  return base + steps;
+  return CREDITS_MATERIAL.TEXTUAL_BASE_VALUE + steps;
 }
 
 /** Calculate material publish reward (integer). */
 export function calcMaterialPublishCredit(_params: MaterialCreditParams): number {
-  return CREDITS_MATERIAL.PUBLISH_REWARD;
+  return calcMaterialCreditValue(_params);
 }
 
 /** Calculate material passive earning per unlock (integer). */
@@ -125,6 +125,12 @@ export function calcDiscussionHelpCredit(validation: 'accepted' | 'upvotes_2' | 
         ? CREDITS_DISCUSSION.VALIDATION_UPVOTES_2
         : CREDITS_DISCUSSION.VALIDATION_UPVOTES_1;
   return CREDITS_DISCUSSION.BASE_HELP * mult;
+}
+
+/** Calculate sprint payout (credits). Only top 3 earn. */
+export function calcSprintPayout(cost: number, rank: 1 | 2 | 3): number {
+  const bonus = CREDITS_SPRINT.RANK_BONUS[rank] ?? 0;
+  return roundCredits(cost + bonus);
 }
 
 /** Grant credits on material publish (idempotent: only once per material via publishCreditsGrantedAt) */
@@ -248,33 +254,50 @@ export async function spendMaterialUnlock(
           metadata: { materialId, ...params } as object,
         },
       });
-      // Grant passive to publisher (skip if same user)
-      if (publisherUserId !== userId) {
-        const passiveAmount = roundCredits(calcMaterialPassiveCredit(params));
-        await tx.user.update({
-          where: { id: publisherUserId },
-          data: { credits: { increment: passiveAmount } },
-        });
-        const afterPub = await tx.user.findUniqueOrThrow({
-          where: { id: publisherUserId },
-          select: { credits: true },
-        });
-        await tx.creditTransaction.create({
-          data: {
-            userId: publisherUserId,
-            amount: passiveAmount,
-            balanceAfter: afterPub.credits,
-            type: 'MATERIAL_PASSIVE',
-            metadata: { materialId, consumerUserId: userId, ...params },
-          },
-        });
-      }
       // Create access record (idempotent: use create, unique constraint prevents duplicate)
       await tx.materialAccess.upsert({
         where: { userId_materialId: { userId, materialId } },
         create: { userId, materialId },
         update: {},
       });
+      // Grant passive to publisher every N purchases (skip if same user)
+      if (publisherUserId !== userId) {
+        const purchaseCount = await tx.materialAccess.count({
+          where: { materialId },
+        });
+        const everyN = CREDITS_MATERIAL.PASSIVE_EVERY_N_PURCHASES;
+        if (purchaseCount % everyN === 0) {
+          const passiveAmount = roundCredits(calcMaterialPassiveCredit(params));
+          const referenceId = `${materialId}:passive:${purchaseCount}`;
+          const existing = await tx.creditTransaction.findFirst({
+            where: {
+              type: 'MATERIAL_PASSIVE',
+              referenceId,
+            },
+            select: { id: true },
+          });
+          if (!existing) {
+            await tx.user.update({
+              where: { id: publisherUserId },
+              data: { credits: { increment: passiveAmount } },
+            });
+            const afterPub = await tx.user.findUniqueOrThrow({
+              where: { id: publisherUserId },
+              select: { credits: true },
+            });
+            await tx.creditTransaction.create({
+              data: {
+                userId: publisherUserId,
+                amount: passiveAmount,
+                balanceAfter: afterPub.credits,
+                type: 'MATERIAL_PASSIVE',
+                referenceId,
+                metadata: { materialId, consumerUserId: userId, purchaseCount, ...params },
+              },
+            });
+          }
+        }
+      }
       return { balanceAfter: afterUser.credits };
     });
     if (publisherUserId !== userId) {
@@ -402,6 +425,34 @@ export async function spendSprintEntry(
       liveEventId
     );
     return { success: true, amount: -amount, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(userId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+/** Grant sprint payout to winner by rank (1-3). */
+export async function grantSprintPayout(
+  userId: string,
+  cost: number,
+  rank: 1 | 2 | 3,
+  liveEventId?: string
+): Promise<CreditResult> {
+  const amount = roundCredits(calcSprintPayout(cost, rank));
+  try {
+    const referenceId = liveEventId ? `${liveEventId}:rank:${rank}` : undefined;
+    const { balanceAfter, transactionId } = await executeTransaction(
+      userId,
+      amount,
+      'SPRINT_PAYOUT',
+      liveEventId ? { liveEventId, cost, rank } : { cost, rank },
+      referenceId
+    );
+    return { success: true, amount, balanceAfter, transactionId };
   } catch (e) {
     return {
       success: false,

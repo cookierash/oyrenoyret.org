@@ -114,6 +114,14 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     date: string;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [payoutDialogOpen, setPayoutDialogOpen] = useState(false);
+  const [payoutTarget, setPayoutTarget] = useState<LiveEvent | null>(null);
+  const [payoutForm, setPayoutForm] = useState({
+    first: '',
+    second: '',
+    third: '',
+  });
+  const [payingOut, setPayingOut] = useState(false);
   const minDateTime = toLocalInputValue(new Date());
 
   const loadData = () => {
@@ -237,6 +245,62 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     setDeleting(false);
     setDeleteDialogOpen(false);
     setDeleteTarget(null);
+  };
+
+  const requestPayout = (event: LiveEvent) => {
+    if (event.type !== 'PROBLEM_SPRINT') return;
+    const sanitizedId = typeof event.id === 'string' ? event.id.trim() : '';
+    if (!sanitizedId) {
+      toast.error('Missing event id. Please refresh and try again.');
+      return;
+    }
+    setPayoutTarget(event);
+    setPayoutForm({ first: '', second: '', third: '' });
+    setPayoutDialogOpen(true);
+  };
+
+  const confirmPayout = async () => {
+    if (!payoutTarget) {
+      setPayoutDialogOpen(false);
+      return;
+    }
+    const trimmed = {
+      first: payoutForm.first.trim(),
+      second: payoutForm.second.trim(),
+      third: payoutForm.third.trim(),
+    };
+    const values = [trimmed.first, trimmed.second, trimmed.third].filter(Boolean);
+    if (values.length === 0) {
+      toast.error('Please enter at least one winner.');
+      return;
+    }
+    const normalized = values.map((value) => value.toLowerCase());
+    if (new Set(normalized).size !== normalized.length) {
+      toast.error('Each rank must have a unique winner.');
+      return;
+    }
+    setPayingOut(true);
+    try {
+      const res = await fetch(`/api/live-events/${payoutTarget.id}/payout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(trimmed),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? 'Failed to pay out winners.');
+        return;
+      }
+      toast.success('Payouts completed.');
+      setPayoutDialogOpen(false);
+      setPayoutTarget(null);
+      setPayoutForm({ first: '', second: '', third: '' });
+      loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to pay out winners.');
+    } finally {
+      setPayingOut(false);
+    }
   };
 
   const filteredAndSorted = useMemo(() => {
@@ -394,6 +458,67 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={payoutDialogOpen}
+        onOpenChange={(open) => {
+          setPayoutDialogOpen(open);
+          if (!open) {
+            setPayoutTarget(null);
+            setPayingOut(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Payout sprint winners</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter the winners by email, user ID, or public ID. Leave a rank blank if there is no winner.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor={`${type}-payout-first`}>
+                1st place (cost + 3)
+              </Label>
+              <Input
+                id={`${type}-payout-first`}
+                value={payoutForm.first}
+                onChange={(e) => setPayoutForm((prev) => ({ ...prev, first: e.target.value }))}
+                placeholder="Email or user id"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`${type}-payout-second`}>
+                2nd place (cost + 2)
+              </Label>
+              <Input
+                id={`${type}-payout-second`}
+                value={payoutForm.second}
+                onChange={(e) => setPayoutForm((prev) => ({ ...prev, second: e.target.value }))}
+                placeholder="Email or user id"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`${type}-payout-third`}>
+                3rd place (cost + 1)
+              </Label>
+              <Input
+                id={`${type}-payout-third`}
+                value={payoutForm.third}
+                onChange={(e) => setPayoutForm((prev) => ({ ...prev, third: e.target.value }))}
+                placeholder="Email or user id"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={payingOut}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPayout} disabled={payingOut}>
+              {payingOut ? 'Paying out...' : 'Pay winners'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -532,6 +657,15 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                         </td>
                         <td className="py-3 pr-2">
                           <div className="flex justify-start gap-2">
+                            {type === 'PROBLEM_SPRINT' ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => requestPayout(liveEvent)}
+                              >
+                                Payout winners
+                              </Button>
+                            ) : null}
                             <Button
                               variant="danger"
                               size="sm"

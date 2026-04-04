@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { PiArrowUp as ArrowBigUp, PiArrowDown as ArrowBigDown, PiArrowLeft as ArrowLeft, PiChatCircle as MessageSquare } from 'react-icons/pi';
+import { PiArrowFatUpBold as ArrowBigUp, PiArrowFatDownBold as ArrowBigDown, PiArrowLeft as ArrowLeft, PiChatCircle as MessageSquare } from 'react-icons/pi';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,15 @@ interface Reply {
   childReplies?: Reply[];
 }
 
+interface DiscussionSummary {
+  id: string;
+  title: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  createdAt: string;
+}
+
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
   const time = new Intl.DateTimeFormat('en-US', {
@@ -54,6 +63,8 @@ export default function ReplyPage() {
   const router = useRouter();
 
   const [parentReply, setParentReply] = useState<Reply | null>(null);
+  const [previousReply, setPreviousReply] = useState<Reply | null>(null);
+  const [discussionInfo, setDiscussionInfo] = useState<DiscussionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [threadPath, setThreadPath] = useState<string[]>([]);
   const [childReplies, setChildReplies] = useState<Reply[]>([]);
@@ -79,11 +90,15 @@ export default function ReplyPage() {
           throw new Error('Reply not found');
         }
         setParentReply(data.reply);
+        setPreviousReply(data.parentReply ?? null);
+        setDiscussionInfo(data.discussion ?? null);
         setThreadPath(Array.isArray(data.threadPath) ? data.threadPath : [replyId]);
       })
       .catch(() => {
         toast.error('Failed to load reply');
         setParentReply(null);
+        setPreviousReply(null);
+        setDiscussionInfo(null);
         setThreadPath([]);
       })
       .finally(() => setLoading(false));
@@ -151,13 +166,17 @@ export default function ReplyPage() {
           parentReplyId: replyId,
         }),
       });
-      await res.json();
+      const created = await res.json();
       if (!res.ok) throw new Error('Failed to reply');
       setReplyContent('');
       setDialogContent('');
       setDialogOpen(false);
-      router.refresh();
-      await loadChildReplies();
+      if (created?.id) {
+        router.push(`/discussions/${id}/replies/${created.id}`);
+      } else {
+        router.refresh();
+        await loadChildReplies();
+      }
     } catch {
       toast.error('Failed to post reply');
     } finally {
@@ -232,8 +251,8 @@ export default function ReplyPage() {
 
   return (
     <DashboardShell>
-      <main className="lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
-          <div className="space-y-6 min-w-0 pb-12 lg:overflow-y-auto">
+      <main className="lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden">
+          <div className="space-y-6 min-w-0 pb-12 lg:h-full lg:overflow-y-auto">
             <div className="border-b border-border/60 py-2">
               <Button size="sm" variant="ghost" asChild>
                 <Link href={backHref} className="inline-flex items-center gap-1">
@@ -277,6 +296,66 @@ export default function ReplyPage() {
             </div>
 
             <div className="space-y-3 min-w-0">
+              {((previousReply ?? discussionInfo)) ? (
+                previousReply ? (
+                  <div className="relative pl-6">
+                    <span className="absolute left-3 top-0 bottom-0 w-px bg-border/60" />
+                    <Link
+                      href={`/discussions/${id}/replies/${previousReply.id}`}
+                      className="block py-2 transition-colors hover:bg-muted/20"
+                    >
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatDateTime(previousReply.createdAt)}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <PostAvatar
+                          userId={previousReply.authorId}
+                          authorName={previousReply.authorName}
+                          size="xs"
+                        />
+                        <span className="text-xs font-semibold text-foreground/80">
+                          {previousReply.authorName}
+                        </span>
+                      </div>
+                      <p className="mt-2 max-h-24 overflow-hidden text-sm text-foreground/80 whitespace-pre-wrap break-words">
+                        {previousReply.content}
+                      </p>
+                    </Link>
+                  </div>
+                ) : discussionInfo ? (
+                  <div className="relative pl-6">
+                    <span className="absolute left-3 top-0 bottom-0 w-px bg-border/60" />
+                    <Link
+                      href={`/discussions/${id}`}
+                      className="block py-2 transition-colors hover:bg-muted/20"
+                    >
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatDateTime(discussionInfo.createdAt)}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <PostAvatar
+                          userId={discussionInfo.authorId}
+                          authorName={discussionInfo.authorName}
+                          size="xs"
+                        />
+                        <span className="text-xs font-semibold text-foreground/80">
+                          {discussionInfo.authorName}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-foreground/90 line-clamp-2 break-words">
+                        {discussionInfo.title}
+                      </p>
+                      <p className="mt-1 max-h-20 overflow-hidden text-sm text-foreground/80 whitespace-pre-wrap break-words">
+                        {discussionInfo.content}
+                      </p>
+                    </Link>
+                  </div>
+                ) : null
+              ) : null}
               <div className="flex items-center gap-2">
                 <PostAvatar
                   userId={parentReply.authorId}

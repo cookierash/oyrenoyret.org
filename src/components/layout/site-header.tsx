@@ -184,22 +184,22 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
               items={[
                 {
                   label: 'Documentation',
-                  href: '/docs',
+                  href: '/resources/docs',
                   description: 'Platform guides and API docs',
                 },
                 {
                   label: 'Help Center',
-                  href: '/help',
+                  href: '/resources/help',
                   description: 'FAQs and support articles',
                 },
                 {
                   label: 'Changelog',
-                  href: '/changelog',
+                  href: '/resources/changelog',
                   description: 'Audit platform updates and releases',
                 },
                 {
                   label: 'Blog',
-                  href: '/blog',
+                  href: '/resources/blog',
                   description: 'Latest updates and insights',
                 },
               ]}
@@ -319,28 +319,28 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                 Resources
               </span>
               <Link
-                href="/docs"
+                href="/resources/docs"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
                 Documentation
               </Link>
               <Link
-                href="/help"
+                href="/resources/help"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
                 Help Center
               </Link>
               <Link
-                href="/changelog"
+                href="/resources/changelog"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
                 Changelog
               </Link>
               <Link
-                href="/blog"
+                href="/resources/blog"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >

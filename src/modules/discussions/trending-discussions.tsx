@@ -10,6 +10,7 @@ interface Discussion {
   id: string;
   title: string;
   voteScore: number;
+  totalPopularity: number;
   replyCount: number;
   lastActivityAt: string;
 }
@@ -33,7 +34,7 @@ export function TrendingDiscussions({
       .then((r) => (r.ok ? r.json() : []))
       .then((data: Discussion[]) => {
         const sorted = [...data].sort((a, b) => {
-          const scoreDiff = b.voteScore - a.voteScore;
+          const scoreDiff = b.totalPopularity - a.totalPopularity;
           if (scoreDiff !== 0) return scoreDiff;
           return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
         });
@@ -84,14 +85,14 @@ export function TrendingDiscussions({
                 <span
                   className={cn(
                     'text-xs font-semibold px-2 py-1 rounded-md border',
-                    d.voteScore > 0
+                    d.totalPopularity > 0
                       ? 'text-primary border-primary/30 bg-primary/10'
-                      : d.voteScore < 0
+                      : d.totalPopularity < 0
                         ? 'text-destructive border-destructive/30 bg-destructive/10'
                         : 'text-muted-foreground border-border/60 bg-muted/40'
                   )}
                 >
-                  {d.voteScore}
+                  {d.totalPopularity}
                 </span>
               ) : null}
             </Link>

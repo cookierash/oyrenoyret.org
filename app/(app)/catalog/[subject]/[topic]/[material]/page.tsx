@@ -86,6 +86,7 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
     })
   );
   const isOwn = userId !== null && material.userId === userId;
+  const hasAccess = Boolean(unlocked) || isOwn;
   const authorName =
     [material.user.firstName, material.user.lastName].filter(Boolean).join(' ') || 'Student';
 
@@ -96,7 +97,9 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
         description={`${topic.name} · ${subject.name}`}
         actions={
           <Button size="sm" variant="secondary-primary" asChild>
-            <Link href="/library">Back to library</Link>
+            <Link href={hasAccess ? '/library' : '/catalog'}>
+              {hasAccess ? 'Back to library' : 'Back to catalog'}
+            </Link>
           </Button>
         }
       />

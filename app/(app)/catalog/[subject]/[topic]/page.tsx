@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { SUBJECTS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { TopicMaterialsClient } from '@/src/modules/materials/topic-materials-client';
+import { CatalogSearch } from '@/src/modules/materials/catalog-search';
 
 interface TopicPageProps {
   params: Promise<{ subject: string; topic: string }>;
@@ -47,6 +48,14 @@ export default async function TopicPage({ params }: TopicPageProps) {
       />
 
       <main className="space-y-4 pt-2">
+        <section className="relative">
+          <CatalogSearch
+            tagMode="topic"
+            tagOptions={topics.map((item) => ({ id: item.id, name: item.name }))}
+            baseSubjectIds={[subjectId]}
+            baseTopicIds={[topicId]}
+          />
+        </section>
         <section>
           <TopicMaterialsClient subjectId={subjectId} topicId={topicId} />
         </section>

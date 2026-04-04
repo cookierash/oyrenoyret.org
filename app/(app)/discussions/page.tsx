@@ -20,6 +20,7 @@ export default function DiscussionsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
+  const searchTimer = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
@@ -40,7 +41,25 @@ export default function DiscussionsPage() {
     };
   }, []);
 
-  const tagMatch = useMemo(() => searchQuery.match(/(?:^|\s)#([a-z0-9-]*)$/i), [searchQuery]);
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSubmittedQuery('');
+      return;
+    }
+    searchTimer.current = setTimeout(() => {
+      setSubmittedQuery(trimmed);
+    }, 250);
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, [searchQuery]);
+
+  const tagMatch = useMemo(() => {
+    const matches = Array.from(searchQuery.matchAll(/(?:^|\s)#([a-z0-9-]*)/gi));
+    return matches.length ? matches[matches.length - 1] : null;
+  }, [searchQuery]);
   const tagQuery = tagMatch?.[1]?.toLowerCase() ?? '';
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const activeSubjects = useMemo(
@@ -69,7 +88,13 @@ export default function DiscussionsPage() {
       return;
     }
     setSelectedSubjects((prev) => [...prev, subjectId]);
-    setSearchQuery('');
+    if (tagMatch?.index != null) {
+      const token = tagMatch[0] ?? '';
+      const before = searchQuery.slice(0, tagMatch.index);
+      const after = searchQuery.slice(tagMatch.index + token.length);
+      const next = `${before}${after}`.replace(/\s{2,}/g, ' ').trimStart();
+      setSearchQuery(next);
+    }
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
@@ -79,6 +104,7 @@ export default function DiscussionsPage() {
   };
 
   const submitSearch = () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
     setSubmittedQuery(searchQuery.trim());
   };
   const clearSearch = () => {
@@ -147,7 +173,7 @@ export default function DiscussionsPage() {
               </div>
             ) : null}
             {showSuggestions ? (
-              <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-md border border-border bg-popover shadow-sm">
+              <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-md border border-border bg-background shadow-sm">
                 <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
                   Subjects
                 </div>

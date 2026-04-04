@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { PostAvatar } from '@/src/modules/discussions/post-avatar';
-import { PiArrowUp as ArrowBigUp, PiArrowDown as ArrowBigDown, PiChatCircle as MessageSquare, PiArrowLeft as ArrowLeft } from 'react-icons/pi';
+import { PiArrowFatUpBold as ArrowBigUp, PiArrowFatDownBold as ArrowBigDown, PiChatCircle as MessageSquare, PiArrowLeft as ArrowLeft } from 'react-icons/pi';
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -263,11 +263,19 @@ export default function DiscussionDetailPage() {
   }
 
   const replyCount = discussion.replies?.length ?? 0;
+  const replyVoteTotal = (discussion.replies ?? []).reduce((total, reply) => {
+    const childTotal = (reply.childReplies ?? []).reduce(
+      (childSum, child) => childSum + (child.voteScore ?? 0),
+      0
+    );
+    return total + (reply.voteScore ?? 0) + childTotal;
+  }, 0);
+  const netPopularity = discussion.voteScore + replyVoteTotal;
 
   return (
     <DashboardShell>
-      <main className="lg:h-[calc(100vh-4rem)] lg:overflow-hidden">
-          <div className="space-y-6 min-w-0 pb-12 lg:overflow-y-auto">
+      <main className="lg:h-[calc(100vh-4rem)] lg:min-h-0 lg:overflow-hidden">
+          <div className="space-y-6 min-w-0 pb-12 lg:h-full lg:overflow-y-auto">
             <div className="border-b border-border/60 py-2">
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
@@ -325,14 +333,14 @@ export default function DiscussionDetailPage() {
                   <span
                     className={cn(
                       'min-w-[2rem] px-2 text-center text-xs font-semibold',
-                      discussion.voteScore > 0
+                      netPopularity > 0
                         ? 'text-primary'
-                        : discussion.voteScore < 0
+                        : netPopularity < 0
                           ? 'text-destructive'
                           : 'text-muted-foreground'
                     )}
                   >
-                    {discussion.voteScore}
+                    {netPopularity}
                   </span>
                   <Button
                     size="icon"
