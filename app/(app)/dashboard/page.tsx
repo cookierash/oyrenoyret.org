@@ -14,7 +14,6 @@ import { redirect } from 'next/navigation';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
-import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';
 import { STREAK_OFFSET_HOURS, toDayNumber } from '@/src/lib/streak';
 import { recordDailyVisit } from '@/src/modules/visits';
 import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiVideoCamera as Video } from 'react-icons/pi';
