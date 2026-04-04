@@ -32,6 +32,7 @@ interface Reply {
   createdAt: string;
   voteScore: number;
   userVote?: 1 | -1 | null;
+  childReplies?: Reply[];
 }
 
 interface Discussion {
