@@ -14,6 +14,8 @@ import { SUBJECTS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { SUBJECT_COLORS } from '@/src/config/subject-meta';
 import { PiBookOpen as BookOpen, PiCaretRight as ChevronRight } from 'react-icons/pi';
+import { CatalogSearch } from '@/src/modules/materials/catalog-search';
+import { prisma } from '@/src/db/client';
 
 interface SubjectPageProps {
   params: Promise<{ subject: string }>;
@@ -32,6 +34,20 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     notFound();
   }
 
+  const topicCounts = await prisma.material.groupBy({
+    by: ['topicId'],
+    where: {
+      subjectId: subject.id,
+      status: 'PUBLISHED',
+      deletedAt: null,
+    },
+    _count: { _all: true },
+  });
+
+  const topicCountMap = new Map(
+    topicCounts.map((row) => [row.topicId, row._count._all])
+  );
+
   return (
     <DashboardShell>
       <PageHeader
@@ -45,6 +61,13 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
       />
 
       <main className="space-y-4 pt-2">
+        <section className="relative">
+          <CatalogSearch
+            tagMode="topic"
+            tagOptions={topics.map((item) => ({ id: item.id, name: item.name }))}
+            baseSubjectIds={[subject.id]}
+          />
+        </section>
         <p className="max-w-2xl text-sm text-muted-foreground">
           Topics aligned with TIMSS, PISA, and common international curricula across
           subjects.
@@ -67,7 +90,12 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
                       <span className="font-medium text-foreground truncate">
                         {topic.name}
                       </span>
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] text-muted-foreground">
+                          {topicCountMap.get(topic.id) ?? 0} materials
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                      </div>
                     </div>
                   </div>
                 </Link>

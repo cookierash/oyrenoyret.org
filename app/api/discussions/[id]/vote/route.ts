@@ -31,7 +31,7 @@ export async function POST(
 
     const { id: discussionId } = await params;
     const body = await request.json();
-    const value = body.value === -1 ? -1 : 1;
+    const value = body.value === -1 ? -1 : body.value === 1 ? 1 : 0;
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -39,13 +39,19 @@ export async function POST(
           where: { id: discussionId, archivedAt: null },
           data: { lastActivityAt: new Date() },
         });
-        await tx.discussionVote.upsert({
-          where: {
-            discussionId_userId: { discussionId, userId },
-          },
-          create: { discussionId, userId, value },
-          update: { value },
-        });
+        if (value === 0) {
+          await tx.discussionVote.deleteMany({
+            where: { discussionId, userId },
+          });
+        } else {
+          await tx.discussionVote.upsert({
+            where: {
+              discussionId_userId: { discussionId, userId },
+            },
+            create: { discussionId, userId, value },
+            update: { value },
+          });
+        }
       });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {

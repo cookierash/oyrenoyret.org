@@ -43,20 +43,22 @@ export const CREDITS_GROUP_SESSION = {
 // ─── Materials ──────────────────────────────────────────────────────────────
 
 export const CREDITS_MATERIAL = {
-  /** Base credit value for materials (used for unlock cost) */
-  BASE_VALUE: 3,
+  /** Base credit value for textual materials (used for unlock cost + publish reward) */
+  TEXTUAL_BASE_VALUE: 1,
   /** Minimum textual content (words) */
-  TEXTUAL_MIN_WORDS: 300,
+  TEXTUAL_MIN_WORDS: 500,
   /** Words per +1 credit */
-  TEXTUAL_STEP_WORDS: 200,
+  TEXTUAL_STEP_WORDS: 1000,
   /** Minimum practice test questions */
   PRACTICE_MIN_QUESTIONS: 5,
+  /** Base credit value for practice tests */
+  PRACTICE_BASE_VALUE: 1,
   /** Questions per +1 credit */
-  PRACTICE_STEP_QUESTIONS: 5,
-  /** Publish reward (integer credits) */
-  PUBLISH_REWARD: 1,
-  /** Passive reward per unlock (integer credits) */
+  PRACTICE_STEP_QUESTIONS: 10,
+  /** Passive reward amount (integer credits) */
   PASSIVE_REWARD: 1,
+  /** Passive reward granted every N purchases */
+  PASSIVE_EVERY_N_PURCHASES: 10,
 } as const;
 
 // ─── Problem-Solving Sprints ────────────────────────────────────────────────
@@ -66,11 +68,11 @@ export const CREDITS_SPRINT = {
   BASE_ENTRY: 3,
   /** Duration factors (kept at 1 to preserve integer entry cost) */
   DURATION_FACTOR: { 10: 1, 12: 1, 15: 1 } as Record<SprintDuration, number>,
-  /** Payouts by rank (credits). Only top 3 earn. */
-  RANK_PAYOUTS: {
-    1: 9,
-    2: 7,
-    3: 5,
+  /** Payout bonus over entry cost (credits). Only top 3 earn. */
+  RANK_BONUS: {
+    1: 3,
+    2: 2,
+    3: 1,
     // 4+ : 0
   } as Record<number, number>,
 } as const;

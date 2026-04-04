@@ -33,7 +33,7 @@ export async function POST(
 
     const { id: replyId } = await params;
     const body = await request.json();
-    const value = body.value === -1 ? -1 : 1;
+    const value = body.value === -1 ? -1 : body.value === 1 ? 1 : 0;
 
     const reply = await prisma.discussionReply.findUnique({
       where: { id: replyId },
@@ -55,13 +55,19 @@ export async function POST(
       return NextResponse.json({ error: 'Reply not found or discussion archived' }, { status: 404 });
     }
 
-    await prisma.replyVote.upsert({
-      where: {
-        replyId_userId: { replyId, userId },
-      },
-      create: { replyId, userId, value },
-      update: { value },
-    });
+    if (value === 0) {
+      await prisma.replyVote.deleteMany({
+        where: { replyId, userId },
+      });
+    } else {
+      await prisma.replyVote.upsert({
+        where: {
+          replyId_userId: { replyId, userId },
+        },
+        create: { replyId, userId, value },
+        update: { value },
+      });
+    }
 
     await prisma.discussion.update({
       where: { id: reply.discussionId },

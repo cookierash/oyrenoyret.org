@@ -30,7 +30,11 @@ function stripHtmlWithLineBreaks(html: string): string {
   const withBreaks = html
     .replace(/<\s*br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6)>/gi, '\n');
-  return withBreaks.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return withBreaks
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[ \t\r\f\v]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim();
 }
 
 function practiceTestPreview(content: string): {

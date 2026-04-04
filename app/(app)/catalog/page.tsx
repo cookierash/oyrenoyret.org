@@ -11,8 +11,23 @@ import { SUBJECTS } from '@/src/config/constants';
 import { SUBJECT_ICONS, SUBJECT_COLORS } from '@/src/config/subject-meta';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { PiCaretRight as ChevronRight } from 'react-icons/pi';
+import { CatalogSearch } from '@/src/modules/materials/catalog-search';
+import { prisma } from '@/src/db/client';
 
-export default function CatalogPage() {
+export default async function CatalogPage() {
+  const subjectCounts = await prisma.material.groupBy({
+    by: ['subjectId'],
+    where: {
+      status: 'PUBLISHED',
+      deletedAt: null,
+    },
+    _count: { _all: true },
+  });
+
+  const subjectCountMap = new Map(
+    subjectCounts.map((row) => [row.subjectId, row._count._all])
+  );
+
   return (
     <DashboardShell>
       <PageHeader
@@ -21,10 +36,14 @@ export default function CatalogPage() {
       />
 
       <main className="space-y-4 pt-2">
+        <section className="relative">
+          <CatalogSearch />
+        </section>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {SUBJECTS.map((subject) => {
             const Icon = SUBJECT_ICONS[subject.id];
             const topicCount = CURRICULUM_TOPICS[subject.id]?.length ?? 0;
+            const materialCount = subjectCountMap.get(subject.id) ?? 0;
             return (
               <Link
                 key={subject.id}
@@ -41,11 +60,12 @@ export default function CatalogPage() {
                     <span className="font-semibold text-foreground truncate">
                       {subject.name}
                     </span>
-                    {topicCount > 0 && (
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        {topicCount} topics
-                      </span>
-                    )}
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {topicCount} topics
+                    </span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {materialCount} materials
+                    </span>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">
                     {subject.description}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import Link from 'next/link';
-import { PiWarningCircle as AlertCircle, PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiChatCircle as MessageSquare, PiShieldCheck as ShieldCheck } from 'react-icons/pi';
+import { PiWarningCircle as AlertCircle, PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiChatCircle as MessageSquare, PiShieldCheck as ShieldCheck, PiArrowCircleUp as CreditUp, PiArrowCircleDown as CreditDown } from 'react-icons/pi';
 import { toast } from 'sonner';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -460,6 +460,11 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                       const isGain = item.amount > 0;
                       const absAmount = Math.abs(item.amount);
                       const label = TRANSACTION_LABELS[item.label] ?? item.label;
+                      const creditMessage = isGain ? 'Credits added' : 'Credits spent';
+                      const creditTime = new Date(item.createdAt).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      });
 
                       return (
                         <li key={`credit-${item.id}`}>
@@ -472,15 +477,12 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                                   : 'bg-destructive/10 text-destructive',
                               )}
                             >
-                              {isGain ? '+' : '−'}
+                              {isGain ? <CreditUp className="h-4 w-4" /> : <CreditDown className="h-4 w-4" />}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-foreground truncate">{label}</p>
-                              <p suppressHydrationWarning className="text-[11px] text-muted-foreground">
-                                {new Date(item.createdAt).toLocaleTimeString('en-US', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
+                              <p className="text-sm font-medium text-foreground truncate">{creditMessage}</p>
+                              <p suppressHydrationWarning className="text-[11px] text-muted-foreground truncate">
+                                {label} · {creditTime}
                               </p>
                             </div>
                             <div className="shrink-0 text-right">

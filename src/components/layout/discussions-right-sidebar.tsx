@@ -23,7 +23,7 @@ export function DiscussionsRightSidebar({ className }: DiscussionsRightSidebarPr
         </section>
         <div className="h-px w-full bg-border/70" />
         <section className="p-4 pb-8">
-          <TrendingDiscussions variant="plain" showTitle={false} showScore={false} />
+          <TrendingDiscussions variant="plain" showTitle={false} showScore />
         </section>
       </div>
     </aside>

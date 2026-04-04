@@ -69,6 +69,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
     })
     : null;
 
+  const hasAccess = Boolean(unlocked) || isOwn;
   if (unlocked && !isOwn) {
     redirect(`/catalog/${material.subjectId}/${material.topicId}/${material.id}`);
   }
@@ -104,8 +105,8 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
         description={`${topic.name} · ${subject.name}`}
         actions={
           <Button size="sm" variant="secondary-primary" asChild>
-            <Link href="/library">
-              Back to library
+            <Link href={hasAccess ? '/library' : '/catalog'}>
+              {hasAccess ? 'Back to library' : 'Back to catalog'}
             </Link>
           </Button>
         }

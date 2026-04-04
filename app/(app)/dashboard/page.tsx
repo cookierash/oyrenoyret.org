@@ -81,12 +81,11 @@ function calcStreakStats(dayNumbers: number[]) {
 function buildWeekDays(daySet: Set<number>, today: number) {
   const labels = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
   return Array.from({ length: 7 }).map((_, idx) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (6 - idx));
-    const dayNumber = toDayNumber(date);
+    const dayNumber = today - (6 - idx);
+    const date = new Date(dayNumber * 24 * 60 * 60 * 1000);
     return {
       key: `${dayNumber}-${idx}`,
-      label: labels[date.getDay()],
+      label: labels[date.getUTCDay()],
       isActive: daySet.has(dayNumber),
       isToday: dayNumber === today,
     };
@@ -124,7 +123,7 @@ export default async function DashboardPage() {
     prisma.materialAccess.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      take: 4,
+      take: 3,
       include: {
         material: {
           select: {
@@ -341,31 +340,57 @@ export default async function DashboardPage() {
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {recentPurchases.map(({ material, createdAt }) => (
                 <Link
                   key={material.id}
                   href={`/catalog/${material.subjectId}/${material.topicId}/${material.id}`}
-                  className="card-frame border-dashed bg-muted/20 px-4 py-3"
+                  className="group card-frame bg-card p-3 transition-all duration-200 flex flex-col gap-2"
                 >
-                  <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    <span className="capitalize">{material.subjectId.replace(/-/g, ' ')}</span>
-                    <span>
-                      {new Date(createdAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-medium text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                      {material.title}
+                    </h3>
+                    <div className="shrink-0 flex items-center gap-1">
+                      <span
+                        className={`inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                          material.materialType === 'PRACTICE_TEST'
+                            ? 'text-purple-600 bg-purple-50 dark:bg-purple-500/10 dark:text-purple-400'
+                            : 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400'
+                        }`}
+                      >
+                        {material.materialType === 'PRACTICE_TEST' ? 'Test' : 'Textual'}
+                      </span>
+                    </div>
                   </div>
-                  <p className="mt-2 text-sm font-semibold text-foreground line-clamp-2">
-                    {material.title}
+
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="capitalize">
+                      {material.subjectId.replace(/-/g, ' ')}
+                    </span>
+                    {material.difficulty && (
+                      <span
+                        className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                          material.difficulty === 'ADVANCED'
+                            ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                            : material.difficulty === 'INTERMEDIATE'
+                              ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400'
+                              : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
+                        }`}
+                      >
+                        {material.difficulty.charAt(0) + material.difficulty.slice(1).toLowerCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground/60 mt-auto">
+                    Purchased{' '}
+                    {new Date(createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
                   </p>
-                  <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
-                      {material.materialType === 'PRACTICE_TEST' ? 'Practice test' : 'Text lesson'}
-                    </span>
-                    <DifficultyBars difficulty={material.difficulty} />
-                  </div>
                 </Link>
               ))}
             </div>
