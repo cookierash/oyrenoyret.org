@@ -71,7 +71,7 @@ export async function POST(
       { rank: 1, value: normalizeValue(body?.first) },
       { rank: 2, value: normalizeValue(body?.second) },
       { rank: 3, value: normalizeValue(body?.third) },
-    ].filter((w) => w.value);
+    ].filter((w): w is WinnerInput => Boolean(w.value));
 
     if (winners.length === 0) {
       return NextResponse.json({ error: 'At least one winner is required.' }, { status: 400 });
@@ -148,4 +148,3 @@ export async function POST(
     );
   }
 }
-
