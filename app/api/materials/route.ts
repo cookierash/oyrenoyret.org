@@ -28,8 +28,10 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
-    const takeParam = Number(searchParams.get('take'));
-    const skipParam = Number(searchParams.get('skip'));
+    const takeRaw = searchParams.get('take');
+    const skipRaw = searchParams.get('skip');
+    const takeParam = takeRaw ? Number(takeRaw) : undefined;
+    const skipParam = skipRaw ? Number(skipRaw) : undefined;
     const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : undefined;
     const skip = Number.isFinite(skipParam) && skipParam > 0 ? skipParam : undefined;
     const includeAccess =
