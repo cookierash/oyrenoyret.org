@@ -9,6 +9,8 @@ import { prisma } from '@/src/db/client';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { PiMedal as Award, PiCalendar as Calendar, PiCheckCircle as CheckCircle } from 'react-icons/pi';
+import { getI18n } from '@/src/i18n/server';
+import { getLocaleCode } from '@/src/i18n';
 
 interface CertificatePageProps {
   params: Promise<{ id: string }>;
@@ -16,6 +18,8 @@ interface CertificatePageProps {
 
 export default async function CertificateVerifyPage({ params }: CertificatePageProps) {
   const { id } = await params;
+  const { locale, messages } = await getI18n();
+  const copy = messages.record.certificate;
 
   const user = await prisma.user.findFirst({
     where: { publicId: id, deletedAt: null },
@@ -33,8 +37,8 @@ export default async function CertificateVerifyPage({ params }: CertificatePageP
     certificate = await prisma.certificate.create({
       data: {
         userId: user.id,
-        title: 'Academic Record',
-        description: 'This certificate verifies the student academic record.',
+        title: copy.certificateTitle,
+        description: copy.certificateDescription,
       },
     });
   }
@@ -42,8 +46,8 @@ export default async function CertificateVerifyPage({ params }: CertificatePageP
   return (
     <div className="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
       <PageHeader
-        title="Certificate Details"
-        description="Verify and view achievement details."
+        title={copy.headerTitle}
+        description={copy.headerDescription}
       />
 
       <Card className="mt-2 border border-primary/20 bg-card overflow-hidden relative">
@@ -59,10 +63,10 @@ export default async function CertificateVerifyPage({ params }: CertificatePageP
 
           <div className="space-y-4">
             <h1 className="text-3xl sm:text-4xl font-bold font-comfortaa text-primary tracking-tight">
-              Certificate of Completion
+              {copy.completionTitle}
             </h1>
             <p className="text-muted-foreground uppercase tracking-widest text-sm font-semibold">
-              This acknowledges that
+              {copy.acknowledges}
             </p>
             <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
               {user.firstName} {user.lastName}
@@ -70,7 +74,7 @@ export default async function CertificateVerifyPage({ params }: CertificatePageP
           </div>
 
           <div className="pt-4 pb-4 border-y border-border/50">
-            <p className="text-muted-foreground mb-4">has successfully completed</p>
+            <p className="text-muted-foreground mb-4">{copy.completed}</p>
             <h3 className="text-xl font-semibold mb-2">{certificate.title}</h3>
             {certificate.description && (
               <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
@@ -83,7 +87,8 @@ export default async function CertificateVerifyPage({ params }: CertificatePageP
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-primary" />
               <span>
-                Issued: {new Date(certificate.issuedAt).toLocaleDateString('en-US', {
+                {copy.issued}{' '}
+                {new Date(certificate.issuedAt).toLocaleDateString(getLocaleCode(locale), {
                   year: 'numeric',
                   month: 'long',
                   day: 'numeric',
@@ -93,13 +98,16 @@ export default async function CertificateVerifyPage({ params }: CertificatePageP
             <div className="flex items-center gap-2 font-medium">
               <CheckCircle className="w-4 h-4 text-emerald-500" />
               <span className="text-emerald-600 dark:text-emerald-400">
-                Verified by <span className="font-comfortaa lowercase">oyrenoyret</span>
+                {copy.verifiedByPrefix}
+                {copy.verifiedByPrefix ? ' ' : null}
+                <span className="font-comfortaa lowercase">oyrenoyret</span>
+                {copy.verifiedBySuffix ? ` ${copy.verifiedBySuffix}` : null}
               </span>
             </div>
           </div>
 
           <div className="pt-8 text-xs text-muted-foreground font-mono">
-            Certificate ID: {user.publicId}
+            {copy.certificateId} {user.publicId}
           </div>
         </CardContent>
       </Card>

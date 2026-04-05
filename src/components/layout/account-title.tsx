@@ -2,35 +2,38 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import type { MessageKey } from '@/src/i18n';
 
-const PAGE_LABELS: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/studio': 'Studio',
-  '/catalog': 'Catalog',
-  '/library': 'Library',
-  '/live-activities': 'Live Activities',
-  '/admin': 'Admin',
-  '/admin/dashboard': 'Admin Dashboard',
-  '/admin/live-activities': 'Manage Live Activities',
-  '/admin/live-activities/problem-sprints': 'Problem Sprints',
-  '/admin/live-activities/announcements': 'Announcements',
-  '/admin/live-activities/events': 'Events',
-  '/discussions': 'Discussions',
-  '/recent-activities': 'Recent Activities',
-  '/academic-record': 'Academic record',
-  '/settings': 'Settings',
-};
+function getPageLabel(pathname: string, t: (key: MessageKey) => string): string {
+  const map: Record<string, MessageKey> = {
+    '/dashboard': 'pages.dashboard',
+    '/studio': 'pages.studio',
+    '/catalog': 'pages.catalog',
+    '/library': 'pages.library',
+    '/live-activities': 'pages.liveActivities',
+    '/admin': 'pages.admin',
+    '/admin/dashboard': 'pages.adminDashboard',
+    '/admin/live-activities': 'pages.manageLiveActivities',
+    '/admin/live-activities/problem-sprints': 'pages.problemSprints',
+    '/admin/live-activities/announcements': 'pages.announcements',
+    '/admin/live-activities/events': 'pages.events',
+    '/discussions': 'pages.discussions',
+    '/recent-activities': 'pages.recentActivities',
+    '/academic-record': 'pages.academicRecord',
+    '/settings': 'pages.settings',
+  };
 
-function getPageLabel(pathname: string): string {
-  if (pathname in PAGE_LABELS) return PAGE_LABELS[pathname];
-  if (pathname.startsWith('/catalog/')) return 'Catalog';
-  if (pathname.startsWith('/preview/')) return 'Preview';
-  if (pathname.startsWith('/library/')) return 'Library';
-  if (pathname.startsWith('/discussions/')) return 'Discussion';
-  if (pathname.startsWith('/recent-activities')) return 'Recent Activities';
-  if (pathname.startsWith('/sprints/')) return 'Problem Sprint';
-  if (pathname.startsWith('/admin/')) return 'Admin';
-  if (pathname.startsWith('/studio/')) return 'Editor';
+  if (pathname in map) return t(map[pathname]);
+  if (pathname.startsWith('/catalog/')) return t('pages.catalog');
+  if (pathname.startsWith('/preview/')) return t('pages.preview');
+  if (pathname.startsWith('/library/')) return t('pages.library');
+  if (pathname.startsWith('/discussions/')) return t('pages.discussion');
+  if (pathname.startsWith('/recent-activities')) return t('pages.recentActivities');
+  if (pathname.startsWith('/sprints/')) return t('pages.problemSprint');
+  if (pathname.startsWith('/admin/')) return t('pages.admin');
+  if (pathname.startsWith('/studio/')) return t('pages.editor');
+  if (pathname.startsWith('/settings')) return t('pages.settings');
   return 'oyrenoyret';
 }
 
@@ -44,14 +47,15 @@ interface AccountTitleProps {
  */
 export function AccountTitle({ displayName: _displayName }: AccountTitleProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
 
   useEffect(() => {
-    const pageLabel = getPageLabel(pathname);
+    const pageLabel = getPageLabel(pathname, t);
     document.title = `${pageLabel} - oyrenoyret.org`;
     return () => {
       document.title = 'oyrenoyret.org';
     };
-  }, [pathname, _displayName]);
+  }, [pathname, _displayName, t]);
 
   return null;
 }

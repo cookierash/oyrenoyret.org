@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { PiChatCircle as MessageSquare, PiCaretUp as ChevronUp } from 'react-icons/pi';
 import { PostAvatar } from './post-avatar';
 import { formatRelativeTime } from './relative-time';
-import { SUBJECTS } from '@/src/config/constants';
-import type { SubjectId } from '@/src/config/curriculum';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { buildTagIndex, createTagMap, parseTaggedQuery } from '@/src/lib/tagging';
 
 interface Discussion {
   id: string;
@@ -31,28 +32,6 @@ interface DiscussionListProps {
   onClearSearch?: () => void;
 }
 
-const SUBJECT_SLUGS = SUBJECTS.map((s) => ({
-  id: s.id,
-  slug: s.name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, ''),
-}));
-
-function parseSearchQuery(raw: string) {
-  const tags = raw.match(/#[a-z0-9-]+/gi) ?? [];
-  const normalizedTags = tags.map((t) => t.slice(1).toLowerCase());
-  const subjectIds = normalizedTags
-    .map((tag) => {
-      const direct = SUBJECT_SLUGS.find((s) => s.id === tag || s.slug === tag);
-      return direct?.id ?? null;
-    })
-    .filter((id): id is SubjectId => Boolean(id));
-
-  const textQuery = raw.replace(/#[a-z0-9-]+/gi, '').trim().toLowerCase();
-  return { subjectIds, textQuery };
-}
-
 export function DiscussionList({
   refreshKey = 0,
   query = '',
@@ -61,20 +40,36 @@ export function DiscussionList({
 }: DiscussionListProps) {
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
+  const { locale, messages } = useI18n();
+  const copy = messages.discussions.list;
+  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const subjectTagIndex = useMemo(
+    () =>
+      buildTagIndex(
+        subjects.map((subject) => ({
+          id: subject.id,
+          name: subject.name,
+          tag: subject.tag,
+          aliases: subject.aliases,
+        })),
+      ),
+    [subjects],
+  );
+  const subjectTagMap = useMemo(() => createTagMap(subjectTagIndex), [subjectTagIndex]);
 
   useEffect(() => {
-    const { subjectIds: tagSubjectIds, textQuery } = parseSearchQuery(query);
+    const { tagIds: tagSubjectIds, textQuery } = parseTaggedQuery(query, subjectTagMap);
     const combinedSubjects = Array.from(new Set([...subjectIds, ...tagSubjectIds]));
     const params = new URLSearchParams();
     if (combinedSubjects.length > 0) params.set('subjects', combinedSubjects.join(','));
-    if (textQuery) params.set('q', textQuery);
+    if (textQuery) params.set('q', textQuery.toLowerCase());
     params.set('take', '50');
     fetch(`/api/discussions?${params.toString()}`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : []))
       .then(setDiscussions)
       .catch(() => setDiscussions([]))
       .finally(() => setLoading(false));
-  }, [refreshKey, query, subjectIds]);
+  }, [refreshKey, query, subjectIds, subjectTagMap]);
 
   if (loading) {
     return (
@@ -101,9 +96,9 @@ export function DiscussionList({
         <MessageSquare className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
         {hasQuery ? (
           <>
-            <p className="text-sm text-muted-foreground font-medium">No discussions found.</p>
+            <p className="text-sm text-muted-foreground font-medium">{copy.noFound}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Try a different keyword or remove the subject filter.
+              {copy.noFoundHint}
             </p>
             {onClearSearch ? (
               <button
@@ -111,15 +106,15 @@ export function DiscussionList({
                 onClick={onClearSearch}
                 className="mt-3 inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
               >
-                Clear search
+                {copy.clear}
               </button>
             ) : null}
           </>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground font-medium">No discussions yet.</p>
+            <p className="text-sm text-muted-foreground font-medium">{copy.noDiscussions}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Be the first to start a discussion from the button above.
+              {copy.noDiscussionsHint}
             </p>
           </>
         )}
@@ -157,7 +152,7 @@ export function DiscussionList({
               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                 <span className="truncate">{d.authorName}</span>
                 <span className="shrink-0">·</span>
-                <span className="shrink-0">{formatRelativeTime(d.createdAt)}</span>
+                <span className="shrink-0">{formatRelativeTime(d.createdAt, locale)}</span>
                 <span className="shrink-0 flex items-center gap-1">
                   <MessageSquare className="h-3 w-3" />
                   {d.replyCount}

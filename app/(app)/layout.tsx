@@ -44,7 +44,6 @@ export default async function AppLayout({
     [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email.split('@')[0];
   const isStaff = user.role === 'ADMIN' || user.role === 'TEACHER';
   const showTutorial = !isStaff && !user.tutorialCompletedAt;
-
   return (
     <AppShell
       displayName={displayName}

@@ -7,14 +7,19 @@
 import Link from 'next/link';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
-import { SUBJECTS } from '@/src/config/constants';
 import { SUBJECT_ICONS, SUBJECT_COLORS } from '@/src/config/subject-meta';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { PiCaretRight as ChevronRight } from 'react-icons/pi';
 import { CatalogSearch } from '@/src/modules/materials/catalog-search';
 import { prisma } from '@/src/db/client';
+import { getI18n } from '@/src/i18n/server';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import type { SubjectId } from '@/src/config/curriculum';
 
 export default async function CatalogPage() {
+  const { messages } = await getI18n();
+  const copy = messages.app.catalog;
+  const subjects = getLocalizedSubjects(messages);
   const subjectCounts = await prisma.material.groupBy({
     by: ['subjectId'],
     where: {
@@ -31,8 +36,8 @@ export default async function CatalogPage() {
   return (
     <DashboardShell>
       <PageHeader
-        title="Subject catalog"
-        description="Browse all subjects and topics. Pick what you want to learn next."
+        title={copy.title}
+        description={copy.description}
       />
 
       <main className="space-y-4 pt-2">
@@ -40,18 +45,19 @@ export default async function CatalogPage() {
           <CatalogSearch />
         </section>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {SUBJECTS.map((subject) => {
-            const Icon = SUBJECT_ICONS[subject.id];
-            const topicCount = CURRICULUM_TOPICS[subject.id]?.length ?? 0;
-            const materialCount = subjectCountMap.get(subject.id) ?? 0;
+          {subjects.map((subject) => {
+            const subjectId = subject.id as SubjectId;
+            const Icon = SUBJECT_ICONS[subjectId];
+            const topicCount = CURRICULUM_TOPICS[subjectId]?.length ?? 0;
+            const materialCount = subjectCountMap.get(subjectId) ?? 0;
             return (
               <Link
-                key={subject.id}
-                href={`/catalog/${subject.id}`}
+                key={subjectId}
+                href={`/catalog/${subjectId}`}
                 className="group card-frame bg-card flex items-center gap-3 px-3 py-2.5 transition-all duration-200 hover:bg-muted/30"
               >
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${SUBJECT_COLORS[subject.id]}`}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${SUBJECT_COLORS[subjectId]}`}
                 >
                   <Icon className="h-4 w-4" />
                 </div>
@@ -61,10 +67,10 @@ export default async function CatalogPage() {
                       {subject.name}
                     </span>
                     <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {topicCount} topics
+                      {topicCount} {copy.topics}
                     </span>
                     <span className="shrink-0 text-[10px] text-muted-foreground">
-                      {materialCount} materials
+                      {materialCount} {copy.materials}
                     </span>
                   </div>
                   <p className="truncate text-xs text-muted-foreground">

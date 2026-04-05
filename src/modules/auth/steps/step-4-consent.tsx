@@ -8,7 +8,7 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { consentSchema, type ConsentInput } from '../schemas/registration';
+import { createConsentSchema, type ConsentInput } from '../schemas/registration';
 import { grantParentalConsent } from '../actions/registration';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,10 +20,12 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PiShieldCheck as ShieldCheck } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { resolveAuthError } from '@/src/modules/auth/utils/resolve-auth-error';
 
 interface Step4Props {
   userId: string;
@@ -34,34 +36,6 @@ interface Step4Props {
 }
 const BUTTON_CLASS = 'h-10 text-sm font-semibold';
 
-const CONSENT_TEXT = `
-By checking the box below, I confirm that:
-
-1. I am the parent or legal guardian of the student registering for OyrenOyret.
-
-2. I give permission for my child to:
-   - Create and use an account on OyrenOyret
-   - Participate in online learning and teaching activities
-   - Interact with other students on the platform
-
-3. I understand the platform may collect:
-   - Basic personal information (name, email address, grade level)
-   - Learning activity data (lessons attended or taught, progress)
-   - Usage and interaction data
-
-4. I consent to the collection and use of this data for educational and platform-related purposes.
-
-5. I understand that OyrenOyret provides a moderated environment, but cannot guarantee complete supervision.
-   - My child is responsible for their behavior and interactions
-   - I will guide my child to use the platform responsibly
-
-6. I understand that the platform uses a credit system only and that no real money transactions are involved.
-
-7. I may request deletion of my child's account and withdraw consent at any time by contacting the platform.
-
-This consent is required for students under 18 years of age to use the platform.
-`;
-
 export function Step4Consent({
   userId,
   onSuccess,
@@ -70,9 +44,13 @@ export function Step4Consent({
   onValuesChange,
 }: Step4Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t, messages } = useI18n();
+  const copy = messages.auth.steps.consent;
+  const validation = messages.auth.validation;
+  const validationSchema = useMemo(() => createConsentSchema(validation), [validation]);
 
   const form = useForm<ConsentInput>({
-    resolver: zodResolver(consentSchema),
+    resolver: zodResolver(validationSchema),
     mode: 'onChange',
     defaultValues: {
       consentGranted: initialValues?.consentGranted ?? false,
@@ -95,13 +73,13 @@ export function Step4Consent({
       const result = await grantParentalConsent(userId, data);
 
       if (result.success) {
-        toast.success('Registration completed successfully!');
+        toast.success(copy.success);
         onSuccess();
       } else {
-        toast.error(result.error || 'Failed to grant consent');
+        toast.error(resolveAuthError(messages, t, copy.failed, result));
       }
     } catch {
-      toast.error('An unexpected error occurred');
+      toast.error(copy.unexpected);
     } finally {
       setIsSubmitting(false);
     }
@@ -113,11 +91,11 @@ export function Step4Consent({
         <div className="space-y-4">
           <div className="space-y-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Consent required
+              {copy.badge}
             </p>
-            <h3 className="text-lg font-semibold">Parental Consent Required</h3>
+            <h3 className="text-lg font-semibold">{copy.title}</h3>
             <p className="text-sm text-muted-foreground">
-              As required by law, we need parental or legal guardian consent for students under 18 years of age.
+              {copy.subtitle}
             </p>
           </div>
 
@@ -127,15 +105,15 @@ export function Step4Consent({
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-medium">Consent summary</p>
+                <p className="text-sm font-medium">{copy.summaryTitle}</p>
                 <p className="text-xs text-muted-foreground">
-                  Please review the statements below before granting consent.
+                  {copy.summarySubtitle}
                 </p>
               </div>
             </div>
             <div className="mt-4 rounded-xl border border-border/60 bg-background/60 p-3 sm:p-4">
               <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                {CONSENT_TEXT}
+                {copy.consentText}
               </p>
             </div>
           </div>
@@ -162,14 +140,14 @@ export function Step4Consent({
                   </FormControl>
                   <div className="space-y-1 leading-none flex-1">
                     <FormLabel className="cursor-pointer font-medium">
-                      I agree to the parental consent terms
+                      {copy.checkbox}
                     </FormLabel>
                     <p className="text-xs text-muted-foreground">
-                      Required to activate the student account
+                      {copy.requiredHint}
                     </p>
                   </div>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Required
+                    {copy.requiredBadge}
                   </span>
                 </div>
                 <FormMessage />
@@ -186,7 +164,7 @@ export function Step4Consent({
             onClick={onPrevious}
             className={`flex-1 ${BUTTON_CLASS}`}
           >
-            Previous
+            {copy.previous}
           </Button>
           <Button
             type="submit"
@@ -195,7 +173,7 @@ export function Step4Consent({
             className={`flex-1 ${BUTTON_CLASS}`}
             disabled={isSubmitting || !form.formState.isValid}
           >
-            {isSubmitting ? 'Completing...' : 'Complete Registration'}
+            {isSubmitting ? copy.completing : copy.complete}
           </Button>
         </div>
       </form>

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { MaterialCardCompact } from './material-card-compact';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface MaterialWithCost {
   id: string;
@@ -32,6 +33,8 @@ export function CatalogMaterialsGrid({
   unlockedIds,
   balance,
 }: CatalogMaterialsGridProps) {
+  const { messages } = useI18n();
+  const authorFallback = messages.materials.authorFallback;
   const [unlockInProgress, setUnlockInProgress] = useState(0);
 
   const onUnlockStart = useCallback(() => {
@@ -52,7 +55,7 @@ export function CatalogMaterialsGrid({
             id={m.id}
             title={m.title}
             materialType={m.materialType}
-            authorName={[m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student'}
+            authorName={[m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || authorFallback}
             isUnlocked={unlockedIds.includes(m.id) || isOwn}
             isOwn={isOwn}
             estimatedCost={m.estimatedCost}

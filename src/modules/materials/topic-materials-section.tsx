@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { CatalogMaterialsGrid } from './catalog-materials-grid';
 import { TopicMaterialsSkeleton } from './topic-materials-skeleton';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 export type TopicMaterialWithCost = {
   id: string;
@@ -53,6 +54,8 @@ export function TopicMaterialsSection({
   balance,
   loading = false,
 }: TopicMaterialsSectionProps) {
+  const { messages } = useI18n();
+  const copy = messages.materials.topicList;
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('newest');
 
@@ -106,31 +109,31 @@ export function TopicMaterialsSection({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
-            placeholder="Search materials..."
+            placeholder={copy.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-9"
-            aria-label="Search materials by title or author"
+            aria-label={copy.searchLabel}
           />
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="topic-sort" className="text-sm text-muted-foreground whitespace-nowrap">
-            Sort by
+            {copy.sortLabel}
           </label>
           <Select
             id="topic-sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="w-[180px]"
-            aria-label="Sort materials"
+            aria-label={copy.sortLabel}
           >
-            <SelectItem value="newest">Newest first</SelectItem>
-            <SelectItem value="oldest">Oldest first</SelectItem>
-            <SelectItem value="mostUnlocked">Most unlocked</SelectItem>
-            <SelectItem value="titleAz">Title A–Z</SelectItem>
-            <SelectItem value="titleZa">Title Z–A</SelectItem>
-            <SelectItem value="easiest">Easiest first</SelectItem>
-            <SelectItem value="hardest">Hardest first</SelectItem>
+            <SelectItem value="newest">{copy.sortOptions.newest}</SelectItem>
+            <SelectItem value="oldest">{copy.sortOptions.oldest}</SelectItem>
+            <SelectItem value="mostUnlocked">{copy.sortOptions.mostUnlocked}</SelectItem>
+            <SelectItem value="titleAz">{copy.sortOptions.titleAz}</SelectItem>
+            <SelectItem value="titleZa">{copy.sortOptions.titleZa}</SelectItem>
+            <SelectItem value="easiest">{copy.sortOptions.easiest}</SelectItem>
+            <SelectItem value="hardest">{copy.sortOptions.hardest}</SelectItem>
           </Select>
         </div>
       </div>
@@ -139,12 +142,12 @@ export function TopicMaterialsSection({
         <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
           <p className="text-sm text-muted-foreground">
             {search.trim()
-              ? 'No materials match your search.'
-              : 'No materials shared yet for this topic.'}
+              ? copy.emptySearch
+              : copy.emptyTopic}
           </p>
           {!search.trim() ? (
             <p className="mt-2 text-xs text-muted-foreground/70">
-              Be the first to create one in the studio.
+              {copy.emptyHint}
             </p>
           ) : null}
         </div>

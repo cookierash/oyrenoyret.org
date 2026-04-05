@@ -11,6 +11,7 @@ import { prisma } from '@/src/db/client';
 import { isStaff } from '@/src/lib/permissions';
 import { StickyPartnersBar } from '@/src/components/landing/sticky-partners-bar';
 import { LandingThemeLock } from '@/src/components/landing/landing-theme-lock';
+import { getI18n } from '@/src/i18n/server';
 
 export const metadata = {
   title: {
@@ -99,6 +100,8 @@ export default async function HomePage() {
   }
 
   const partnerLogos = getPartnerLogos();
+  const { messages } = await getI18n();
+  const copy = messages.landing;
 
   return (
     <div className="landing-light relative flex min-h-screen flex-col overflow-x-hidden bg-background text-foreground">
@@ -112,12 +115,12 @@ export default async function HomePage() {
                 <div className="mx-auto w-full max-w-[120px] sm:max-w-[150px] lg:max-w-[190px]">
                   <div className="relative aspect-[725/788] w-full [--orbit-radius:110px] sm:[--orbit-radius:140px] lg:[--orbit-radius:170px]">
                     <div className="absolute inset-0 animate-figure-float">
-                      <Image
-                        src="/oyrenoyret-meditating.svg"
-                        alt="Illustration of mindful learning"
-                        fill
-                        sizes="(min-width: 1024px) 190px, (min-width: 640px) 150px, 120px"
-                        className="object-contain"
+                        <Image
+                          src="/oyrenoyret-meditating.svg"
+                          alt={copy.heroAlt}
+                          fill
+                          sizes="(min-width: 1024px) 190px, (min-width: 640px) 150px, 120px"
+                          className="object-contain"
                         priority
                       />
                     </div>
@@ -157,20 +160,19 @@ export default async function HomePage() {
                   </div>
                 </div>
                 <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
-                  Knowledge builds upon itself
+                  {copy.headline}
                 </h1>
                 <p className="text-base text-muted-foreground sm:text-lg">
-                  We help students layer concepts with clarity, using guided practice and
-                  parent-approved learning pathways designed for confident growth.
+                  {copy.subtitle}
                 </p>
               </div>
 
               <div className="mt-4 flex w-full max-w-3xl flex-row items-center justify-center gap-3">
                 <Button asChild size="lg" variant="primary" className="flex-1 sm:flex-none">
-                  <Link href="/register">Get started for free</Link>
+                  <Link href="/register">{copy.ctaPrimary}</Link>
                 </Button>
                 <Button asChild size="lg" variant="secondary-primary" className="flex-1 sm:flex-none">
-                  <Link href="/learn-more">Learn more about us</Link>
+                  <Link href="/learn-more">{copy.ctaSecondary}</Link>
                 </Button>
               </div>
 
@@ -181,7 +183,7 @@ export default async function HomePage() {
                     <div className="relative h-full w-full">
                       <Image
                         src="/landing-page-screen.gif"
-                        alt="Landing page preview"
+                        alt={copy.previewAlt}
                         fill
                         priority
                         unoptimized

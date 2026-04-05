@@ -16,6 +16,8 @@ import { PiArrowFatUpBold as ArrowBigUp, PiArrowFatDownBold as ArrowBigDown, PiC
 import { toast } from 'sonner';
 import { cn } from '@/src/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getLocaleCode, type Locale } from '@/src/i18n';
+import { useI18n } from '@/src/i18n/i18n-provider';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -50,13 +52,13 @@ interface Discussion {
   currentUserId?: string | null;
 }
 
-const formatDateTime = (iso: string) => {
+const formatDateTime = (iso: string, locale: Locale) => {
   const date = new Date(iso);
-  const time = new Intl.DateTimeFormat('en-US', {
+  const time = new Intl.DateTimeFormat(getLocaleCode(locale), {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-  const day = new Intl.DateTimeFormat('en-US', {
+  const day = new Intl.DateTimeFormat(getLocaleCode(locale), {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -68,6 +70,8 @@ export default function DiscussionDetailPage() {
   const MAX_REPLY_LENGTH = 2000;
   const params = useParams();
   const router = useRouter();
+  const { locale, messages } = useI18n();
+  const copy = messages.discussions.detail;
   const id = params.id as string;
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -147,7 +151,7 @@ export default function DiscussionDetailPage() {
       });
       if (!res.ok) throw new Error('Failed to vote');
     } catch {
-      toast.error('Failed to vote');
+      toast.error(copy.failedVote);
       setDiscussion(discussion);
     } finally {
       setVoteLoading(null);
@@ -165,9 +169,9 @@ export default function DiscussionDetailPage() {
       if (!res.ok) throw new Error('Failed to accept');
       router.refresh();
       fetchDiscussion();
-      toast.success('Marked as best answer');
+      toast.success(copy.markedBest);
     } catch {
-      toast.error('Failed to accept');
+      toast.error(copy.failedAccept);
     } finally {
       setAcceptingReplyId(null);
     }
@@ -197,7 +201,7 @@ export default function DiscussionDetailPage() {
         fetchDiscussion();
       }
     } catch {
-      toast.error('Failed to reply');
+      toast.error(copy.failedReply);
     } finally {
       setSubmitting(false);
     }
@@ -216,7 +220,7 @@ export default function DiscussionDetailPage() {
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back to discussions
+                  {copy.back}
                 </Link>
               </Button>
             </div>
@@ -253,11 +257,11 @@ export default function DiscussionDetailPage() {
             <Button size="sm" variant="ghost" asChild>
               <Link href="/discussions" className="inline-flex items-center gap-1">
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back to discussions
+                {copy.back}
               </Link>
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">Discussion not found.</p>
+          <p className="text-sm text-muted-foreground">{copy.notFound}</p>
         </div>
       </DashboardShell>
     );
@@ -281,7 +285,7 @@ export default function DiscussionDetailPage() {
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back to discussions
+                  {copy.back}
                 </Link>
               </Button>
             </div>
@@ -298,7 +302,7 @@ export default function DiscussionDetailPage() {
                     {discussion.authorName}
                   </span>
                   <span className="px-1">·</span>
-                  <span>{formatDateTime(discussion.createdAt)}</span>
+                  <span>{formatDateTime(discussion.createdAt, locale)}</span>
                 </div>
               </div>
               <h1 className="text-[15px] font-semibold text-foreground break-words">
@@ -315,7 +319,7 @@ export default function DiscussionDetailPage() {
                   className="h-8 gap-1 px-2 text-xs"
                 >
                   <MessageSquare className="h-3.5 w-3.5" />
-                  Reply
+                  {copy.replyAction}
                 </Button>
                 <div className="flex items-center overflow-hidden rounded-md border border-border/60 bg-muted/40">
                   <Button
@@ -323,7 +327,7 @@ export default function DiscussionDetailPage() {
                     variant="ghost"
                     onClick={() => handleVote('discussion', discussion.id, 1)}
                     disabled={!!voteLoading}
-                    aria-label="Upvote"
+                    aria-label={copy.upvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
                       discussion.userVote === 1 && 'text-primary bg-primary/10'
@@ -348,7 +352,7 @@ export default function DiscussionDetailPage() {
                     variant="ghost"
                     onClick={() => handleVote('discussion', discussion.id, -1)}
                     disabled={!!voteLoading}
-                    aria-label="Downvote"
+                    aria-label={copy.downvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
                       discussion.userVote === -1 && 'text-destructive bg-destructive/10'
@@ -367,30 +371,32 @@ export default function DiscussionDetailPage() {
                     <textarea
                       value={inlineReply}
                       onChange={(e) => setInlineReply(e.target.value)}
-                      placeholder="Write a reply"
+                      placeholder={copy.replyPlaceholder}
                       className="w-full min-h-[96px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                       maxLength={MAX_REPLY_LENGTH}
                     />
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
-                        {inlineRemaining <= 100 ? `${inlineRemaining} characters left` : ''}
+                        {inlineRemaining <= 100
+                          ? copy.charactersLeft.replace('{{count}}', String(inlineRemaining))
+                          : ''}
                       </div>
                       <Button
                         size="sm"
                         onClick={() => submitReply(inlineReply)}
                         disabled={submitting || !inlineReply.trim()}
                       >
-                        Reply
+                        {copy.replyAction}
                       </Button>
                     </div>
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-foreground">Replies</h2>
+                    <h2 className="text-sm font-semibold text-foreground">{copy.repliesTitle}</h2>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Replies to this discussion appear below.
+                    {copy.repliesSubtitle}
                   </p>
                 </div>
 
@@ -422,7 +428,7 @@ export default function DiscussionDetailPage() {
                                 {reply.authorName}
                               </span>
                               <span className="px-1">·</span>
-                              <span>{formatDateTime(reply.createdAt)}</span>
+                              <span>{formatDateTime(reply.createdAt, locale)}</span>
                             </div>
                           </div>
                           <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
@@ -446,8 +452,8 @@ export default function DiscussionDetailPage() {
                                   )}
                                 >
                                   {discussion?.acceptedReplyId === reply.id
-                                    ? '✓ Best answer'
-                                    : 'Accept as best answer'}
+                                    ? copy.bestAnswer
+                                    : copy.acceptBestAnswer}
                                 </button>
                               </div>
                             )}
@@ -456,7 +462,7 @@ export default function DiscussionDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No replies yet.</p>
+                  <p className="text-sm text-muted-foreground">{copy.noReplies}</p>
                 )}
               </div>
             </div>
@@ -466,33 +472,33 @@ export default function DiscussionDetailPage() {
         <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Write a reply</AlertDialogTitle>
+              <AlertDialogTitle>{copy.dialogTitle}</AlertDialogTitle>
               <AlertDialogDescription>
-                Share your thoughts on this discussion.
+                {copy.dialogDescription}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-3">
               <textarea
                 value={dialogContent}
                 onChange={(e) => setDialogContent(e.target.value)}
-                placeholder="Write your reply..."
+                placeholder={copy.dialogPlaceholder}
                 className="w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
                 maxLength={MAX_REPLY_LENGTH}
               />
               {dialogRemaining <= 100 ? (
                 <div className="text-right text-xs text-muted-foreground">
-                  {dialogRemaining} characters left
+                  {copy.charactersLeft.replace('{{count}}', String(dialogRemaining))}
                 </div>
               ) : null}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
+                  {copy.cancel}
                 </Button>
                 <Button
                   onClick={() => submitReply(dialogContent, dialogParentId)}
                   disabled={submitting || !dialogContent.trim()}
                 >
-                  Post reply
+                  {copy.postReply}
                 </Button>
               </div>
             </div>

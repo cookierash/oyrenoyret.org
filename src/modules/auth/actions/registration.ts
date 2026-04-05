@@ -46,11 +46,13 @@ export async function registerStudentInfo(data: StudentInfoInput) {
     const { checkRegistrationRateLimit } = await import('./rate-limit');
     const rateLimit = await checkRegistrationRateLimit();
     if (!rateLimit.allowed) {
+      const minutes = Math.ceil(
+        (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
+      );
       return {
         success: false,
-        error: `Too many registration attempts. Please wait ${Math.ceil(
-          (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
-        )} minutes.`,
+        errorKey: 'registrationRateLimit',
+        errorVars: { minutes },
       };
     }
 
@@ -73,7 +75,7 @@ export async function registerStudentInfo(data: StudentInfoInput) {
       } else {
         return {
           success: false,
-          error: 'An account with this email already exists',
+          errorKey: 'emailExists',
         };
       }
     }
@@ -102,15 +104,9 @@ export async function registerStudentInfo(data: StudentInfoInput) {
       userId: user.id,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
     return {
       success: false,
-      error: 'An unexpected error occurred',
+      errorKey: 'registrationUnexpected',
     };
   }
 }
@@ -124,7 +120,7 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
     if (!tokenCheck.ok) {
       return {
         success: false,
-        error: tokenCheck.error,
+        errorKey: tokenCheck.errorKey,
       };
     }
 
@@ -139,7 +135,7 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
     if (!user) {
       return {
         success: false,
-        error: 'User not found',
+        errorKey: 'userNotFound',
       };
     }
 
@@ -147,7 +143,7 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
     if (validated.parentEmail === user.email) {
       return {
         success: false,
-        error: 'Parent email must be different from student email',
+        errorKey: 'parentEmailSame',
       };
     }
 
@@ -167,15 +163,9 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
       success: true,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
     return {
       success: false,
-      error: 'An unexpected error occurred',
+      errorKey: 'registrationUnexpected',
     };
   }
 }
@@ -189,7 +179,7 @@ export async function sendParentVerificationCode(userId: string) {
     if (!tokenCheck.ok) {
       return {
         success: false,
-        error: tokenCheck.error,
+        errorKey: tokenCheck.errorKey,
       };
     }
 
@@ -198,11 +188,13 @@ export async function sendParentVerificationCode(userId: string) {
     const rateLimit = await checkVerificationResendRateLimit();
 
     if (!rateLimit.allowed) {
+      const minutes = Math.ceil(
+        (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
+      );
       return {
         success: false,
-        error: `Too many verification requests. Please wait ${Math.ceil(
-          (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
-        )} minutes.`,
+        errorKey: 'verificationRateLimit',
+        errorVars: { minutes },
       };
     }
 
@@ -213,7 +205,7 @@ export async function sendParentVerificationCode(userId: string) {
     if (!user || !user.parentEmail) {
       return {
         success: false,
-        error: 'Parent email not found',
+        errorKey: 'parentEmailNotFound',
       };
     }
 
@@ -250,15 +242,9 @@ export async function sendParentVerificationCode(userId: string) {
       success: true,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
     return {
       success: false,
-      error: 'Failed to send verification code',
+      errorKey: 'verificationSendFailed',
     };
   }
 }
@@ -272,7 +258,7 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
     if (!tokenCheck.ok) {
       return {
         success: false,
-        error: tokenCheck.error,
+        errorKey: tokenCheck.errorKey,
       };
     }
 
@@ -286,7 +272,7 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
     if (!user || !user.parentEmail) {
       return {
         success: false,
-        error: 'User or parent email not found',
+        errorKey: 'userOrParentNotFound',
       };
     }
 
@@ -318,7 +304,7 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
 
       return {
         success: false,
-        error: 'Invalid verification code',
+        errorKey: 'verificationInvalid',
       };
     }
 
@@ -326,7 +312,7 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
     if (isCodeExpired(verification.expiresAt)) {
       return {
         success: false,
-        error: 'Verification code has expired. Please request a new one.',
+        errorKey: 'verificationExpired',
       };
     }
 
@@ -334,7 +320,7 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
     if (verification.attempts >= getMaxVerificationAttempts()) {
       return {
         success: false,
-        error: 'Too many verification attempts. Please request a new code.',
+        errorKey: 'verificationTooMany',
       };
     }
 
@@ -360,15 +346,9 @@ export async function verifyParentEmail(userId: string, data: VerificationCodeIn
       success: true,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
     return {
       success: false,
-      error: 'Verification failed',
+      errorKey: 'verificationFailed',
     };
   }
 }
@@ -382,7 +362,7 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
     if (!tokenCheck.ok) {
       return {
         success: false,
-        error: tokenCheck.error,
+        errorKey: tokenCheck.errorKey,
       };
     }
 
@@ -392,7 +372,7 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
     if (!validated.consentGranted) {
       return {
         success: false,
-        error: 'Consent must be granted to proceed',
+        errorKey: 'consentRequired',
       };
     }
 
@@ -403,7 +383,7 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
     if (!user || !user.parentEmail) {
       return {
         success: false,
-        error: 'User or parent email not found',
+        errorKey: 'userOrParentNotFound',
       };
     }
 
@@ -443,15 +423,9 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
       success: true,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
     return {
       success: false,
-      error: 'Failed to grant consent',
+      errorKey: 'consentFailed',
     };
   }
 }

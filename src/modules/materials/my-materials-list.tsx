@@ -16,9 +16,11 @@ import {
   AlertDialogTitle,
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
-import { SUBJECTS } from '@/src/config/constants';
-import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { getLocalizedTopicNameMap } from '@/src/i18n/topic-utils';
+import { getLocaleCode } from '@/src/i18n';
 
 interface Material {
   id: string;
@@ -34,21 +36,30 @@ interface Material {
 
 type SortKey = 'newest' | 'oldest' | 'titleAz' | 'titleZa' | 'draftFirst' | 'publishedFirst' | 'textFirst' | 'practiceFirst';
 
-function getSubjectName(id: string) {
-  return SUBJECTS.find((s) => s.id === id)?.name ?? id;
-}
-
-function getTopicName(subjectId: string, topicId: string) {
-  const topics = (CURRICULUM_TOPICS as Record<string, { id: string; name: string }[]>)[subjectId];
-  return topics?.find((t) => t.id === topicId)?.name ?? topicId;
-}
-
 interface MyMaterialsListProps {
   onRefresh?: () => void;
 }
 
 export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   const router = useRouter();
+  const { locale, messages, t } = useI18n();
+  const copy = messages.studio.list;
+  const localeCode = getLocaleCode(locale);
+  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const subjectNameMap = useMemo(
+    () => new Map(subjects.map((subject) => [subject.id, subject.name])),
+    [subjects],
+  );
+  const topicNameMap = useMemo(() => getLocalizedTopicNameMap(messages), [messages]);
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }),
+    [localeCode],
+  );
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState<string | null>(null);
@@ -71,8 +82,8 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     if (q) {
       list = materials.filter((m) => {
         const title = m.title.toLowerCase();
-        const subject = getSubjectName(m.subjectId).toLowerCase();
-        const topic = getTopicName(m.subjectId, m.topicId).toLowerCase();
+        const subject = (subjectNameMap.get(m.subjectId) ?? m.subjectId).toLowerCase();
+        const topic = (topicNameMap.get(`${m.subjectId}:${m.topicId}`) ?? m.topicId).toLowerCase();
         return title.includes(q) || subject.includes(q) || topic.includes(q);
       });
     }
@@ -99,7 +110,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
           return 0;
       }
     });
-  }, [materials, search, sort]);
+  }, [materials, search, sort, subjectNameMap]);
 
   useEffect(() => {
     setPage(1);
@@ -165,7 +176,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     if (!objectiveTarget) return;
     const cleaned = objectiveSlots.map((s) => s.trim()).filter(Boolean);
     if (cleaned.length < 2) {
-      setObjectiveError('Please add at least 2 objectives to publish.');
+      setObjectiveError(copy.objectives.error);
       return;
     }
     setObjectiveError(null);
@@ -176,24 +187,27 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'PUBLISHED', objectives: cleaned.join('\n') }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to publish');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(copy.toast.publishFailed);
+        return;
+      }
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
       const creditsMsg =
         typeof data.creditsGranted === 'number' && data.creditsGranted > 0
-          ? ` +${Math.round(Number(data.creditsGranted))} credits`
+          ? t('studio.list.creditsSuffix', { count: Math.round(Number(data.creditsGranted)) })
           : '';
-      toast.success(`Material published! It will appear under the topic in the catalog.${creditsMsg}`);
+      toast.success(t('studio.list.toast.publishSuccess', { credits: creditsMsg }));
       setObjectiveDialogOpen(false);
       setObjectiveTarget(null);
       setObjectiveError(null);
       router.refresh();
       fetchMaterials();
       onRefresh?.();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to publish');
+    } catch {
+      toast.error(copy.toast.publishFailed);
     } finally {
       setPublishing(null);
     }
@@ -207,14 +221,16 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'DRAFT' }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to unpublish');
-      toast.success('Material moved back to drafts.');
+      if (!res.ok) {
+        toast.error(copy.toast.unpublishFailed);
+        return;
+      }
+      toast.success(copy.toast.unpublishSuccess);
       router.refresh();
       fetchMaterials();
       onRefresh?.();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to unpublish');
+    } catch {
+      toast.error(copy.toast.unpublishFailed);
     } finally {
       setPublishing(null);
     }
@@ -224,16 +240,18 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     setDeleting(id);
     try {
       const res = await fetch(`/api/materials/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to delete');
-      toast.success('Material deleted.');
+      if (!res.ok) {
+        toast.error(copy.toast.deleteFailed);
+        return;
+      }
+      toast.success(copy.toast.deleteSuccess);
       router.refresh();
       fetchMaterials();
       onRefresh?.();
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    } catch {
+      toast.error(copy.toast.deleteFailed);
     } finally {
       setDeleting(null);
     }
@@ -279,32 +297,32 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
-            placeholder="Search materials..."
+            placeholder={copy.searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
-            aria-label="Search materials by title, subject, or topic"
+            aria-label={copy.searchLabel}
           />
         </div>
         <div className="flex items-center gap-2">
           <label htmlFor="studio-sort" className="text-sm text-muted-foreground whitespace-nowrap">
-            Sort by
+            {copy.sortLabel}
           </label>
           <Select
             id="studio-sort"
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
             className="w-[180px]"
-            aria-label="Sort materials"
+            aria-label={copy.sortLabel}
           >
-            <SelectItem value="newest">Newest first</SelectItem>
-            <SelectItem value="oldest">Oldest first</SelectItem>
-            <SelectItem value="titleAz">Title A–Z</SelectItem>
-            <SelectItem value="titleZa">Title Z–A</SelectItem>
-            <SelectItem value="draftFirst">Draft first</SelectItem>
-            <SelectItem value="publishedFirst">Published first</SelectItem>
-            <SelectItem value="textFirst">Text first</SelectItem>
-            <SelectItem value="practiceFirst">Practice test first</SelectItem>
+            <SelectItem value="newest">{copy.sortOptions.newest}</SelectItem>
+            <SelectItem value="oldest">{copy.sortOptions.oldest}</SelectItem>
+            <SelectItem value="titleAz">{copy.sortOptions.titleAz}</SelectItem>
+            <SelectItem value="titleZa">{copy.sortOptions.titleZa}</SelectItem>
+            <SelectItem value="draftFirst">{copy.sortOptions.draftFirst}</SelectItem>
+            <SelectItem value="publishedFirst">{copy.sortOptions.publishedFirst}</SelectItem>
+            <SelectItem value="textFirst">{copy.sortOptions.textFirst}</SelectItem>
+            <SelectItem value="practiceFirst">{copy.sortOptions.practiceFirst}</SelectItem>
           </Select>
         </div>
       </div>
@@ -313,20 +331,20 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
         <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
           <FileText className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground font-medium">
-            No materials created yet.
+            {copy.emptyTitle}
           </p>
           <p className="text-xs text-muted-foreground/60 mt-1">
-            Click &quot;Create new material&quot; to get started.
+            {copy.emptyHint}
           </p>
         </div>
       ) : filteredAndSorted.length === 0 ? (
         <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
           <Search className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground font-medium">
-            No materials match your search.
+            {copy.emptySearchTitle}
           </p>
           <p className="text-xs text-muted-foreground/60 mt-1">
-            Try a different keyword or clear the filters.
+            {copy.emptySearchHint}
           </p>
         </div>
       ) : (
@@ -335,13 +353,13 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
             <table className="w-full min-w-[900px] border-collapse">
               <thead>
                 <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="py-2 pr-4 font-medium">Title</th>
-                  <th className="py-2 pr-4 font-medium">Subject</th>
-                  <th className="py-2 pr-4 font-medium">Topic</th>
-                  <th className="py-2 pr-4 font-medium">Type</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
-                  <th className="py-2 pr-4 font-medium">Updated</th>
-                  <th className="py-2 pr-2 text-right font-medium">Actions</th>
+                  <th className="py-2 pr-4 font-medium">{copy.table.title}</th>
+                  <th className="py-2 pr-4 font-medium">{copy.table.subject}</th>
+                  <th className="py-2 pr-4 font-medium">{copy.table.topic}</th>
+                  <th className="py-2 pr-4 font-medium">{copy.table.type}</th>
+                  <th className="py-2 pr-4 font-medium">{copy.table.status}</th>
+                  <th className="py-2 pr-4 font-medium">{copy.table.updated}</th>
+                  <th className="py-2 pr-2 text-right font-medium">{copy.table.actions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -351,23 +369,23 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                       <div className="font-medium">{m.title}</div>
                     </td>
                     <td className="py-3 pr-4 min-w-[160px]">
-                      {getSubjectName(m.subjectId)}
+                      {subjectNameMap.get(m.subjectId) ?? m.subjectId}
                     </td>
                     <td className="py-3 pr-4 min-w-[180px]">
-                      {getTopicName(m.subjectId, m.topicId)}
+                      {topicNameMap.get(`${m.subjectId}:${m.topicId}`) ?? m.topicId}
                     </td>
                     <td className="py-3 pr-4 min-w-[140px]">
                       <Badge variant="outline" className="text-xs">
-                        {m.materialType === 'PRACTICE_TEST' ? 'Practice test' : 'Text'}
+                        {m.materialType === 'PRACTICE_TEST' ? copy.type.practice : copy.type.text}
                       </Badge>
                     </td>
                     <td className="py-3 pr-4 min-w-[120px]">
                       <Badge variant={m.status === 'PUBLISHED' ? 'default' : 'secondary'}>
-                        {m.status}
+                        {m.status === 'PUBLISHED' ? copy.status.published : copy.status.draft}
                       </Badge>
                     </td>
                     <td className="py-3 pr-4 min-w-[140px] text-muted-foreground">
-                      {new Date(m.updatedAt).toLocaleDateString()}
+                      {dateFormatter.format(new Date(m.updatedAt))}
                     </td>
                     <td className="py-3 pr-2">
                       <div className="flex justify-start gap-2">
@@ -377,7 +395,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                           onClick={() => openDeleteDialog(m.id, m.title)}
                           disabled={deleting === m.id}
                         >
-                          {deleting === m.id ? 'Deleting...' : 'Delete'}
+                          {deleting === m.id ? copy.actions.deleting : copy.actions.delete}
                         </Button>
                       {m.status === 'PUBLISHED' ? (
                         <Button
@@ -386,7 +404,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                           onClick={() => unpublish(m.id)}
                           disabled={publishing === m.id}
                         >
-                          {publishing === m.id ? 'Unpublishing...' : 'Unpublish'}
+                          {publishing === m.id ? copy.actions.unpublishing : copy.actions.unpublish}
                         </Button>
                       ) : (
                         <Button
@@ -395,16 +413,16 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                           onClick={() => openPublishDialog(m.id, m.title)}
                           disabled={publishing === m.id}
                         >
-                          {publishing === m.id ? 'Publishing...' : 'Publish'}
+                          {publishing === m.id ? copy.actions.publishing : copy.actions.publish}
                         </Button>
                       )}
                         <Button variant="secondary-primary" size="sm" asChild>
-                          <Link href={`/studio/${m.id}`}>Edit</Link>
+                          <Link href={`/studio/${m.id}`}>{copy.actions.edit}</Link>
                         </Button>
                         {m.status === 'PUBLISHED' && (
                           <Button variant="ghost" size="sm" asChild>
                             <Link href={`/catalog/${m.subjectId}/${m.topicId}`}>
-                              View in catalog
+                              {copy.actions.viewCatalog}
                             </Link>
                           </Button>
                         )}
@@ -422,7 +440,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                 size="sm"
                 onClick={() => setPage((current) => current + 1)}
               >
-                Load more items
+                {copy.actions.loadMore}
               </Button>
             </div>
           ) : null}
@@ -432,9 +450,11 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       <AlertDialog open={objectiveDialogOpen} onOpenChange={setObjectiveDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Set learning objectives</AlertDialogTitle>
+            <AlertDialogTitle>{copy.objectives.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              Add learning objectives for {objectiveTarget?.title ? `"${objectiveTarget.title}"` : 'this material'}. Please enter at least two objectives.
+              {t('studio.list.objectives.description', {
+                title: objectiveTarget?.title ? `"${objectiveTarget.title}"` : copy.objectives.materialFallback,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3">
@@ -448,7 +468,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                   setObjectiveSlots(next);
                   if (objectiveError) setObjectiveError(null);
                 }}
-                placeholder={`Objective ${idx + 1}`}
+                placeholder={t('studio.list.objectives.placeholder', { count: idx + 1 })}
                 className="h-9 text-sm"
                 autoFocus={idx === 0}
               />
@@ -462,7 +482,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                 size="sm"
                 onClick={() => setObjectiveDialogOpen(false)}
               >
-                Cancel
+                {copy.objectives.cancel}
               </Button>
               <Button
                 variant="primary"
@@ -470,7 +490,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                 onClick={publishWithObjectives}
                 disabled={publishing === objectiveTarget?.id}
               >
-                {publishing === objectiveTarget?.id ? 'Publishing...' : 'Publish'}
+                {publishing === objectiveTarget?.id ? copy.objectives.publishing : copy.objectives.publish}
               </Button>
             </div>
           </div>
@@ -480,9 +500,11 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete material?</AlertDialogTitle>
+            <AlertDialogTitle>{copy.deleteDialog.title}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {deleteTarget?.title ? `"${deleteTarget.title}"` : 'this material'}. This action cannot be undone.
+              {t('studio.list.deleteDialog.description', {
+                title: deleteTarget?.title ? `"${deleteTarget.title}"` : copy.deleteDialog.materialFallback,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 pt-4">
@@ -492,7 +514,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
               onClick={() => setDeleteDialogOpen(false)}
               disabled={Boolean(deleting)}
             >
-              Cancel
+              {copy.deleteDialog.cancel}
             </Button>
             <Button
               variant="danger"
@@ -500,7 +522,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
               onClick={() => deleteTarget && deleteMaterial(deleteTarget.id)}
               disabled={Boolean(deleting)}
             >
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleting ? copy.deleteDialog.deleting : copy.deleteDialog.confirm}
             </Button>
           </div>
         </AlertDialogContent>

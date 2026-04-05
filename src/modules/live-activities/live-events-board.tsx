@@ -7,6 +7,9 @@ import { PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiCheckCirc
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/difficulty-bars';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { useSettings } from '@/src/components/settings/settings-provider';
+import { getLocaleCode } from '@/src/i18n';
 
 interface LiveEvent {
   id: string;
@@ -17,21 +20,6 @@ interface LiveEvent {
   creditCost: number;
   type: string;
   enrollmentStatus: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | null;
-}
-
-function formatDate(date: Date) {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatTime(date: Date) {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }
 
 function EventCardSkeleton() {
@@ -57,6 +45,8 @@ function EventCardSkeleton() {
 }
 
 export function LiveEventsBoard() {
+  const { messages } = useI18n();
+  const copy = messages.liveActivities.board;
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -98,9 +88,9 @@ export function LiveEventsBoard() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (res.status === 402) {
-          toast.error('Insufficient credits to register.');
+          toast.error(copy.toastInsufficientCredits);
         } else {
-          toast.error(data.error ?? 'Failed to register.');
+          toast.error(copy.toastFailedRegister);
         }
         return;
       }
@@ -120,12 +110,12 @@ export function LiveEventsBoard() {
       }
       toast.success(
         nextStatus === 'CONFIRMED'
-          ? 'You are already enrolled in this sprint.'
-          : 'Registration started. Check your recent activities to complete.'
+          ? copy.toastAlreadyEnrolled
+          : copy.toastRegistrationStarted
       );
       fetchEvents();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to register.');
+    } catch {
+      toast.error(copy.toastFailedRegister);
     } finally {
       setActionId(null);
     }
@@ -136,12 +126,14 @@ export function LiveEventsBoard() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">My events</h2>
+            <h2 className="text-sm font-semibold text-foreground">{copy.myEventsTitle}</h2>
             <p className="text-xs text-muted-foreground">
-              Confirmed registrations for your upcoming sprints.
+              {copy.myEventsSubtitle}
             </p>
           </div>
-          <span className="text-xs text-muted-foreground">{myEvents.length} enrolled</span>
+          <span className="text-xs text-muted-foreground">
+            {copy.enrolledCount.replace('{{count}}', String(myEvents.length))}
+          </span>
         </div>
         {loading ? (
           <div className="grid gap-4">
@@ -157,12 +149,10 @@ export function LiveEventsBoard() {
               <CheckCircle2 className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
             )}
             <p className="text-sm font-medium text-muted-foreground">
-              {hasNoEvents ? 'No live events scheduled.' : 'No confirmed events yet.'}
+              {hasNoEvents ? copy.noLiveScheduled : copy.noConfirmedEvents}
             </p>
             <p className="mt-1 text-xs text-muted-foreground/70">
-              {hasNoEvents
-                ? 'Check back soon or watch the announcements sidebar.'
-                : 'Register in All events to see it here.'}
+              {hasNoEvents ? copy.noEventsHint : copy.noConfirmedHint}
             </p>
           </div>
         ) : (
@@ -181,9 +171,9 @@ export function LiveEventsBoard() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">All events</h2>
+          <h2 className="text-sm font-semibold text-foreground">{copy.allEventsTitle}</h2>
           <p className="text-xs text-muted-foreground">
-            Problem sprints you can join in the next 10-15 minutes.
+            {copy.allEventsSubtitle}
           </p>
         </div>
         {loading ? (
@@ -196,12 +186,10 @@ export function LiveEventsBoard() {
           <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
             <Calendar className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
             <p className="text-sm font-medium text-muted-foreground">
-              {hasNoEvents ? 'No live events scheduled.' : 'You are enrolled in all current events.'}
+              {hasNoEvents ? copy.noLiveScheduled : copy.allEnrolled}
             </p>
             <p className="mt-1 text-xs text-muted-foreground/70">
-              {hasNoEvents
-                ? 'Check back soon or watch the announcements sidebar.'
-                : 'We will post new sprints soon.'}
+              {hasNoEvents ? copy.noEventsHint : copy.allEnrolledHint}
             </p>
           </div>
         ) : (
@@ -228,11 +216,35 @@ interface LiveEventCardProps {
 }
 
 function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
+  const { locale, messages } = useI18n();
+  const { timeFormat } = useSettings();
+  const copy = messages.liveActivities.board;
   const eventDate = new Date(event.date);
   const isPending = event.enrollmentStatus === 'PENDING';
   const isConfirmed = event.enrollmentStatus === 'CONFIRMED';
   const isCancelled = event.enrollmentStatus === 'CANCELLED';
   const isBusy = actionId === event.id;
+  const localeCode = getLocaleCode(locale);
+  const hour12 =
+    timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    [localeCode],
+  );
+  const timeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        hour: 'numeric',
+        minute: '2-digit',
+        ...(hour12 === undefined ? {} : { hour12 }),
+      }),
+    [localeCode, hour12],
+  );
 
   return (
     <div className="card-frame bg-card p-4">
@@ -242,19 +254,19 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
             <h3 className="text-sm font-semibold text-foreground">{event.topic}</h3>
             {isConfirmed ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
-                Enrolled
+                {copy.statusEnrolled}
               </span>
             ) : isPending ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
-                Verification needed
+                {copy.statusVerification}
               </span>
             ) : isCancelled ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
-                Registration cancelled
+                {copy.statusCancelled}
               </span>
             ) : null}
           </div>
-          <p className="text-xs text-muted-foreground">Problem sprint</p>
+          <p className="text-xs text-muted-foreground">{copy.eventType}</p>
         </div>
         <DifficultyBars difficulty={event.difficulty} />
       </div>
@@ -262,19 +274,19 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
           <Calendar className="h-3 w-3" />
-          {formatDate(eventDate)}
+          {dateFormatter.format(eventDate)}
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
           <Clock className="h-3 w-3" />
-          {formatTime(eventDate)}
+          {timeFormatter.format(eventDate)}
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
           <Clock className="h-3 w-3" />
-          {event.durationMinutes} min solution window
+          {copy.durationLabel.replace('{{minutes}}', String(event.durationMinutes))}
         </span>
         <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
           <Coins className="h-3 w-3" />
-          {Math.round(event.creditCost)} credits
+          {copy.creditsLabel.replace('{{count}}', String(Math.round(event.creditCost)))}
         </span>
       </div>
 
@@ -282,29 +294,29 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
         {isPending ? (
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <AlertCircle className="h-4 w-4 text-amber-500" />
-            A confirmation request was sent to your recent activities inbox.
+            {copy.pendingNotice}
           </div>
         ) : isCancelled ? (
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <AlertCircle className="h-4 w-4 text-rose-500" />
-            This registration was cancelled. You can register again.
+            {copy.cancelledNotice}
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">Ready when you are.</span>
+          <span className="text-xs text-muted-foreground">{copy.readyNotice}</span>
         )}
 
         <div className="flex items-center gap-2">
           {isConfirmed ? (
             <Button asChild size="sm" variant="secondary-primary">
-              <Link href={`/sprints/${event.id}`}>Enter sprint</Link>
+              <Link href={`/sprints/${event.id}`}>{copy.enterSprint}</Link>
             </Button>
           ) : isPending ? (
             <Button asChild size="sm" variant="secondary" disabled={isBusy}>
-              <Link href="/recent-activities">Complete registration</Link>
+              <Link href="/recent-activities">{copy.completeRegistration}</Link>
             </Button>
           ) : (
             <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy}>
-              {isCancelled ? 'Register again' : 'Register'}
+              {isCancelled ? copy.registerAgain : copy.register}
             </Button>
           )}
         </div>

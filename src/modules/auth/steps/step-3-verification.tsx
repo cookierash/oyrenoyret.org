@@ -8,7 +8,7 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { verificationCodeSchema, type VerificationCodeInput } from '../schemas/registration';
+import { createVerificationCodeSchema, type VerificationCodeInput } from '../schemas/registration';
 import {
   sendParentVerificationCode,
   verifyParentEmail,
@@ -23,8 +23,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { resolveAuthError } from '@/src/modules/auth/utils/resolve-auth-error';
 
 interface Step3Props {
   userId: string;
@@ -39,9 +41,14 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSendingCode, setIsSendingCode] = useState(false);
   const hasSentInitialCode = useRef(false);
+  const { t, messages } = useI18n();
+  const copy = messages.auth.steps.verification;
+  const placeholders = messages.auth.placeholders;
+  const validation = messages.auth.validation;
+  const validationSchema = useMemo(() => createVerificationCodeSchema(validation), [validation]);
 
   const form = useForm<VerificationCodeInput>({
-    resolver: zodResolver(verificationCodeSchema),
+    resolver: zodResolver(validationSchema),
     mode: 'onChange',
     defaultValues: {
       code: '',
@@ -62,12 +69,12 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
       const result = await sendParentVerificationCode(userId);
 
       if (result.success) {
-        toast.success(`Verification code sent to ${parentEmail}`);
+        toast.success(t('auth.steps.verification.codeSent', { email: parentEmail }));
       } else {
-        toast.error(result.error || 'Failed to send verification code');
+        toast.error(resolveAuthError(messages, t, copy.sendFailed, result));
       }
     } catch {
-      toast.error('An unexpected error occurred');
+      toast.error(copy.unexpected);
     } finally {
       setIsSendingCode(false);
     }
@@ -79,14 +86,14 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
       const result = await verifyParentEmail(userId, data);
 
       if (result.success) {
-        toast.success('Email verified successfully');
+        toast.success(copy.verified);
         onSuccess();
       } else {
-        toast.error(result.error || 'Invalid verification code');
+        toast.error(resolveAuthError(messages, t, copy.invalid, result));
         form.resetField('code');
       }
     } catch {
-      toast.error('An unexpected error occurred');
+      toast.error(copy.unexpected);
     } finally {
       setIsSubmitting(false);
     }
@@ -98,13 +105,13 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
         <div className="space-y-2">
           <div className="rounded-lg border border-primary/20 bg-primary/10 p-3">
             <p className="text-sm text-muted-foreground">
-              A 6-digit verification code has been sent to:
+              {copy.bannerTitle}
             </p>
             <p className="font-semibold text-primary mt-2">
               {parentEmail}
             </p>
             <p className="text-xs text-muted-foreground mt-2">
-              Please check your email and enter the code below. The code expires in 15 minutes.
+              {copy.bannerHint}
             </p>
           </div>
 
@@ -113,11 +120,11 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
             name="code"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={FIELD_LABEL_CLASS}>Verification Code</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>{copy.codeLabel}</FormLabel>
                   <FormControl>
                     <Input
                       type="text"
-                      placeholder="000000"
+                      placeholder={placeholders.verificationCode}
                       maxLength={6}
                       className={`${INPUT_CLASS} text-center text-2xl tracking-widest font-sans tabular-nums`}
                       {...field}
@@ -134,7 +141,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
 
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              Didn&apos;t receive the code?
+              {copy.missingCode}
             </span>
             <Button
               type="button"
@@ -143,7 +150,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
               disabled={isSendingCode}
               className="h-auto p-0 text-primary underline-offset-4 hover:underline bg-transparent shadow-none"
             >
-              {isSendingCode ? 'Sending...' : 'Resend Code'}
+              {isSendingCode ? copy.sending : copy.resend}
             </Button>
           </div>
         </div>
@@ -156,7 +163,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
             onClick={onPrevious}
             className="h-10 flex-1 text-sm font-semibold"
           >
-            Previous
+            {copy.previous}
           </Button>
           <Button
             type="submit"
@@ -165,7 +172,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
             className="h-10 flex-1 text-sm font-semibold"
             disabled={isSubmitting || !form.formState.isValid}
           >
-            {isSubmitting ? 'Verifying...' : 'Next: Consent'}
+            {isSubmitting ? copy.verifying : copy.next}
           </Button>
         </div>
       </form>

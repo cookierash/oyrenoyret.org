@@ -11,25 +11,26 @@ import SuperscriptExtension from '@tiptap/extension-superscript';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextStrikethrough as Strikethrough, PiTextAa as SubscriptIcon, PiTextH as SuperscriptIcon, PiCode as Code, PiCodeSimple as Code2, PiQuotes as Quote, PiMinus as Minus, PiList as List, PiListNumbers as ListOrdered, PiTextHOne as Heading1, PiTextHTwo as Heading2, PiTextHThree as Heading3, PiTextT as Type, PiArrowCounterClockwise as Undo, PiArrowClockwise as Redo, PiHighlighterCircle as Highlighter, PiPalette as Palette, PiEraser as Eraser } from 'react-icons/pi';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 const TEXT_COLORS = [
-  { name: 'Default', value: '' },
-  { name: 'Gray', value: '#6b7280' },
-  { name: 'Red', value: '#dc2626' },
-  { name: 'Orange', value: '#ea580c' },
-  { name: 'Amber', value: '#d97706' },
-  { name: 'Green', value: '#16a34a' },
-  { name: 'Blue', value: '#2563eb' },
-  { name: 'Purple', value: '#7c3aed' },
-];
+  { key: 'default', value: '' },
+  { key: 'gray', value: '#6b7280' },
+  { key: 'red', value: '#dc2626' },
+  { key: 'orange', value: '#ea580c' },
+  { key: 'amber', value: '#d97706' },
+  { key: 'green', value: '#16a34a' },
+  { key: 'blue', value: '#2563eb' },
+  { key: 'purple', value: '#7c3aed' },
+] as const;
 
 const HIGHLIGHT_COLORS = [
-  { name: 'None', value: '' },
-  { name: 'Yellow', value: '#fef08a' },
-  { name: 'Green', value: '#bbf7d0' },
-  { name: 'Blue', value: '#bfdbfe' },
-  { name: 'Pink', value: '#fbcfe8' },
-];
+  { key: 'none', value: '' },
+  { key: 'yellow', value: '#fef08a' },
+  { key: 'green', value: '#bbf7d0' },
+  { key: 'blue', value: '#bfdbfe' },
+  { key: 'pink', value: '#fbcfe8' },
+] as const;
 
 interface DocumentEditorProps {
   content: string;
@@ -42,10 +43,15 @@ interface DocumentEditorProps {
 export function DocumentEditor({
   content,
   onChange,
-  placeholder = 'Start writing...',
+  placeholder,
   editable = true,
   className = '',
 }: DocumentEditorProps) {
+  const { messages } = useI18n();
+  const toolbar = messages.editor.toolbar;
+  const colorLabels = messages.editor.colors;
+  const highlightLabels = messages.editor.highlights;
+  const resolvedPlaceholder = placeholder ?? messages.studio.editor.placeholders.document;
   const [showColors, setShowColors] = useState<'text' | 'highlight' | null>(null);
 
   useEffect(() => {
@@ -62,7 +68,7 @@ export function DocumentEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit,
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({ placeholder: resolvedPlaceholder }),
       TextStyle,
       Color,
       Underline,
@@ -142,8 +148,8 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={undo}
             disabled={!editor.can().undo()}
-            aria-label="Undo"
-            title="Undo"
+            aria-label={toolbar.undo}
+            title={toolbar.undo}
           >
             <Undo className="h-4 w-4" />
           </Button>
@@ -154,8 +160,8 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={redo}
             disabled={!editor.can().redo()}
-            aria-label="Redo"
-            title="Redo"
+            aria-label={toolbar.redo}
+            title={toolbar.redo}
           >
             <Redo className="h-4 w-4" />
           </Button>
@@ -167,9 +173,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setBold}
             data-active={editor.isActive('bold')}
-            aria-label="Bold"
+            aria-label={toolbar.bold}
             aria-pressed={editor.isActive('bold')}
-            title="Bold"
+            title={toolbar.bold}
           >
             <Bold className="h-4 w-4" />
           </Button>
@@ -180,9 +186,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setItalic}
             data-active={editor.isActive('italic')}
-            aria-label="Italic"
+            aria-label={toolbar.italic}
             aria-pressed={editor.isActive('italic')}
-            title="Italic"
+            title={toolbar.italic}
           >
             <Italic className="h-4 w-4" />
           </Button>
@@ -193,9 +199,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setUnderline}
             data-active={editor.isActive('underline')}
-            aria-label="Underline"
+            aria-label={toolbar.underline}
             aria-pressed={editor.isActive('underline')}
-            title="Underline"
+            title={toolbar.underline}
           >
             <UnderlineIcon className="h-4 w-4" />
           </Button>
@@ -206,9 +212,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setStrike}
             data-active={editor.isActive('strike')}
-            aria-label="Strikethrough"
+            aria-label={toolbar.strikethrough}
             aria-pressed={editor.isActive('strike')}
-            title="Strikethrough"
+            title={toolbar.strikethrough}
           >
             <Strikethrough className="h-4 w-4" />
           </Button>
@@ -219,9 +225,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setSubscript}
             data-active={editor.isActive('subscript')}
-            aria-label="Subscript"
+            aria-label={toolbar.subscript}
             aria-pressed={editor.isActive('subscript')}
-            title="Subscript"
+            title={toolbar.subscript}
           >
             <SubscriptIcon className="h-4 w-4" />
           </Button>
@@ -232,9 +238,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setSuperscript}
             data-active={editor.isActive('superscript')}
-            aria-label="Superscript"
+            aria-label={toolbar.superscript}
             aria-pressed={editor.isActive('superscript')}
-            title="Superscript"
+            title={toolbar.superscript}
           >
             <SuperscriptIcon className="h-4 w-4" />
           </Button>
@@ -245,9 +251,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setInlineCode}
             data-active={editor.isActive('code')}
-            aria-label="Inline code"
+            aria-label={toolbar.inlineCode}
             aria-pressed={editor.isActive('code')}
-            title="Inline code"
+            title={toolbar.inlineCode}
           >
             <Code className="h-4 w-4" />
           </Button>
@@ -257,8 +263,8 @@ export function DocumentEditor({
             size="icon"
             className="h-8 w-8"
             onClick={clearFormatting}
-            aria-label="Clear formatting"
-            title="Clear formatting"
+            aria-label={toolbar.clearFormatting}
+            title={toolbar.clearFormatting}
           >
             <Eraser className="h-4 w-4" />
           </Button>
@@ -270,10 +276,10 @@ export function DocumentEditor({
               size="icon"
               className="h-8 w-10 flex flex-col gap-0.5"
               onClick={(e) => { e.stopPropagation(); setShowColors((s) => (s === 'text' ? null : 'text')); }}
-              aria-label="Text color"
+              aria-label={toolbar.textColor}
               aria-haspopup="menu"
               aria-expanded={showColors === 'text'}
-              title="Text color"
+              title={toolbar.textColor}
             >
               <Palette className="h-4 w-4" />
               <div className="h-0.5 w-3 rounded-full" style={{ backgroundColor: editor.getAttributes('textStyle').color || 'currentColor' }} />
@@ -283,12 +289,12 @@ export function DocumentEditor({
                 <div className="grid grid-cols-4 gap-1.5 min-w-[120px]">
                   {TEXT_COLORS.map((c) => (
                     <button
-                      key={c.value || 'default'}
+                      key={c.key}
                       type="button"
                       className="h-7 w-7 rounded-sm border border-border transition-transform hover:scale-110 active:scale-95 flex items-center justify-center p-0.5"
                       style={c.value ? { backgroundColor: c.value } : undefined}
                       onClick={() => setColor(c.value)}
-                      title={c.name}
+                      title={colorLabels[c.key]}
                     >
                       {!c.value && <Eraser className="h-3.5 w-3.5 text-muted-foreground" />}
                     </button>
@@ -304,9 +310,9 @@ export function DocumentEditor({
               size="icon"
               className="h-8 w-10 flex flex-col gap-0.5"
               onClick={(e) => { e.stopPropagation(); setShowColors((s) => (s === 'highlight' ? null : 'highlight')); }}
-              title="Highlight"
+              title={toolbar.highlight}
               data-active={editor.isActive('highlight')}
-              aria-label="Highlight"
+              aria-label={toolbar.highlight}
               aria-pressed={editor.isActive('highlight')}
               aria-haspopup="menu"
               aria-expanded={showColors === 'highlight'}
@@ -319,12 +325,12 @@ export function DocumentEditor({
                 <div className="grid grid-cols-5 gap-1.5 min-w-[150px]">
                   {HIGHLIGHT_COLORS.map((c) => (
                     <button
-                      key={c.value || 'none'}
+                      key={c.key}
                       type="button"
                       className="h-7 w-7 rounded-sm border border-border transition-transform hover:scale-110 active:scale-95 flex items-center justify-center p-0.5"
                       style={c.value ? { backgroundColor: c.value } : undefined}
                       onClick={() => setHighlight(c.value)}
-                      title={c.name}
+                      title={highlightLabels[c.key]}
                     >
                       {!c.value && <Eraser className="h-3.5 w-3.5 text-muted-foreground" />}
                     </button>
@@ -341,9 +347,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setH1}
             data-active={editor.isActive('heading', { level: 1 })}
-            aria-label="Heading 1"
+            aria-label={toolbar.heading1}
             aria-pressed={editor.isActive('heading', { level: 1 })}
-            title="Heading 1"
+            title={toolbar.heading1}
           >
             <Heading1 className="h-4 w-4" />
           </Button>
@@ -354,9 +360,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setH2}
             data-active={editor.isActive('heading', { level: 2 })}
-            aria-label="Heading 2"
+            aria-label={toolbar.heading2}
             aria-pressed={editor.isActive('heading', { level: 2 })}
-            title="Heading 2"
+            title={toolbar.heading2}
           >
             <Heading2 className="h-4 w-4" />
           </Button>
@@ -367,9 +373,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setH3}
             data-active={editor.isActive('heading', { level: 3 })}
-            aria-label="Heading 3"
+            aria-label={toolbar.heading3}
             aria-pressed={editor.isActive('heading', { level: 3 })}
-            title="Heading 3"
+            title={toolbar.heading3}
           >
             <Heading3 className="h-4 w-4" />
           </Button>
@@ -380,9 +386,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setParagraph}
             data-active={editor.isActive('paragraph')}
-            aria-label="Body text"
+            aria-label={toolbar.bodyText}
             aria-pressed={editor.isActive('paragraph')}
-            title="Body text"
+            title={toolbar.bodyText}
           >
             <Type className="h-4 w-4" />
           </Button>
@@ -394,9 +400,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setBulletList}
             data-active={editor.isActive('bulletList')}
-            aria-label="Bulleted list"
+            aria-label={toolbar.bulletList}
             aria-pressed={editor.isActive('bulletList')}
-            title="Bulleted list"
+            title={toolbar.bulletList}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -407,9 +413,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setOrderedList}
             data-active={editor.isActive('orderedList')}
-            aria-label="Numbered list"
+            aria-label={toolbar.numberedList}
             aria-pressed={editor.isActive('orderedList')}
-            title="Numbered list"
+            title={toolbar.numberedList}
           >
             <ListOrdered className="h-4 w-4" />
           </Button>
@@ -421,9 +427,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setBlockquote}
             data-active={editor.isActive('blockquote')}
-            aria-label="Quote"
+            aria-label={toolbar.quote}
             aria-pressed={editor.isActive('blockquote')}
-            title="Quote"
+            title={toolbar.quote}
           >
             <Quote className="h-4 w-4" />
           </Button>
@@ -434,9 +440,9 @@ export function DocumentEditor({
             className="h-8 w-8"
             onClick={setCodeBlock}
             data-active={editor.isActive('codeBlock')}
-            aria-label="Code block"
+            aria-label={toolbar.codeBlock}
             aria-pressed={editor.isActive('codeBlock')}
-            title="Code block"
+            title={toolbar.codeBlock}
           >
             <Code2 className="h-4 w-4" />
           </Button>
@@ -446,8 +452,8 @@ export function DocumentEditor({
             size="icon"
             className="h-8 w-8"
             onClick={insertHorizontalRule}
-            aria-label="Divider"
-            title="Divider"
+            aria-label={toolbar.divider}
+            title={toolbar.divider}
           >
             <Minus className="h-4 w-4" />
           </Button>

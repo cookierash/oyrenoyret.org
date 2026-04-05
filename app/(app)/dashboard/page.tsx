@@ -17,8 +17,12 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { STREAK_OFFSET_HOURS, toDayNumber } from '@/src/lib/streak';
 import { recordDailyVisit } from '@/src/modules/visits';
 import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiVideoCamera as Video } from 'react-icons/pi';
+import { getSettingsPreferences } from '@/src/lib/settings-preferences-server';
+import { getI18n } from '@/src/i18n/server';
+import { getLocaleCode } from '@/src/i18n';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 
-function calcStreakStats(dayNumbers: number[]) {
+function calcStreakStats(dayNumbers: number[], labels: readonly string[]) {
   const daySet = new Set<number>(dayNumbers);
 
   const today = toDayNumber(new Date());
@@ -30,7 +34,7 @@ function calcStreakStats(dayNumbers: number[]) {
       current: 0,
       best: 0,
       weekCount: 0,
-      weekDays: buildWeekDays(daySet, today),
+      weekDays: buildWeekDays(daySet, today, labels),
       hasToday,
       hasYesterday,
     };
@@ -71,14 +75,13 @@ function calcStreakStats(dayNumbers: number[]) {
     current,
     best,
     weekCount,
-    weekDays: buildWeekDays(daySet, today),
+    weekDays: buildWeekDays(daySet, today, labels),
     hasToday,
     hasYesterday,
   };
 }
 
-function buildWeekDays(daySet: Set<number>, today: number) {
-  const labels = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
+function buildWeekDays(daySet: Set<number>, today: number, labels: readonly string[]) {
   return Array.from({ length: 7 }).map((_, idx) => {
     const dayNumber = today - (6 - idx);
     const date = new Date(dayNumber * 24 * 60 * 60 * 1000);
@@ -91,16 +94,23 @@ function buildWeekDays(daySet: Set<number>, today: number) {
   });
 }
 
-function getGreeting() {
+function getGreeting(copy: { morning: string; afternoon: string; evening: string }) {
   const hour = new Date().getUTCHours() + STREAK_OFFSET_HOURS; // UTC+4 (user's timezone)
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour < 12) return copy.morning;
+  if (hour < 17) return copy.afternoon;
+  return copy.evening;
 }
 
 export default async function DashboardPage() {
   const userId = await getCurrentSession();
   if (!userId) redirect('/login');
+  const { timeFormat } = await getSettingsPreferences();
+  const { locale, messages } = await getI18n();
+  const copy = messages.app.dashboard;
+  const subjectNameMap = new Map(
+    getLocalizedSubjects(messages).map((subject) => [subject.id, subject.name]),
+  );
+  const difficultyCopy = messages.materials.difficulty;
 
   const now = new Date();
   await recordDailyVisit(userId, now);
@@ -148,14 +158,17 @@ export default async function DashboardPage() {
     redirect('/admin/dashboard');
   }
 
-  const displayName = user?.firstName || 'there';
-  const greeting = getGreeting();
-  const streakStats = calcStreakStats(dailyVisits.map((entry) => entry.dayNumber));
+  const displayName = user?.firstName || copy.fallbackName;
+  const greeting = getGreeting(copy.greeting);
+  const streakStats = calcStreakStats(
+    dailyVisits.map((entry) => entry.dayNumber),
+    copy.weekdays,
+  );
   const streakMessage = streakStats.hasToday
-    ? 'Keep it up!'
+    ? copy.streakMessages.today
     : streakStats.hasYesterday
-      ? 'Keep it alive today'
-      : 'Start a streak today!';
+      ? copy.streakMessages.yesterday
+      : copy.streakMessages.start;
 
   return (
     <DashboardShell>
@@ -167,7 +180,7 @@ export default async function DashboardPage() {
                 {greeting}, {displayName}
               </h1>
               <p className="text-sm text-muted-foreground">
-                Here is your learning snapshot for today.
+                {copy.snapshot}
               </p>
             </div>
 
@@ -180,14 +193,14 @@ export default async function DashboardPage() {
                 <div className="flex items-center gap-4 md:flex-col md:items-start">
                   <div className="space-y-1">
                     <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      Today
+                      {copy.today}
                     </p>
                     <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-semibold text-foreground">
                         {streakStats.current}
                       </span>
                       <span className="text-sm text-muted-foreground">
-                        {streakStats.current === 1 ? 'day' : 'days'}
+                        {streakStats.current === 1 ? copy.dayLabel.singular : copy.dayLabel.plural}
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground">{streakMessage}</p>
@@ -218,13 +231,13 @@ export default async function DashboardPage() {
                 <div className="flex items-center justify-between gap-4 md:flex-col md:items-end md:text-right">
                   <div className="space-y-1">
                     <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      Best streak
+                      {copy.bestStreak}
                     </p>
                     <div className="flex items-baseline gap-2 md:justify-end">
                       <span className="text-2xl font-semibold text-foreground">
                         {streakStats.best}
                       </span>
-                      <span className="text-xs text-muted-foreground">days</span>
+                      <span className="text-xs text-muted-foreground">{copy.dayLabel.plural}</span>
                     </div>
                   </div>
                 </div>
@@ -237,13 +250,13 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Video className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Upcoming live activities</h2>
+              <h2 className="text-sm font-semibold">{copy.upcoming}</h2>
             </div>
             <Link
               href="/live-activities"
               className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
-              View all
+              {copy.viewAll}
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -251,9 +264,9 @@ export default async function DashboardPage() {
           {upcomingActivities.length === 0 ? (
             <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
               <Video className="mx-auto mb-2 h-7 w-7 text-muted-foreground/60" />
-              <p className="text-sm font-medium text-muted-foreground">No live activities yet</p>
+              <p className="text-sm font-medium text-muted-foreground">{copy.noLive}</p>
               <p className="mt-1 text-xs text-muted-foreground/70">
-                New sessions will appear here once scheduled.
+                {copy.noLiveHint}
               </p>
             </div>
           ) : (
@@ -268,10 +281,10 @@ export default async function DashboardPage() {
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-muted/60 text-center">
                         <span className="text-[11px] font-semibold uppercase text-muted-foreground">
-                          {activityDate.toLocaleDateString('en-US', { month: 'short' })}
+                          {activityDate.toLocaleDateString(getLocaleCode(locale), { month: 'short' })}
                         </span>
                         <span className="text-lg font-semibold text-foreground">
-                          {activityDate.toLocaleDateString('en-US', { day: '2-digit' })}
+                          {activityDate.toLocaleDateString(getLocaleCode(locale), { day: '2-digit' })}
                         </span>
                       </div>
                       <div className="min-w-[200px] flex-1">
@@ -290,15 +303,19 @@ export default async function DashboardPage() {
                           </span>
                           <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
                             <Clock className="h-3 w-3" />
-                            {activityDate.toLocaleTimeString('en-US', {
+                            {activityDate.toLocaleTimeString(getLocaleCode(locale), {
                               hour: 'numeric',
                               minute: '2-digit',
+                              hour12:
+                                timeFormat === 'auto'
+                                  ? undefined
+                                  : timeFormat === '12-hour',
                             })}
                           </span>
                           {activity.duration && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
                               <Clock className="h-3 w-3" />
-                              {activity.duration} min
+                              {activity.duration} {copy.minLabel}
                             </span>
                           )}
                         </div>
@@ -315,13 +332,13 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">Recently purchased materials</h2>
+              <h2 className="text-sm font-semibold">{copy.recentMaterials}</h2>
             </div>
             <Link
               href="/library"
               className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
-              All materials
+              {copy.allMaterials}
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -329,13 +346,13 @@ export default async function DashboardPage() {
           {recentPurchases.length === 0 ? (
             <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
               <BookOpen className="mx-auto mb-2 h-7 w-7 text-muted-foreground/60" />
-              <p className="text-sm font-medium text-muted-foreground">No materials yet</p>
+              <p className="text-sm font-medium text-muted-foreground">{copy.noMaterials}</p>
               <p className="mt-1 text-xs text-muted-foreground/70">
-                Browse the{' '}
+                {copy.noMaterialsHintStart}
                 <Link href="/catalog" className="text-foreground underline underline-offset-2">
-                  catalog
+                  {copy.noMaterialsLink}
                 </Link>{' '}
-                to find your first one.
+                {copy.noMaterialsHintEnd}
               </p>
             </div>
           ) : (
@@ -358,14 +375,14 @@ export default async function DashboardPage() {
                             : 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400'
                         }`}
                       >
-                        {material.materialType === 'PRACTICE_TEST' ? 'Test' : 'Textual'}
+                        {material.materialType === 'PRACTICE_TEST' ? copy.testLabel : copy.textualLabel}
                       </span>
                     </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     <span className="capitalize">
-                      {material.subjectId.replace(/-/g, ' ')}
+                      {subjectNameMap.get(material.subjectId) ?? material.subjectId}
                     </span>
                     {material.difficulty && (
                       <span
@@ -377,14 +394,14 @@ export default async function DashboardPage() {
                               : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'
                         }`}
                       >
-                        {material.difficulty.charAt(0) + material.difficulty.slice(1).toLowerCase()}
+                        {difficultyCopy[material.difficulty]}
                       </span>
                     )}
                   </div>
 
                   <p className="text-[11px] text-muted-foreground/60 mt-auto">
-                    Purchased{' '}
-                    {new Date(createdAt).toLocaleDateString('en-US', {
+                    {copy.purchased}{' '}
+                    {new Date(createdAt).toLocaleDateString(getLocaleCode(locale), {
                       month: 'short',
                       day: 'numeric',
                       year: 'numeric',

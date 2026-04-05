@@ -13,10 +13,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/src/components/ui/logo';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
   const [cookieOpen, setCookieOpen] = useState(false);
+  const { t } = useI18n();
 
   return (
     <footer className="border-t border-border/60 bg-background">
@@ -30,7 +32,7 @@ export function SiteFooter() {
                 className="w-fit text-left transition-colors hover:text-foreground"
                 onClick={() => setCookieOpen(true)}
               >
-                Cookie settings
+                {t('footer.cookieSettings')}
               </button>
               <p>© {year} oyrenoyret.org</p>
             </div>
@@ -38,76 +40,82 @@ export function SiteFooter() {
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-10 lg:grid-cols-5">
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Platform</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('footer.platform')}
+              </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
                   <Link href="/dashboard" className="transition-colors hover:text-foreground">
-                    Dashboard
+                    {t('footer.dashboard')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/catalog" className="transition-colors hover:text-foreground">
-                    Catalog
+                    {t('footer.catalog')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/library" className="transition-colors hover:text-foreground">
-                    Library
+                    {t('footer.library')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/live-activities" className="transition-colors hover:text-foreground">
-                    Live activities
+                    {t('footer.liveActivities')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/discussions" className="transition-colors hover:text-foreground">
-                    Discussions
+                    {t('footer.discussions')}
                   </Link>
                 </li>
               </ul>
             </div>
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Learning</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('footer.learning')}
+              </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
                   <Link href="/studio" className="transition-colors hover:text-foreground">
-                    Studio
+                    {t('footer.studio')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/my-materials" className="transition-colors hover:text-foreground">
-                    My materials
+                    {t('footer.myMaterials')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/recent-activities" className="transition-colors hover:text-foreground">
-                    Recent Activities
+                    {t('footer.recentActivities')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/academic-record" className="transition-colors hover:text-foreground">
-                    Academic record
+                    {t('footer.academicRecord')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/settings" className="transition-colors hover:text-foreground">
-                    Settings
+                    {t('footer.settings')}
                   </Link>
                 </li>
               </ul>
             </div>
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Account</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('footer.account')}
+              </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
                   <Link href="/login" className="transition-colors hover:text-foreground">
-                    Log in
+                    {t('footer.logIn')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/register" className="transition-colors hover:text-foreground">
-                    Get started
+                    {t('footer.getStarted')}
                   </Link>
                 </li>
                 <li>
@@ -115,43 +123,47 @@ export function SiteFooter() {
                     href="/forgot-password"
                     className="transition-colors hover:text-foreground"
                   >
-                    Reset password
+                    {t('footer.resetPassword')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/record/verify" className="transition-colors hover:text-foreground">
-                    Verify record
+                    {t('footer.verifyRecord')}
                   </Link>
                 </li>
               </ul>
             </div>
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Resources</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('footer.resources')}
+              </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
                   <Link href="/resources/help" className="transition-colors hover:text-foreground">
-                    Help center
+                    {t('footer.helpCenter')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/resources/blog" className="transition-colors hover:text-foreground">
-                    Blog
+                    {t('footer.blog')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/resources/changelog" className="transition-colors hover:text-foreground">
-                    Changelog
+                    {t('footer.changelog')}
                   </Link>
                 </li>
                 <li>
                   <Link href="/contact" className="transition-colors hover:text-foreground">
-                    Contact
+                    {t('footer.contact')}
                   </Link>
                 </li>
               </ul>
             </div>
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Social</h3>
+              <h3 className="text-sm font-semibold text-foreground">
+                {t('footer.social')}
+              </h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>
                   <Link
@@ -182,31 +194,32 @@ export function SiteFooter() {
       <AlertDialog open={cookieOpen} onOpenChange={setCookieOpen}>
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Cookie settings</AlertDialogTitle>
+            <AlertDialogTitle>{t('footer.cookieTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              We only use strictly necessary cookies for authentication and security. There
-              are no analytics or marketing cookies to opt out of.
+              {t('footer.cookieDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           <div className="space-y-3">
             <div className="flex items-start gap-3 rounded-md border border-input px-3 py-3">
-              <Checkbox checked disabled />
-              <div>
-                <p className="text-sm font-medium text-foreground">Strictly necessary</p>
+                <Checkbox checked disabled />
+                <div>
+                <p className="text-sm font-medium text-foreground">
+                  {t('footer.strictlyNecessary')}
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Required for security, authentication, and core platform functions.
+                  {t('footer.strictlyNecessaryDesc')}
                 </p>
               </div>
             </div>
             <div className="rounded-md border border-input bg-muted/40 px-3 py-3 text-xs text-muted-foreground">
-              We do not use optional cookies for personalization, analytics, or advertising.
+              {t('footer.noOptionalCookies')}
             </div>
             <Link
               href="/legals/cookie-policy"
               className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
             >
-              Read the full cookie policy
+              {t('footer.cookiePolicy')}
             </Link>
           </div>
 
@@ -216,7 +229,7 @@ export function SiteFooter() {
               size="md"
               onClick={() => setCookieOpen(false)}
             >
-              Close
+              {t('footer.close')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

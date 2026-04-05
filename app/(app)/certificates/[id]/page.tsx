@@ -10,6 +10,8 @@ import { prisma } from '@/src/db/client';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { PiMedal as Award, PiCalendar as Calendar, PiCheckCircle as CheckCircle } from 'react-icons/pi';
+import { getI18n } from '@/src/i18n/server';
+import { getLocaleCode } from '@/src/i18n';
 
 interface CertificatePageProps {
   params: Promise<{ id: string }>;
@@ -19,6 +21,10 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
     const { id } = await params;
     const userId = await getCurrentSession();
     if (!userId) redirect('/login');
+
+    const { t, messages, locale } = await getI18n();
+    const copy = messages.certificates;
+    const localeCode = getLocaleCode(locale);
 
     const certificate = await prisma.certificate.findUnique({
         where: { id },
@@ -32,11 +38,17 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
         return redirect('/academic-record');
     }
 
+    const issuedDate = new Intl.DateTimeFormat(localeCode, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    }).format(new Date(certificate.issuedAt));
+
     return (
         <div className="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <PageHeader
-                title="Certificate Details"
-                description="Verify and view your achievement."
+                title={copy.detailsTitle}
+                description={copy.detailsDescription}
             />
 
             <Card className="mt-2 border border-primary/20 bg-card overflow-hidden relative">
@@ -52,10 +64,10 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
 
                     <div className="space-y-4">
                         <h1 className="text-3xl sm:text-4xl font-bold font-comfortaa text-primary tracking-tight">
-                            Certificate of Completion
+                            {copy.completionTitle}
                         </h1>
                         <p className="text-muted-foreground uppercase tracking-widest text-sm font-semibold">
-                            This acknowledges that
+                            {copy.acknowledgesLabel}
                         </p>
                         <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
                             {certificate.user.firstName} {certificate.user.lastName}
@@ -63,7 +75,7 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
                     </div>
 
                     <div className="pt-4 pb-4 border-y border-border/50">
-                        <p className="text-muted-foreground mb-4">has successfully completed</p>
+                        <p className="text-muted-foreground mb-4">{copy.completedLabel}</p>
                         <h3 className="text-xl font-semibold mb-2">{certificate.title}</h3>
                         {certificate.description && (
                             <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
@@ -75,27 +87,28 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-8 text-sm text-foreground/80 pt-4">
                         <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-primary" />
-                            <span>Issued: {new Date(certificate.issuedAt).toLocaleDateString('en-US', {
-                                year: 'numeric', month: 'long', day: 'numeric'
-                            })}</span>
+                            <span>
+                                {t('certificates.issuedLabel', { date: issuedDate })}
+                            </span>
                         </div>
                         <div className="flex items-center gap-2 font-medium">
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
                             <span className="text-emerald-600 dark:text-emerald-400">
-                              Verified by <span className="font-comfortaa lowercase">oyrenoyret</span>
+                              {copy.verifiedLabel}{' '}
+                              <span className="font-comfortaa lowercase">oyrenoyret</span>
                             </span>
                         </div>
                     </div>
 
                     <div className="pt-8 text-xs text-muted-foreground font-mono">
-                        Certificate ID: {certificate.id}
+                        {t('certificates.idLabel', { id: certificate.id })}
                     </div>
                 </CardContent>
             </Card>
 
             <div className="mt-8 text-center text-sm text-muted-foreground sm:flex justify-center gap-4">
                 <a href="/academic-record" className="hover:text-foreground hover:underline transition-colors">
-                    &larr; Back to Academic Record
+                    &larr; {copy.backToRecord}
                 </a>
             </div>
         </div>

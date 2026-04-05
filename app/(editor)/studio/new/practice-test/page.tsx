@@ -11,9 +11,13 @@ import Link from 'next/link';
 import { PracticeTestEditor } from '@/src/modules/materials/practice-test-editor';
 import { Button } from '@/components/ui/button';
 import { PiArrowLeft as ArrowLeft, PiClipboardText as ClipboardList } from 'react-icons/pi';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 export default function NewPracticeTestPage() {
   const router = useRouter();
+  const { messages } = useI18n();
+  const copy = messages.studio.newPractice;
+  const badge = messages.studio.headerBadge;
 
   return (
     <div className="flex flex-col h-full">
@@ -21,22 +25,22 @@ export default function NewPracticeTestPage() {
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1.5">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Studio
+              {badge}
             </div>
             <div className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-primary" />
               <h1 className="text-xl font-semibold tracking-tight text-foreground">
-                New practice test
+                {copy.title}
               </h1>
             </div>
             <p className="text-sm text-muted-foreground">
-              Build multiple-choice questions with 3-5 options and mark the correct answer. Add objectives when you publish.
+              {copy.description}
             </p>
           </div>
           <Button variant="secondary-primary" size="sm" asChild>
             <Link href="/studio">
               <ArrowLeft className="h-4 w-4" />
-              Back to studio
+              {copy.back}
             </Link>
           </Button>
         </div>

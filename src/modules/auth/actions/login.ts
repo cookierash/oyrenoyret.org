@@ -23,11 +23,13 @@ export async function login(data: LoginInput) {
     const { checkLoginRateLimit } = await import('./rate-limit');
     const rateLimit = await checkLoginRateLimit();
     if (!rateLimit.allowed) {
+      const minutes = Math.ceil(
+        (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
+      );
       return {
         success: false,
-        error: `Too many login attempts. Please try again in ${Math.ceil(
-          (rateLimit.resetAt.getTime() - Date.now()) / 1000 / 60
-        )} minutes.`,
+        errorKey: 'loginRateLimit',
+        errorVars: { minutes },
       };
     }
 
@@ -49,7 +51,7 @@ export async function login(data: LoginInput) {
       if (!adminPasswordHash) {
         return {
           success: false,
-          error: 'Invalid email or password',
+          errorKey: 'invalidCredentials',
         };
       }
 
@@ -63,7 +65,7 @@ export async function login(data: LoginInput) {
       if (!adminPasswordValid) {
         return {
           success: false,
-          error: 'Invalid email or password',
+          errorKey: 'invalidCredentials',
         };
       }
 
@@ -82,7 +84,7 @@ export async function login(data: LoginInput) {
       } else if (user.role !== 'ADMIN') {
         return {
           success: false,
-          error: 'Admin account misconfigured. Contact support.',
+          errorKey: 'adminMisconfigured',
         };
       } else if (
         user.passwordHash !== adminPasswordHash ||
@@ -103,7 +105,7 @@ export async function login(data: LoginInput) {
     if (!user) {
       return {
         success: false,
-        error: 'Invalid email or password',
+        errorKey: 'invalidCredentials',
       };
     }
 
@@ -111,7 +113,7 @@ export async function login(data: LoginInput) {
     if (!user.passwordHash) {
       return {
         success: false,
-        error: 'Invalid email or password',
+        errorKey: 'invalidCredentials',
       };
     }
 
@@ -123,7 +125,7 @@ export async function login(data: LoginInput) {
     if (!passwordValid) {
       return {
         success: false,
-        error: 'Invalid email or password',
+        errorKey: 'invalidCredentials',
       };
     }
 
@@ -131,7 +133,7 @@ export async function login(data: LoginInput) {
     if (!isAdminCredentials && user.status !== 'ACTIVE') {
       return {
         success: false,
-        error: 'Registration incomplete. Please complete your registration.',
+        errorKey: 'registrationIncomplete',
       };
     }
 
@@ -149,7 +151,7 @@ export async function login(data: LoginInput) {
       if (!consent) {
         return {
           success: false,
-          error: 'Parental consent required. Please complete your registration.',
+          errorKey: 'parentalConsentRequired',
         };
       }
     }
@@ -169,15 +171,9 @@ export async function login(data: LoginInput) {
       role: user.role,
     };
   } catch (error) {
-    if (error instanceof Error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
     return {
       success: false,
-      error: 'Login failed',
+      errorKey: 'loginFailed',
     };
   }
 }

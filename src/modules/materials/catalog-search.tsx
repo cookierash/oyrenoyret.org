@@ -5,7 +5,17 @@ import Link from 'next/link';
 import { PiMagnifyingGlass as SearchIcon, PiX as X } from 'react-icons/pi';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SUBJECTS } from '@/src/config/constants';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { getLocalizedTopicNameMap } from '@/src/i18n/topic-utils';
+import {
+  buildTagIndex,
+  createTagMap,
+  normalizeTagToken,
+  parseTaggedQuery,
+  slugifyTag,
+  TAG_MATCH_REGEX,
+} from '@/src/lib/tagging';
 
 interface CatalogSearchResult {
   id: string;
@@ -26,36 +36,15 @@ interface CatalogSearchProps {
   tagOptions?: { id: string; name: string }[];
 }
 
-function buildTagIndex(options: { id: string; name: string }[]) {
-  return options.map((opt) => ({
-    id: opt.id,
-    slug: opt.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, ''),
-  }));
-}
-
-function parseSearchQuery(raw: string, tagIndex: { id: string; slug: string }[]) {
-  const tags = raw.match(/#[a-z0-9-]+/gi) ?? [];
-  const normalizedTags = tags.map((t) => t.slice(1).toLowerCase());
-  const tagIds = normalizedTags
-    .map((tag) => {
-      const direct = tagIndex.find((s) => s.id === tag || s.slug === tag);
-      return direct?.id ?? null;
-    })
-    .filter((id): id is string => Boolean(id));
-
-  const textQuery = raw.replace(/#[a-z0-9-]+/gi, '').trim();
-  return { tagIds, textQuery };
-}
-
 export function CatalogSearch({
   baseSubjectIds,
   baseTopicIds,
   tagMode = 'subject',
   tagOptions,
 }: CatalogSearchProps) {
+  const { t, messages } = useI18n();
+  const copy = messages.materials.catalogSearch;
+  const authorFallback = messages.materials.authorFallback;
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -64,14 +53,35 @@ export function CatalogSearch({
   const [focused, setFocused] = useState(false);
   const blurTimer = useRef<NodeJS.Timeout | null>(null);
 
+  const localizedSubjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const subjectNameMap = useMemo(
+    () => new Map(localizedSubjects.map((subject) => [subject.id, subject.name])),
+    [localizedSubjects],
+  );
+  const topicNameMap = useMemo(() => getLocalizedTopicNameMap(messages), [messages]);
   const tagSource = useMemo(
     () =>
       tagMode === 'topic'
-        ? tagOptions ?? []
-        : SUBJECTS.map((s) => ({ id: s.id, name: s.name })),
-    [tagMode, tagOptions]
+        ? (tagOptions ?? []).map((option) => ({
+            id: option.id,
+            name: option.name,
+            tag: slugifyTag(option.name),
+            aliases: [],
+          }))
+        : localizedSubjects.map((subject) => ({
+            id: subject.id,
+            name: subject.name,
+            tag: subject.tag,
+            aliases: subject.aliases,
+          })),
+    [tagMode, tagOptions, localizedSubjects],
   );
   const tagIndex = useMemo(() => buildTagIndex(tagSource), [tagSource]);
+  const tagMap = useMemo(() => createTagMap(tagIndex), [tagIndex]);
+  const tagLookup = useMemo(
+    () => new Map(tagIndex.map((entry) => [entry.id, entry])),
+    [tagIndex],
+  );
   const baseIds = useMemo(
     () => baseSubjectIds ?? [],
     [baseSubjectIds ? baseSubjectIds.join(',') : '']
@@ -81,13 +91,13 @@ export function CatalogSearch({
     [baseTopicIds ? baseTopicIds.join(',') : '']
   );
   const tagMatch = useMemo(() => {
-    const matches = Array.from(query.matchAll(/(?:^|\s)#([a-z0-9-]*)/gi));
+    const matches = Array.from(query.matchAll(TAG_MATCH_REGEX));
     return matches.length ? matches[matches.length - 1] : null;
   }, [query]);
-  const tagQuery = tagMatch?.[1]?.toLowerCase() ?? '';
+  const tagQuery = tagMatch?.[1] ? normalizeTagToken(tagMatch[1]) : '';
   const { tagIds, textQuery } = useMemo(
-    () => parseSearchQuery(query, tagIndex),
-    [query, tagIndex]
+    () => parseTaggedQuery(query, tagMap),
+    [query, tagMap],
   );
   const effectiveSubjectIds = useMemo(() => {
     if (tagMode === 'subject') {
@@ -105,16 +115,17 @@ export function CatalogSearch({
 
   const tagSuggestions = useMemo(() => {
     if (!tagMatch) return [];
-    return tagSource
-      .filter((opt) => {
+    return tagIndex
+      .filter((entry) => {
         if (!tagQuery) return true;
         return (
-          opt.id.includes(tagQuery) ||
-          opt.name.toLowerCase().includes(tagQuery)
+          entry.tokens.some((token) => token.includes(tagQuery)) ||
+          normalizeTagToken(entry.name).includes(tagQuery)
         );
       })
-      .slice(0, 8);
-  }, [tagMatch, tagQuery, tagSource]);
+      .slice(0, 8)
+      .map((entry) => ({ id: entry.id, name: entry.name, tag: entry.tag }));
+  }, [tagMatch, tagQuery, tagIndex]);
 
   const showTagSuggestions = Boolean(tagMatch) && tagSuggestions.length > 0;
 
@@ -185,12 +196,8 @@ export function CatalogSearch({
   const showMenu = focused && query.trim().length > 0 && !showTagSuggestions;
 
   const isTopicMode = tagMode === 'topic';
-  const placeholder = isTopicMode
-    ? 'Search materials or use #topic (e.g., #fractions)'
-    : 'Search materials or use #subject (e.g., #mathematics)';
-  const helperText = isTopicMode
-    ? 'Filter by topic with #topic, like #fractions or #linear-equations.'
-    : 'Filter by subject with #subject, like #physics or #azerbaijani-language.';
+  const placeholder = isTopicMode ? copy.placeholderTopic : copy.placeholderSubject;
+  const helperText = isTopicMode ? copy.helperTopic : copy.helperSubject;
 
   return (
     <div className="space-y-2">
@@ -214,32 +221,32 @@ export function CatalogSearch({
             }}
             className="rounded-r-none"
             placeholder={placeholder}
-            aria-label="Search materials by title, subject, or topic"
+            aria-label={copy.searchLabel}
           />
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded-r-md border border-l-0 border-input bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
-            aria-label="Search materials"
+            aria-label={copy.searchButtonLabel}
           >
             <SearchIcon className="h-4 w-4" />
-            Search
+            {copy.searchButton}
           </button>
         </div>
         {selectedTags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {selectedTags.map((tagId) => {
-              const tag = tagSource.find((s) => s.id === tagId);
+              const tag = tagLookup.get(tagId);
               return (
                 <span
                   key={tagId}
                   className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-1 text-xs font-medium text-foreground"
                 >
-                  #{tagId}
+                  #{tag?.tag ?? tagId}
                   <button
                     type="button"
                     className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
                     onClick={() => removeTag(tagId)}
-                    aria-label={`Remove ${tag?.name ?? tagId}`}
+                    aria-label={t('materials.catalogSearch.removeTag', { tag: tag?.name ?? tagId })}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -252,7 +259,7 @@ export function CatalogSearch({
         {showTagSuggestions ? (
           <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-md border border-border bg-background shadow-sm">
             <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
-              {tagMode === 'topic' ? 'Topics' : 'Subjects'}
+              {tagMode === 'topic' ? copy.tagHeaderTopic : copy.tagHeaderSubject}
             </div>
             <div className="max-h-56 overflow-y-auto py-1">
               {tagSuggestions.map((tag) => (
@@ -264,12 +271,12 @@ export function CatalogSearch({
                   onClick={() => applyTag(tag.id)}
                 >
                   <div className="min-w-0">
-                    <div className="font-medium">#{tag.id}</div>
+                    <div className="font-medium">#{tag.tag}</div>
                     <div className="text-xs text-muted-foreground">{tag.name}</div>
                   </div>
                   {selectedTags.includes(tag.id) ? (
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                      Added
+                      {copy.added}
                     </span>
                   ) : null}
                 </button>
@@ -295,7 +302,7 @@ export function CatalogSearch({
                 </div>
               ) : results.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  No results yet.
+                  {copy.noResults}
                 </div>
               ) : (
                 <ul className="py-2">
@@ -311,12 +318,14 @@ export function CatalogSearch({
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                             <span className="truncate">
-                              {item.subjectName} · {item.topicName}
+                              {subjectNameMap.get(item.subjectId) ?? item.subjectName} · {topicNameMap.get(`${item.subjectId}:${item.topicId}`) ?? item.topicName}
                             </span>
                             <span className="h-1 w-1 rounded-full bg-border" />
-                            <span>{item.materialType === 'PRACTICE_TEST' ? 'Practice test' : 'Notes'}</span>
+                            <span>{item.materialType === 'PRACTICE_TEST' ? copy.practiceTest : copy.notes}</span>
                             <span className="h-1 w-1 rounded-full bg-border" />
-                            <span className="truncate">by {item.authorName}</span>
+                            <span className="truncate">
+                              {copy.by} {item.authorName === 'Student' || !item.authorName ? authorFallback : item.authorName}
+                            </span>
                           </div>
                         </div>
                       </Link>

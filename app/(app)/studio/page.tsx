@@ -20,11 +20,14 @@ import {
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
 import { PiFileText as FileText, PiClipboardText as ClipboardList } from 'react-icons/pi';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 export default function StudioPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const router = useRouter();
+  const { messages } = useI18n();
+  const copy = messages.studio.page;
 
   const refreshList = () => setRefreshKey((k) => k + 1);
 
@@ -33,13 +36,13 @@ export default function StudioPage() {
       <PageHeader
         title={
           <span className="lowercase">
-            <span className="font-comfortaa">oyrenoyret</span> studio
+            <span className="font-comfortaa">oyrenoyret</span> {copy.titleSuffix}
           </span>
         }
-        description="Create and publish learning materials. Materials appear under topics in the catalog."
+        description={copy.description}
         actions={
           <Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>
-            Create new material
+            {copy.createButton}
           </Button>
         }
       />
@@ -51,10 +54,8 @@ export default function StudioPage() {
       <AlertDialog open={showCreateModal} onOpenChange={setShowCreateModal}>
         <AlertDialogContent className="overflow-hidden">
           <AlertDialogHeader>
-            <AlertDialogTitle>Create new material</AlertDialogTitle>
-            <AlertDialogDescription>
-              Choose the type of material you want to create. You can edit and publish it later.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{copy.createDialogTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{copy.createDialogDescription}</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <button
@@ -69,9 +70,9 @@ export default function StudioPage() {
                 <FileText className="h-8 w-8 text-muted-foreground group-hover:text-primary" />
               </div>
               <div className="space-y-0.5 text-center">
-                <span className="block font-medium">Textual document</span>
+                <span className="block font-medium">{copy.optionTextTitle}</span>
                 <span className="block text-xs text-muted-foreground">
-                  Notes, summaries, study guides
+                  {copy.optionTextDescription}
                 </span>
               </div>
             </button>
@@ -87,9 +88,9 @@ export default function StudioPage() {
                 <ClipboardList className="h-8 w-8 text-muted-foreground group-hover:text-primary" />
               </div>
               <div className="space-y-0.5 text-center">
-                <span className="block font-medium">Practice test</span>
+                <span className="block font-medium">{copy.optionPracticeTitle}</span>
                 <span className="block text-xs text-muted-foreground">
-                  Multiple-choice questions
+                  {copy.optionPracticeDescription}
                 </span>
               </div>
             </button>

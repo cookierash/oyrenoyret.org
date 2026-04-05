@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectItem } from '@/components/ui/select';
 import { PiBookOpen as BookOpen, PiMagnifyingGlass as Search } from 'react-icons/pi';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocaleCode } from '@/src/i18n';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 
 interface PurchasedMaterial {
     purchasedAt: string;
@@ -23,13 +26,6 @@ interface PurchasedMaterial {
 
 type SortOption = 'newest' | 'oldest' | 'az' | 'za';
 
-const SORT_LABELS: Record<SortOption, string> = {
-    newest: 'Newest first',
-    oldest: 'Oldest first',
-    az: 'A → Z',
-    za: 'Z → A',
-};
-
 const DIFFICULTY_COLORS: Record<string, string> = {
     BASIC: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400',
     INTERMEDIATE: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-500/10 dark:text-yellow-400',
@@ -41,6 +37,17 @@ export default function MyMaterialsPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [sort, setSort] = useState<SortOption>('newest');
+    const { locale, t, messages } = useI18n();
+    const copy = messages.app.library;
+    const subjectNameMap = useMemo(
+        () => new Map(getLocalizedSubjects(messages).map((subject) => [subject.id, subject.name])),
+        [messages],
+    );
+    const countLabel = (count: number) =>
+        count === 1
+            ? t('app.library.countSingle', { count })
+            : t('app.library.countPlural', { count });
+    const SORT_LABELS: Record<SortOption, string> = copy.sortOptions;
 
     useEffect(() => {
         fetch('/api/materials/my-purchases')
@@ -61,7 +68,8 @@ export default function MyMaterialsPage() {
             list = list.filter(
                 (m) =>
                     m.material.title.toLowerCase().includes(q) ||
-                    m.material.subjectId.toLowerCase().includes(q),
+                    m.material.subjectId.toLowerCase().includes(q) ||
+                    (subjectNameMap.get(m.material.subjectId) ?? '').toLowerCase().includes(q),
             );
         }
 
@@ -75,13 +83,13 @@ export default function MyMaterialsPage() {
         });
 
         return list;
-    }, [materials, search, sort]);
+    }, [materials, search, sort, subjectNameMap]);
 
     return (
         <DashboardShell>
         <PageHeader
-            title="Library"
-            description="All materials you have purchased."
+            title={copy.title}
+            description={copy.description}
         />
 
         <main className="space-y-4 pt-2">
@@ -112,23 +120,23 @@ export default function MyMaterialsPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                             <Input
                                 type="search"
-                                placeholder="Search materials..."
+                                placeholder={copy.searchPlaceholder}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="w-full pl-9"
-                                aria-label="Search materials by title or subject"
+                                aria-label={copy.searchLabel}
                             />
                         </div>
                         <div className="flex items-center gap-2">
                             <label htmlFor="library-sort" className="text-sm text-muted-foreground whitespace-nowrap">
-                                Sort by
+                                {copy.sortBy}
                             </label>
                             <Select
                                 id="library-sort"
                                 value={sort}
                                 onChange={(e) => setSort(e.target.value as SortOption)}
                                 className="w-[180px]"
-                                aria-label="Sort materials"
+                                aria-label={copy.sortLabel}
                             >
                                 {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
                                     <SelectItem key={key} value={key}>
@@ -145,18 +153,20 @@ export default function MyMaterialsPage() {
                             <BookOpen className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
                             {search ? (
                                 <>
-                                    <p className="text-sm text-muted-foreground font-medium">No results for &quot;{search}&quot;</p>
-                                    <p className="text-xs text-muted-foreground/60 mt-1">Try a different search term.</p>
+                                    <p className="text-sm text-muted-foreground font-medium">
+                                        {t('app.library.emptyResults', { query: search })}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground/60 mt-1">{copy.emptyHint}</p>
                                 </>
                             ) : (
                                 <>
-                                    <p className="text-sm text-muted-foreground font-medium">No materials purchased yet.</p>
+                                    <p className="text-sm text-muted-foreground font-medium">{copy.emptyMaterials}</p>
                                     <p className="text-xs text-muted-foreground/60 mt-1">
-                                        Browse the{' '}
+                                        {copy.browseStart}
                                         <Link href="/catalog" className="text-primary underline underline-offset-2">
-                                            catalog
+                                            {copy.browseLink}
                                         </Link>{' '}
-                                        to find materials.
+                                        {copy.browseEnd}
                                     </p>
                                 </>
                             )}
@@ -164,8 +174,8 @@ export default function MyMaterialsPage() {
                     ) : (
                         <div className="space-y-3">
                             <p className="text-xs text-muted-foreground">
-                                {filtered.length} material{filtered.length !== 1 ? 's' : ''}
-                                {search && ` matching "${search}"`}
+                                {countLabel(filtered.length)}
+                                {search ? t('app.library.matching', { query: search }) : null}
                             </p>
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {filtered.map(({ material, purchasedAt }) => (
@@ -185,27 +195,29 @@ export default function MyMaterialsPage() {
                                                         : 'text-blue-600 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400'
                                                         }`}
                                                 >
-                                                    {material.materialType === 'PRACTICE_TEST' ? 'Test' : 'Textual'}
+                                                    {material.materialType === 'PRACTICE_TEST'
+                                                        ? copy.testLabel
+                                                        : copy.textualLabel}
                                                 </span>
                                             </div>
                                         </div>
 
                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                             <span className="capitalize">
-                                                {material.subjectId.replace(/-/g, ' ')}
+                                                {subjectNameMap.get(material.subjectId) ?? material.subjectId}
                                             </span>
                                             {material.difficulty && (
                                                 <span
                                                     className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${DIFFICULTY_COLORS[material.difficulty]}`}
                                                 >
-                                                    {material.difficulty.charAt(0) + material.difficulty.slice(1).toLowerCase()}
+                                                    {copy.difficulty[material.difficulty]}
                                                 </span>
                                             )}
                                         </div>
 
                                         <p className="text-[11px] text-muted-foreground/60 mt-auto">
-                                            Purchased{' '}
-                                            {new Date(purchasedAt).toLocaleDateString('en-US', {
+                                            {copy.purchased}{' '}
+                                            {new Date(purchasedAt).toLocaleDateString(getLocaleCode(locale), {
                                                 month: 'short',
                                                 day: 'numeric',
                                                 year: 'numeric',

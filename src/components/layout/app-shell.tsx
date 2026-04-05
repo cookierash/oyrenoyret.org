@@ -13,6 +13,7 @@ import { LiveAnnouncementsList } from '@/src/modules/live-activities/live-announ
 import { Logo } from '@/src/components/ui/logo';
 import { WelcomeTour } from '@/src/modules/onboarding/welcome-tour';
 import { cn } from '@/src/lib/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface AppShellProps {
   children: ReactNode;
@@ -28,8 +29,14 @@ interface AppShellProps {
   showTutorial?: boolean;
 }
 
-export function AppShell({ children, displayName, user, showTutorial = false }: AppShellProps) {
+export function AppShell({
+  children,
+  displayName,
+  user,
+  showTutorial = false,
+}: AppShellProps) {
   const pathname = usePathname();
+  const { t } = useI18n();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(showTutorial);
   const tutorialCompleteRef = useRef(false);
@@ -74,7 +81,7 @@ export function AppShell({ children, displayName, user, showTutorial = false }: 
             type="button"
             onClick={() => setMobileNavOpen(true)}
             className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-muted/70"
-            aria-label="Open navigation"
+            aria-label={t('header.toggleMenu')}
           >
             <Menu className="h-4 w-4" />
           </button>
@@ -97,7 +104,7 @@ export function AppShell({ children, displayName, user, showTutorial = false }: 
                     ) : (
                       <Megaphone className="h-4 w-4 text-muted-foreground" />
                     )}
-                    {isDiscussionsRoute ? 'Trending discussions' : 'Announcements'}
+                    {isDiscussionsRoute ? t('discussions.trendingTitle') : t('sidebar.announcements')}
                 </div>
                   <div className="h-px w-full bg-border/70" />
                   <div className="p-4">
@@ -139,7 +146,7 @@ export function AppShell({ children, displayName, user, showTutorial = false }: 
             mobileNavOpen ? 'opacity-100' : 'opacity-0',
           )}
           onClick={() => setMobileNavOpen(false)}
-          aria-label="Close navigation"
+          aria-label={t('header.closeNavigation')}
           tabIndex={mobileNavOpen ? 0 : -1}
         />
         <div

@@ -14,11 +14,15 @@ import { PracticeTestEditor } from '@/src/modules/materials/practice-test-editor
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PiArrowLeft as ArrowLeft, PiFileText as FileText, PiClipboardText as ClipboardList } from 'react-icons/pi';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 export default function EditMaterialPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const { messages } = useI18n();
+  const editCopy = messages.studio.edit;
+  const badge = messages.studio.headerBadge;
   const [material, setMaterial] = useState<{
     id: string;
     subjectId: string;
@@ -58,17 +62,17 @@ export default function EditMaterialPage() {
 
   const isPracticeTest = material?.materialType === 'PRACTICE_TEST';
   const HeaderIcon = isPracticeTest ? ClipboardList : FileText;
-  const headerTitle = isPracticeTest ? 'Edit practice test' : 'Edit textual material';
+  const headerTitle = isPracticeTest ? editCopy.titlePractice : editCopy.titleText;
   const headerDescription = isPracticeTest
-    ? 'Update questions, difficulty, and objectives. Publish changes when ready.'
-    : 'Refine your lesson content, structure, and objectives, then publish updates.';
+    ? editCopy.descriptionPractice
+    : editCopy.descriptionText;
 
   const renderHeader = (title: string, description: string) => (
     <header className="border-b border-border bg-background flex-shrink-0">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1.5">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Studio
+            {badge}
           </div>
           <div className="flex items-center gap-2">
             <HeaderIcon className="h-5 w-5 text-primary" />
@@ -80,14 +84,14 @@ export default function EditMaterialPage() {
             {description}
           </p>
         </div>
-        <Button variant="secondary-primary" size="sm" asChild>
-          <Link href="/studio">
-            <ArrowLeft className="h-4 w-4" />
-            Back to studio
-          </Link>
-        </Button>
-      </div>
-    </header>
+          <Button variant="secondary-primary" size="sm" asChild>
+            <Link href="/studio">
+              <ArrowLeft className="h-4 w-4" />
+              {messages.studio.newDocument.back}
+            </Link>
+          </Button>
+        </div>
+      </header>
   );
 
   if (loading) {
@@ -121,9 +125,9 @@ export default function EditMaterialPage() {
   if (error || !material) {
     return (
       <div className="flex flex-col h-full">
-        {renderHeader('Material not found', 'Return to the studio to view your materials.')}
+        {renderHeader(editCopy.notFoundTitle, editCopy.notFoundDescription)}
         <main className="flex-1 flex items-center justify-center">
-          <p className="text-muted-foreground">Document not found.</p>
+          <p className="text-muted-foreground">{editCopy.notFoundShort}</p>
         </main>
       </div>
     );

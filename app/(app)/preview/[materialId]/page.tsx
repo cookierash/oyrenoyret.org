@@ -10,12 +10,14 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { SUBJECTS } from '@/src/config/constants';
-import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { prisma } from '@/src/db/client';
 import { MaterialDetailView } from '@/src/modules/materials/material-detail-view';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { getBalance, calcMaterialUnlockCost, roundCredits } from '@/src/modules/credits';
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
+import { getI18n } from '@/src/i18n/server';
+import { getLocalizedSubject } from '@/src/i18n/subject-utils';
+import { getLocalizedTopicName } from '@/src/i18n/topic-utils';
 
 interface PreviewPageProps {
   params: Promise<{ materialId: string }>;
@@ -23,6 +25,10 @@ interface PreviewPageProps {
 
 export default async function PreviewPage({ params }: PreviewPageProps) {
   const { materialId } = await params;
+  const { messages } = await getI18n();
+  const catalogCopy = messages.app.catalog;
+  const libraryCopy = messages.app.library;
+  const authorFallback = messages.materials.authorFallback;
 
   const material = await prisma.material.findFirst({
     where: {
@@ -55,10 +61,10 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
 
   const subject = SUBJECTS.find((s) => s.id === material.subjectId);
   if (!subject) notFound();
+  const localizedSubject = getLocalizedSubject(messages, subject.id) ?? subject;
 
-  const topics = CURRICULUM_TOPICS[subject.id as keyof typeof CURRICULUM_TOPICS];
-  const topic = topics?.find((t) => t.id === material.topicId);
-  if (!topic) notFound();
+  const topicName = getLocalizedTopicName(messages, subject.id, material.topicId);
+  if (!topicName) notFound();
 
   const userId = await getCurrentSession();
   const isOwn = userId !== null && material.userId === userId;
@@ -96,17 +102,17 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
   );
 
   const authorName =
-    [material.user.firstName, material.user.lastName].filter(Boolean).join(' ') || 'Student';
+    [material.user.firstName, material.user.lastName].filter(Boolean).join(' ') || authorFallback;
 
   return (
     <DashboardShell>
       <PageHeader
         title={material.title}
-        description={`${topic.name} · ${subject.name}`}
+        description={`${topicName} · ${localizedSubject.name}`}
         actions={
           <Button size="sm" variant="secondary-primary" asChild>
             <Link href={hasAccess ? '/library' : '/catalog'}>
-              {hasAccess ? 'Back to library' : 'Back to catalog'}
+              {hasAccess ? libraryCopy.backToLibrary : catalogCopy.backToCatalog}
             </Link>
           </Button>
         }

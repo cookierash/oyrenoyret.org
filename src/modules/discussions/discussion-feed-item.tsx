@@ -7,6 +7,7 @@ import { formatRelativeTime } from './relative-time';
 import { cn } from '@/src/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface DiscussionFeedItemProps {
     id: string;
@@ -36,6 +37,8 @@ export function DiscussionFeedItem({
     const [score, setScore] = useState(initialScore);
     const [userVote, setUserVote] = useState<1 | -1 | null>(initialUserVote);
     const [voteLoading, setVoteLoading] = useState(false);
+    const { locale, messages } = useI18n();
+    const copy = messages.discussions.feedItem;
 
     const handleVote = async (e: React.MouseEvent, value: 1 | -1) => {
         e.preventDefault();
@@ -56,7 +59,7 @@ export function DiscussionFeedItem({
             // revert
             setScore((s) => s - delta);
             setUserVote(userVote);
-            toast.error('Failed to vote');
+            toast.error(copy.voteFailed);
         } finally {
             setVoteLoading(false);
         }
@@ -74,7 +77,7 @@ export function DiscussionFeedItem({
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className="font-semibold text-foreground text-sm">{authorName}</span>
                     <span className="opacity-40">·</span>
-                    <span>{formatRelativeTime(createdAt)}</span>
+                    <span>{formatRelativeTime(createdAt, locale)}</span>
                 </div>
 
                 {/* Title + preview */}

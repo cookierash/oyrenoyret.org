@@ -86,16 +86,18 @@ export async function issueRegistrationToken(userId: string): Promise<string> {
   return token;
 }
 
-export async function requireRegistrationToken(userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function requireRegistrationToken(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; errorKey: 'registrationSessionExpired' | 'registrationSessionInvalid' }> {
   const cookieStore = await cookies();
   const token = cookieStore.get(REGISTRATION_TOKEN_COOKIE)?.value;
   if (!token) {
-    return { ok: false, error: 'Registration session expired. Please restart registration.' };
+    return { ok: false, errorKey: 'registrationSessionExpired' };
   }
 
   const payload = decodePayload(token);
   if (!payload || payload.userId !== userId) {
-    return { ok: false, error: 'Registration session is invalid or expired. Please restart registration.' };
+    return { ok: false, errorKey: 'registrationSessionInvalid' };
   }
 
   return { ok: true };

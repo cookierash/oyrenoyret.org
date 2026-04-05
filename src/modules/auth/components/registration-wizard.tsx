@@ -14,6 +14,7 @@ import { Step4Consent } from '../steps/step-4-consent';
 import { Step5Complete } from '../steps/step-5-complete';
 import { cn } from '@/src/lib/utils';
 import type { ConsentInput, ParentInfoInput, StudentInfoInput } from '../schemas/registration';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 const TOTAL_STEPS = 4;
 const REGISTRATION_STORAGE_KEY = 'oyrenoyret_registration_progress_v1';
@@ -26,6 +27,8 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
   const [step1Values, setStep1Values] = useState<Partial<StudentInfoInput>>({});
   const [step2Values, setStep2Values] = useState<Partial<ParentInfoInput>>({});
   const [step4Values, setStep4Values] = useState<Partial<ConsentInput>>({});
+  const { messages } = useI18n();
+  const copy = messages.auth.registrationWizard;
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -111,28 +114,28 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
   const getStepTitle = () => {
     switch (currentStep) {
       case 1:
-        return 'Create your learning profile';
+        return copy.titles.step1;
       case 2:
-        return 'Add a trusted adult';
+        return copy.titles.step2;
       case 3:
-        return 'Review parental consent';
+        return copy.titles.step3;
       case 4:
-        return 'You are ready to start';
+        return copy.titles.step4;
       default:
-        return 'Registration';
+        return copy.titles.fallback;
     }
   };
 
   const getStepDescription = () => {
     switch (currentStep) {
       case 1:
-        return 'We use this to personalise your journey and keep your progress safe.';
+        return copy.descriptions.step1;
       case 2:
-        return 'We need a parent or legal guardian so everyone stays informed.';
+        return copy.descriptions.step2;
       case 3:
-        return 'Your parent or guardian confirms how we can use and protect your data.';
+        return copy.descriptions.step3;
       case 4:
-        return 'Your account is active. You can now explore lessons and activities.';
+        return copy.descriptions.step4;
       default:
         return '';
     }

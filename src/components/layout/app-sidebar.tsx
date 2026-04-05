@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiBookOpen as BookOpen, PiBooks as Library, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck } from 'react-icons/pi';
+import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiBookOpen as BookOpen, PiBooks as Library, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiPalette as Palette, PiTranslate as Translate } from 'react-icons/pi';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
 import { Logo } from '@/src/components/ui/logo';
-import { ThemeToggle } from '@/src/components/theme-toggle';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn } from '@/src/lib/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface AppSidebarProps {
   user: {
@@ -23,28 +23,56 @@ interface AppSidebarProps {
   onClose?: () => void;
 }
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/studio', label: 'oyrenoyret studio', icon: Sparkles, isBrand: true },
-  { href: '/catalog', label: 'Catalog', icon: BookOpen },
-  { href: '/library', label: 'Library', icon: Library },
-  { href: '/live-activities', label: 'Live Activities', icon: CalendarDays },
-  { href: '/discussions', label: 'Discussions', icon: MessageSquare },
-  { href: '/recent-activities', label: 'Recent Activities', icon: Receipt },
-  { href: '/academic-record', label: 'Academic record', icon: GraduationCap },
-];
-
 import { CREDITS_UPDATED_EVENT } from '@/src/lib/credits-events';
 
 export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useI18n();
   const [credits, setCredits] = useState<number | null>(user.credits ?? null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [logoutPending, setLogoutPending] = useState(false);
   const lastBalanceFetchRef = useRef(0);
   const fetchInFlightRef = useRef(false);
   const isStaff = user.role === 'ADMIN' || user.role === 'TEACHER';
+  const isSettingsRoute = pathname === '/settings' || pathname.startsWith('/settings/');
+  const settingsNavSections = [
+    {
+      title: t('settings.nav.userSettings'),
+      items: [
+        {
+          href: '/settings/my-account',
+          label: t('settings.nav.myAccount'),
+          icon: UserCircle,
+        },
+      ],
+    },
+    {
+      title: t('settings.nav.appSettings'),
+      items: [
+        {
+          href: '/settings/appearance',
+          label: t('settings.nav.appearance'),
+          icon: Palette,
+        },
+        {
+          href: '/settings/language-time',
+          label: t('settings.nav.languageTime'),
+          icon: Translate,
+        },
+      ],
+    },
+  ];
+  const navItems = [
+    { href: '/dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard },
+    { href: '/studio', label: t('sidebar.studio'), icon: Sparkles, isBrand: true },
+    { href: '/catalog', label: t('sidebar.catalog'), icon: BookOpen },
+    { href: '/library', label: t('sidebar.library'), icon: Library },
+    { href: '/live-activities', label: t('sidebar.liveActivities'), icon: CalendarDays },
+    { href: '/discussions', label: t('sidebar.discussions'), icon: MessageSquare },
+    { href: '/recent-activities', label: t('sidebar.recentActivities'), icon: Receipt },
+    { href: '/academic-record', label: t('sidebar.academicRecord'), icon: GraduationCap },
+  ];
 
   const fetchBalance = useCallback(async (force = false) => {
     if (fetchInFlightRef.current) return;
@@ -111,13 +139,14 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     if (logoutPending) return;
     setLogoutPending(true);
     setProfileMenuOpen(false);
+    onClose?.();
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } finally {
       router.replace('/');
       router.refresh();
     }
-  }, [logoutPending, router]);
+  }, [logoutPending, onClose, router]);
 
   return (
     <aside
@@ -126,182 +155,245 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
         className,
       )}
     >
-      <div className="flex h-14 items-center justify-between border-b border-border px-4">
-        <Logo size="sm" showText />
-        <div className="flex items-center gap-2">
-          <ThemeToggle className="h-8 w-8 shrink-0" />
-          {onClose ? (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close navigation"
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          ) : null}
-        </div>
+      <div className="flex h-14 items-center border-b border-border px-4">
+        {isSettingsRoute ? (
+          <div className="relative flex w-full items-center justify-center">
+            <div className="flex items-center gap-2">
+              <Logo size="sm" showText textSize="sm" />
+              <span className="text-[11px] font-semibold text-foreground tracking-tight whitespace-nowrap">
+                {t('settings.nav.settings')}
+              </span>
+            </div>
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t('header.closeNavigation')}
+                className="absolute right-0 flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <Logo size="sm" showText />
+            <div className="ml-auto flex items-center gap-2">
+              {onClose ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={t('header.closeNavigation')}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
 
-      <nav className="flex-1 space-y-0.5 p-2">
-        {!isStaff
-          ? navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                isActive
-                  ? 'bg-muted text-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {item.isBrand ? (
-                <span className="lowercase">
-                  <span className="font-comfortaa">oyrenoyret</span> studio
-                </span>
-              ) : (
-                item.label
-              )}
-            </Link>
-          );
-        })
-          : null}
-        {isStaff ? (
-          <div className="space-y-0.5">
-            <Link
-              href="/admin/dashboard"
-              className={cn(
-                'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                pathname === '/admin/dashboard'
-                  ? 'bg-muted text-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-              )}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Dashboard
-            </Link>
-            <Link
-              href="/admin/live-activities"
-              className={cn(
-                'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                pathname.startsWith('/admin/live-activities')
-                  ? 'bg-muted text-foreground font-medium'
-                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-              )}
-            >
-              <ShieldCheck className="h-4 w-4" />
-              Manage live activities
-            </Link>
-            <div className="ml-6 space-y-0.5">
-              <Link
-                href="/admin/live-activities/problem-sprints"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                  pathname === '/admin/live-activities/problem-sprints'
-                    ? 'bg-muted text-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                )}
-              >
-                <CalendarDays className="h-4 w-4" />
-                Problem Sprint
-              </Link>
-              <Link
-                href="/admin/live-activities/announcements"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                  pathname === '/admin/live-activities/announcements'
-                    ? 'bg-muted text-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                )}
-              >
-                <MessageSquare className="h-4 w-4" />
-                Announcements
-              </Link>
-              <Link
-                href="/admin/live-activities/events"
-                className={cn(
-                  'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                  pathname === '/admin/live-activities/events'
-                    ? 'bg-muted text-foreground font-medium'
-                    : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                )}
-              >
-                <Sparkles className="h-4 w-4" />
-                Events
-              </Link>
-            </div>
+      <nav className={cn('flex-1', isSettingsRoute ? 'space-y-6 p-3' : 'space-y-0.5 p-2')}>
+        {isSettingsRoute ? (
+          <div className="space-y-6">
+            {settingsNavSections.map((section) => (
+              <div key={section.title} className="space-y-2">
+                <p className="px-3 text-xs font-semibold text-muted-foreground">
+                  {section.title}
+                </p>
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => onClose?.()}
+                        className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
-        ) : null}
+        ) : (
+          <>
+            {!isStaff
+              ? navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                      isActive
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.isBrand ? (
+                      <span className="lowercase">
+                        <span className="font-comfortaa">oyrenoyret</span> studio
+                      </span>
+                    ) : (
+                      item.label
+                    )}
+                  </Link>
+                );
+              })
+              : null}
+            {isStaff ? (
+              <div className="space-y-0.5">
+                <Link
+                  href="/admin/dashboard"
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                    pathname === '/admin/dashboard'
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  )}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {t('sidebar.adminDashboard')}
+                </Link>
+                <Link
+                  href="/admin/live-activities"
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                    pathname.startsWith('/admin/live-activities')
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  )}
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  {t('sidebar.manageLive')}
+                </Link>
+                <div className="ml-6 space-y-0.5">
+                  <Link
+                    href="/admin/live-activities/problem-sprints"
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                      pathname === '/admin/live-activities/problem-sprints'
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                    )}
+                  >
+                    <CalendarDays className="h-4 w-4" />
+                    {t('sidebar.problemSprint')}
+                  </Link>
+                  <Link
+                    href="/admin/live-activities/announcements"
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                      pathname === '/admin/live-activities/announcements'
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                    )}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    {t('sidebar.announcements')}
+                  </Link>
+                  <Link
+                    href="/admin/live-activities/events"
+                    className={cn(
+                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                      pathname === '/admin/live-activities/events'
+                        ? 'bg-muted text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                    )}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {t('sidebar.events')}
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
       </nav>
 
-      {!isStaff ? (
+      {!isStaff && !isSettingsRoute ? (
         <div className="px-2 pb-3">
           <div className="w-full rounded-md border border-primary/20 bg-primary/10 px-3 py-2">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
-              Credits
+              {t('sidebar.creditsLabel')}
             </p>
             <p className="mt-1 text-sm font-semibold text-primary">
-              {Math.round(Number(displayCredits))} credits
+              {t('sidebar.creditsValue', { count: Math.round(Number(displayCredits)) })}
             </p>
           </div>
         </div>
       ) : null}
 
       <div className="border-t border-border px-2 py-3">
-        <HoverCard
-          openDelay={10}
-          closeDelay={100}
-          open={profileMenuOpen}
-          onOpenChange={setProfileMenuOpen}
-        >
-          <HoverCardTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/70"
+        {isSettingsRoute ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={logoutPending}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <LogOut className="h-4 w-4" />
+            {logoutPending ? t('settings.nav.loggingOut') : t('settings.nav.logOut')}
+          </button>
+        ) : (
+          <HoverCard
+            openDelay={10}
+            closeDelay={100}
+            open={profileMenuOpen}
+            onOpenChange={setProfileMenuOpen}
+          >
+            <HoverCardTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/70"
+                onMouseEnter={() => setProfileMenuOpen(true)}
+                onMouseLeave={() => setProfileMenuOpen(false)}
+                onClick={() => setProfileMenuOpen((open) => !open)}
+              >
+                <ProfileAvatar
+                  userId={user.id}
+                  firstName={user.firstName}
+                  lastName={user.lastName}
+                  size="sm"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-medium text-foreground">
+                    {user.firstName || user.email.split('@')[0]}
+                  </p>
+                  <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>
+                </div>
+              </button>
+            </HoverCardTrigger>
+            <HoverCardContent
+              side="top"
+              align="start"
+              forceMount
+              sideOffset={4}
+              className={cn(
+                'relative origin-bottom-left w-[var(--radix-hover-card-trigger-width)] bg-background p-1.5 shadow-sm transition-all duration-240 ease-in-out will-change-[opacity,transform] after:absolute after:left-0 after:top-full after:h-2 after:w-full after:content-[\"\"]',
+                profileMenuOpen
+                  ? 'opacity-100 translate-y-0 scale-100'
+                  : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.97]',
+              )}
               onMouseEnter={() => setProfileMenuOpen(true)}
               onMouseLeave={() => setProfileMenuOpen(false)}
-              onClick={() => setProfileMenuOpen((open) => !open)}
             >
-              <ProfileAvatar
-                userId={user.id}
-                firstName={user.firstName}
-                lastName={user.lastName}
-                size="sm"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-foreground">
-                  {user.firstName || user.email.split('@')[0]}
-                </p>
-                <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>
-              </div>
-            </button>
-          </HoverCardTrigger>
-          <HoverCardContent
-            side="top"
-            align="start"
-            forceMount
-            sideOffset={4}
-            className={cn(
-              'relative origin-bottom-left w-[var(--radix-hover-card-trigger-width)] bg-background p-1.5 shadow-sm transition-all duration-240 ease-in-out will-change-[opacity,transform] after:absolute after:left-0 after:top-full after:h-2 after:w-full after:content-[\"\"]',
-              profileMenuOpen
-                ? 'opacity-100 translate-y-0 scale-100'
-                : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.97]',
-            )}
-            onMouseEnter={() => setProfileMenuOpen(true)}
-            onMouseLeave={() => setProfileMenuOpen(false)}
-          >
-            <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-1">
               <Link
                 href="/settings"
                 className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/70"
               >
                 <Settings className="h-4 w-4" />
-                Settings
+                {t('settings.nav.settings')}
               </Link>
               <button
                 type="button"
@@ -310,11 +402,12 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <LogOut className="h-4 w-4" />
-                {logoutPending ? 'Logging out...' : 'Log out'}
+                {logoutPending ? t('settings.nav.loggingOut') : t('settings.nav.logOut')}
               </button>
-            </div>
-          </HoverCardContent>
-        </HoverCard>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+        )}
       </div>
     </aside>
   );

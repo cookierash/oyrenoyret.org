@@ -8,7 +8,7 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { studentInfoSchema, type StudentInfoInput } from '../schemas/registration';
+import { createStudentInfoSchema, type StudentInfoInput } from '../schemas/registration';
 import { registerStudentInfo } from '../actions/registration';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +21,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { cn } from '@/src/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PasswordInput } from '@/src/modules/auth/components/password-input';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { resolveAuthError } from '@/src/modules/auth/utils/resolve-auth-error';
 
 interface Step1Props {
   onSuccess: (userId: string, firstName: string) => void;
@@ -37,9 +39,14 @@ const INPUT_CLASS = 'h-10 rounded-lg bg-background/70';
 
 export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: Step1Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t, messages } = useI18n();
+  const copy = messages.auth.steps.studentInfo;
+  const placeholders = messages.auth.placeholders;
+  const validation = messages.auth.validation;
+  const validationSchema = useMemo(() => createStudentInfoSchema(validation), [validation]);
 
   const form = useForm<StudentInfoInput>({
-    resolver: zodResolver(studentInfoSchema),
+    resolver: zodResolver(validationSchema),
     mode: 'onChange',
     defaultValues: {
       firstName: initialValues?.firstName ?? '',
@@ -65,13 +72,13 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
       const result = await registerStudentInfo(data);
 
       if (result.success && result.userId) {
-        toast.success('Student information saved successfully');
+        toast.success(copy.success);
         onSuccess(result.userId, data.firstName);
       } else {
-        toast.error(result.error || 'Failed to save student information');
+        toast.error(resolveAuthError(messages, t, copy.failed, result));
       }
     } catch {
-      toast.error('An unexpected error occurred');
+      toast.error(copy.unexpected);
     } finally {
       setIsSubmitting(false);
     }
@@ -87,9 +94,9 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
               name="firstName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={FIELD_LABEL_CLASS}>First Name</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>{copy.firstName}</FormLabel>
                   <FormControl>
-                    <Input placeholder="John" className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.firstName} className={INPUT_CLASS} {...field} />
                   </FormControl>
                 </FormItem>
               )}
@@ -100,9 +107,9 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
               name="lastName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={FIELD_LABEL_CLASS}>Last Name</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>{copy.lastName}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Doe" className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.lastName} className={INPUT_CLASS} {...field} />
                   </FormControl>
                 </FormItem>
               )}
@@ -114,9 +121,9 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
             name="email"
             render={({ field }) => (
               <FormItem>
-              <FormLabel className={FIELD_LABEL_CLASS}>Email Address</FormLabel>
+              <FormLabel className={FIELD_LABEL_CLASS}>{copy.email}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="john.doe@example.com" className={INPUT_CLASS} {...field} />
+                <Input type="email" placeholder={placeholders.email} className={INPUT_CLASS} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -128,7 +135,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
             name="grade"
             render={({ field }) => (
               <FormItem>
-              <FormLabel className={FIELD_LABEL_CLASS}>Grade</FormLabel>
+              <FormLabel className={FIELD_LABEL_CLASS}>{copy.grade}</FormLabel>
               <FormControl>
                 <div className="space-y-2">
                   <input
@@ -140,7 +147,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
                     <div
                       className="flex w-full rounded-lg border border-input overflow-hidden bg-background/70"
                       role="group"
-                      aria-label="Select grade"
+                      aria-label={copy.selectGrade}
                     >
                       {GRADES.map((grade) => (
                         <button
@@ -148,7 +155,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
                           type="button"
                           role="radio"
                           aria-checked={field.value === grade}
-                          aria-label={`Grade ${grade}`}
+                          aria-label={t('auth.steps.studentInfo.gradeLabel', { value: grade })}
                           onClick={() => field.onChange(grade)}
                           onBlur={field.onBlur}
                           className={cn(
@@ -176,13 +183,13 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
             name="password"
             render={({ field }) => (
               <FormItem>
-              <FormLabel className={FIELD_LABEL_CLASS}>Password</FormLabel>
+              <FormLabel className={FIELD_LABEL_CLASS}>{copy.password}</FormLabel>
               <FormControl>
-                <PasswordInput placeholder="••••••••" className={INPUT_CLASS} {...field} />
+                <PasswordInput placeholder={placeholders.password} className={INPUT_CLASS} {...field} />
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
-                Must be at least 8 characters with uppercase, lowercase, number, and special character
+                {copy.passwordHint}
               </p>
             </FormItem>
           )}
@@ -193,9 +200,9 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
             name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-              <FormLabel className={FIELD_LABEL_CLASS}>Confirm Password</FormLabel>
+              <FormLabel className={FIELD_LABEL_CLASS}>{copy.confirmPassword}</FormLabel>
               <FormControl>
-                <PasswordInput placeholder="••••••••" className={INPUT_CLASS} {...field} />
+                <PasswordInput placeholder={placeholders.password} className={INPUT_CLASS} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -210,7 +217,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
           className="h-10 w-full text-sm font-semibold"
           disabled={isSubmitting || !form.formState.isValid}
         >
-          {isSubmitting ? 'Saving...' : 'Next: Parent Information'}
+          {isSubmitting ? copy.saving : copy.next}
         </Button>
       </form>
     </Form>

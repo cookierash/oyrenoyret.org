@@ -1,5 +1,7 @@
 'use client';
 
+import { useI18n } from '@/src/i18n/i18n-provider';
+
 export type MaterialDifficulty = 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
 
 interface DifficultyBarsProps {
@@ -9,7 +11,9 @@ interface DifficultyBarsProps {
 
 /** 1 bar green (basic), 2 bars yellow (intermediate), 3 bars red (advanced) */
 export function DifficultyBars({ difficulty, className = '' }: DifficultyBarsProps) {
+  const { t, messages } = useI18n();
   const d = difficulty ?? 'BASIC';
+  const label = messages.materials.difficulty[d] ?? d;
 
   const config = {
     BASIC: { count: 1, color: 'bg-green-500' },
@@ -22,9 +26,9 @@ export function DifficultyBars({ difficulty, className = '' }: DifficultyBarsPro
   return (
     <div
       className={`inline-flex items-center gap-1 shrink-0 ${className}`}
-      title={d.toLowerCase()}
+      title={label}
       role="img"
-      aria-label={`Difficulty: ${d.toLowerCase()}`}
+      aria-label={t('materials.difficultyAria', { level: label })}
     >
       {[1, 2, 3].map((i) => (
         <span

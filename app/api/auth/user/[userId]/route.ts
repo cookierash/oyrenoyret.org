@@ -38,7 +38,7 @@ export async function GET(
 
     const tokenCheck = await requireRegistrationToken(parseResult.data);
     if (!tokenCheck.ok) {
-      return NextResponse.json({ error: tokenCheck.error }, { status: 401 });
+      return NextResponse.json({ errorKey: tokenCheck.errorKey }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({

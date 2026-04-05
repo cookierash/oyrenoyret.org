@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { PiEye as Eye, PiEyeSlash as EyeOff } from 'react-icons/pi';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/src/lib/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 type PasswordInputProps = ComponentProps<typeof Input> & {
   containerClassName?: string;
@@ -20,6 +21,8 @@ export function PasswordInput({
   ...props
 }: PasswordInputProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const { messages } = useI18n();
+  const copy = messages.auth.passwordInput;
 
   return (
     <div className={cn('relative', containerClassName)}>
@@ -36,7 +39,7 @@ export function PasswordInput({
           'text-muted-foreground/80 transition hover:text-foreground'
         )}
         aria-pressed={isVisible}
-        aria-label={isVisible ? 'Hide password' : 'Show password'}
+        aria-label={isVisible ? copy.hide : copy.show}
       >
         {isVisible ? (
           <EyeOff className="h-4 w-4" />

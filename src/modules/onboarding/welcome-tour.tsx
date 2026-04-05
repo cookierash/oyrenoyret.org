@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface WelcomeTourProps {
   open: boolean;
@@ -43,74 +44,79 @@ interface TourStep {
   };
 }
 
-const steps: TourStep[] = [
-  {
-    title: 'Welcome to oyrenoyret',
-    description: 'Here is a quick tour to help you find lessons, track progress, and start learning.',
-    highlights: [
-      {
-        title: 'Dashboard',
-        description: 'Your daily focus, streaks, and progress in one place.',
-        icon: LayoutDashboard,
-      },
-      {
-        title: 'Catalog',
-        description: 'Browse subjects and topics to discover new materials.',
-        icon: BookOpen,
-      },
-      {
-        title: 'Library',
-        description: 'Everything you save or unlock lives here for easy revisit.',
-        icon: Library,
-      },
-    ],
-  },
-  {
-    title: 'Learn by doing',
-    description: 'Study materials, join live sessions, and keep an eye on your achievements.',
-    highlights: [
-      {
-        title: 'Live activities',
-        description: 'Join sprints and events from the calendar.',
-        icon: CalendarDays,
-      },
-      {
-        title: 'Academic record',
-        description: 'Certificates and milestones stay organized for you.',
-        icon: GraduationCap,
-      },
-      {
-        title: 'Create in Studio',
-        description: 'Build and share your own learning materials.',
-        icon: Sparkles,
-      },
-    ],
-  },
-  {
-    title: 'Learn with the community',
-    description: 'Ask questions, help others, and earn credits for contributing.',
-    highlights: [
-      {
-        title: 'Discussions',
-        description: 'Post questions and learn from peer answers.',
-        icon: MessageSquare,
-      },
-      {
-        title: 'Recent Activities',
-        description: 'Stay up to date with replies and updates.',
-        icon: Receipt,
-      },
-      {
-        title: 'Credits',
-        description: 'Spend on materials or earn them by helping others.',
-        icon: Sparkles,
-      },
-    ],
-  },
-];
-
 export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
+  const { t, messages } = useI18n();
+  const copy = messages.welcomeTour;
   const [stepIndex, setStepIndex] = useState(0);
+
+  const steps = useMemo<TourStep[]>(
+    () => [
+      {
+        title: copy.steps.welcome.title,
+        description: copy.steps.welcome.description,
+        highlights: [
+          {
+            title: copy.steps.welcome.highlights.dashboard.title,
+            description: copy.steps.welcome.highlights.dashboard.description,
+            icon: LayoutDashboard,
+          },
+          {
+            title: copy.steps.welcome.highlights.catalog.title,
+            description: copy.steps.welcome.highlights.catalog.description,
+            icon: BookOpen,
+          },
+          {
+            title: copy.steps.welcome.highlights.library.title,
+            description: copy.steps.welcome.highlights.library.description,
+            icon: Library,
+          },
+        ],
+      },
+      {
+        title: copy.steps.practice.title,
+        description: copy.steps.practice.description,
+        highlights: [
+          {
+            title: copy.steps.practice.highlights.liveActivities.title,
+            description: copy.steps.practice.highlights.liveActivities.description,
+            icon: CalendarDays,
+          },
+          {
+            title: copy.steps.practice.highlights.academicRecord.title,
+            description: copy.steps.practice.highlights.academicRecord.description,
+            icon: GraduationCap,
+          },
+          {
+            title: copy.steps.practice.highlights.studio.title,
+            description: copy.steps.practice.highlights.studio.description,
+            icon: Sparkles,
+          },
+        ],
+      },
+      {
+        title: copy.steps.community.title,
+        description: copy.steps.community.description,
+        highlights: [
+          {
+            title: copy.steps.community.highlights.discussions.title,
+            description: copy.steps.community.highlights.discussions.description,
+            icon: MessageSquare,
+          },
+          {
+            title: copy.steps.community.highlights.recentActivities.title,
+            description: copy.steps.community.highlights.recentActivities.description,
+            icon: Receipt,
+          },
+          {
+            title: copy.steps.community.highlights.credits.title,
+            description: copy.steps.community.highlights.credits.description,
+            icon: Sparkles,
+          },
+        ],
+      },
+    ],
+    [copy],
+  );
 
   useEffect(() => {
     if (open) {
@@ -152,9 +158,12 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
         <div className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground tracking-normal">
-              <span>Quick tour</span>
+              <span>{copy.headerLabel}</span>
               <span>
-                Step {stepIndex + 1} of {totalSteps}
+                {t('welcomeTour.stepLabel', {
+                  current: stepIndex + 1,
+                  total: totalSteps,
+                })}
               </span>
             </div>
             <Progress value={progressValue} max={totalSteps} />
@@ -204,14 +213,14 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
               onClick={handleSkip}
               className="self-end sm:self-auto"
             >
-              Skip for now
+              {copy.skip}
             </Button>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={handleBack} disabled={stepIndex === 0}>
-                Back
+                {copy.back}
               </Button>
               <Button variant="primary" size="sm" onClick={handleNext}>
-                {isLastStep ? 'Finish tour' : 'Next'}
+                {isLastStep ? copy.finish : copy.next}
               </Button>
             </div>
           </div>

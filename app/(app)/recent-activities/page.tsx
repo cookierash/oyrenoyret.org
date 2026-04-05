@@ -7,17 +7,20 @@
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { MessagesClient } from '@/src/modules/messages/messages-client';
+import { getI18n } from '@/src/i18n/server';
 
 export const metadata = {
   title: 'Recent Activities',
 };
 
-export default function RecentActivitiesPage() {
+export default async function RecentActivitiesPage() {
+  const { messages } = await getI18n();
+  const copy = messages.app.recentActivities;
   return (
     <DashboardShell>
       <PageHeader
-        title="Recent Activities"
-        description="Your latest notifications and credit activity."
+        title={copy.title}
+        description={copy.description}
       />
 
       <main className="space-y-4 pt-2">

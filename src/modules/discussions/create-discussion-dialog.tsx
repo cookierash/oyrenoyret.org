@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
@@ -12,8 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
-import { SUBJECTS } from '@/src/config/constants';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 
 interface CreateDiscussionDialogProps {
   open: boolean;
@@ -32,13 +33,16 @@ export function CreateDiscussionDialog({
   const [content, setContent] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { t, messages } = useI18n();
+  const copy = messages.discussions.createDialog;
+  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
 
   const remainingContent = MAX_CONTENT_LENGTH - content.length;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
-      toast.error('Title and content are required');
+      toast.error(copy.titleRequired);
       return;
     }
     setSubmitting(true);
@@ -54,12 +58,13 @@ export function CreateDiscussionDialog({
       });
       const created = await res.json();
       if (!res.ok) {
-        throw new Error(created.error || 'Failed to create');
+        toast.error(copy.createFailed);
+        return;
       }
       if (typeof created.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(created.balanceAfter);
       }
-      toast.success('Discussion created');
+      toast.success(copy.created);
       onOpenChange(false);
       setTitle('');
       setContent('');
@@ -67,8 +72,8 @@ export function CreateDiscussionDialog({
       router.refresh();
       onCreated?.();
       router.push(`/discussions/${created.id}`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to create');
+    } catch {
+      toast.error(copy.createFailed);
     } finally {
       setSubmitting(false);
     }
@@ -78,34 +83,34 @@ export function CreateDiscussionDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Create new discussion</AlertDialogTitle>
+          <AlertDialogTitle>{copy.dialogTitle}</AlertDialogTitle>
           <AlertDialogDescription>
-            Share a question or topic for others to discuss.
+            {copy.dialogDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium">Title</label>
+            <label className="text-sm font-medium">{copy.titleLabel}</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="What is your question?"
+              placeholder={copy.titlePlaceholder}
               className="mt-1"
               maxLength={300}
             />
           </div>
           <div>
-            <label className="text-sm font-medium">Details</label>
+            <label className="text-sm font-medium">{copy.detailsLabel}</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Add more context..."
+              placeholder={copy.detailsPlaceholder}
               className="mt-1 w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
               maxLength={MAX_CONTENT_LENGTH}
             />
             {remainingContent <= 100 ? (
               <div className="mt-1 text-right text-xs text-muted-foreground">
-                {remainingContent} characters left
+                {t('discussions.createDialog.charactersLeft', { count: remainingContent })}
               </div>
             ) : null}
           </div>
@@ -115,22 +120,22 @@ export function CreateDiscussionDialog({
               onChange={(e) => {
                 setSubjectId(e.target.value);
               }}
-              placeholder="Subject (optional)"
+              placeholder={copy.subjectPlaceholder}
               className="w-full"
             >
-              {SUBJECTS.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
+              {subjects.map((subject) => (
+                <SelectItem key={subject.id} value={subject.id}>
+                  {subject.name}
                 </SelectItem>
               ))}
             </Select>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {copy.cancel}
             </Button>
             <Button type="submit" variant="primary" disabled={submitting}>
-              {submitting ? 'Creating...' : 'Create'}
+              {submitting ? copy.creating : copy.create}
             </Button>
           </div>
         </form>

@@ -11,11 +11,13 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Button } from '@/components/ui/button';
 import { SUBJECTS } from '@/src/config/constants';
-import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { SUBJECT_COLORS } from '@/src/config/subject-meta';
 import { PiBookOpen as BookOpen, PiCaretRight as ChevronRight } from 'react-icons/pi';
 import { CatalogSearch } from '@/src/modules/materials/catalog-search';
 import { prisma } from '@/src/db/client';
+import { getI18n } from '@/src/i18n/server';
+import { getLocalizedSubject } from '@/src/i18n/subject-utils';
+import { getLocalizedTopics } from '@/src/i18n/topic-utils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -27,12 +29,16 @@ interface SubjectPageProps {
 export default async function SubjectPage({ params }: SubjectPageProps) {
   const { subject: subjectId } = await params;
   const subject = SUBJECTS.find((s) => s.id === subjectId);
+  const { messages } = await getI18n();
+  const copy = messages.app.catalog;
 
   if (!subject) {
     notFound();
   }
 
-  const topics = CURRICULUM_TOPICS[subject.id as keyof typeof CURRICULUM_TOPICS];
+  const localizedSubject = getLocalizedSubject(messages, subject.id) ?? subject;
+
+  const topics = getLocalizedTopics(messages, subject.id);
   if (!topics || topics.length === 0) {
     notFound();
   }
@@ -54,11 +60,11 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
   return (
     <DashboardShell>
       <PageHeader
-        title={subject.name}
-        description={subject.description}
+        title={localizedSubject.name}
+        description={localizedSubject.description}
         actions={
           <Button size="sm" variant="secondary-primary" asChild>
-            <Link href="/catalog">Back to catalog</Link>
+            <Link href="/catalog">{copy.backToCatalog}</Link>
           </Button>
         }
       />
@@ -72,8 +78,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
           />
         </section>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Topics aligned with TIMSS, PISA, and common international curricula across
-          subjects.
+          {copy.topicsIntro}
         </p>
         <section>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -95,7 +100,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] text-muted-foreground">
-                          {topicCountMap.get(topic.id) ?? 0} materials
+                          {topicCountMap.get(topic.id) ?? 0} {copy.materials}
                         </span>
                         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                       </div>

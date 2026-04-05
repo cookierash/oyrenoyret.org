@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface PartnerLogo {
   src: string;
@@ -10,6 +11,8 @@ interface PartnersMarqueeProps {
 }
 
 export function PartnersMarquee({ partners }: PartnersMarqueeProps) {
+  const { messages } = useI18n();
+  const copy = messages.landing;
   if (!partners.length) {
     return null;
   }
@@ -18,7 +21,7 @@ export function PartnersMarquee({ partners }: PartnersMarqueeProps) {
     <div className="w-full">
       <div className="mx-auto flex w-full flex-row flex-wrap items-center justify-center gap-4 text-center sm:gap-6 lg:max-w-4xl lg:flex-nowrap">
         <p className="text-[11px] font-semibold uppercase tracking-normal text-muted-foreground">
-          our partners
+          {copy.partnersLabel}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           {partners.map((partner) => (

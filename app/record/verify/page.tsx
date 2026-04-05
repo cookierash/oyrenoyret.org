@@ -4,10 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 export default function CertificateVerifyPage() {
   const router = useRouter();
   const [value, setValue] = useState('');
+  const { messages } = useI18n();
+  const copy = messages.record.verify;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,10 +23,8 @@ export default function CertificateVerifyPage() {
     <div className="min-h-screen bg-background text-foreground flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">Verify a certificate</h1>
-          <p className="text-sm text-muted-foreground">
-            Enter the certificate ID to view verified details.
-          </p>
+          <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
+          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">
           <Input
@@ -31,10 +32,10 @@ export default function CertificateVerifyPage() {
             onChange={(e) => setValue(e.target.value)}
             placeholder="xxxx-xxxx-xxxx-xxxx"
             className="text-center tracking-widest uppercase"
-            aria-label="Certificate ID"
+            aria-label={copy.label}
           />
           <Button type="submit" variant="primary" className="w-full">
-            Verify
+            {copy.submit}
           </Button>
         </form>
       </div>

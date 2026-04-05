@@ -7,6 +7,7 @@ import { PiArrowRight as ArrowRight, PiCaretDown as ChevronDown, PiList as Menu,
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/src/components/ui/logo';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
+import { useI18n } from '@/src/i18n/i18n-provider';
 import { cn } from '@/src/lib/utils';
 
 interface CurrentUser {
@@ -104,6 +105,7 @@ interface SiteHeaderProps {
 }
 
 export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHeaderProps) {
+  const { t } = useI18n();
   const [hasScrolled, setHasScrolled] = useState(false);
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -166,7 +168,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
             aria-controls="landing-sidebar"
           >
             <Menu className="h-4 w-4" />
-            <span className="sr-only">Toggle menu</span>
+            <span className="sr-only">{t('header.toggleMenu')}</span>
           </button>
           <Logo size="sm" showText textSize="lg" />
           <span className="h-9 w-9" aria-hidden />
@@ -180,52 +182,52 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
           {/* 2. Directives Section - Core Navigation (centered) */}
           <nav className="hidden items-center justify-center gap-3 md:flex">
             <HoverDropdown
-              label="Resources"
+              label={t('header.resources')}
               items={[
                 {
-                  label: 'Documentation',
+                  label: t('header.documentation'),
                   href: '/resources/docs',
-                  description: 'Platform guides and API docs',
+                  description: t('header.documentationDesc'),
                 },
                 {
-                  label: 'Help Center',
+                  label: t('header.helpCenter'),
                   href: '/resources/help',
-                  description: 'FAQs and support articles',
+                  description: t('header.helpCenterDesc'),
                 },
                 {
-                  label: 'Changelog',
+                  label: t('header.changelog'),
                   href: '/resources/changelog',
-                  description: 'Audit platform updates and releases',
+                  description: t('header.changelogDesc'),
                 },
                 {
-                  label: 'Blog',
+                  label: t('header.blog'),
                   href: '/resources/blog',
-                  description: 'Latest updates and insights',
+                  description: t('header.blogDesc'),
                 },
               ]}
             />
             <HoverDropdown
-              label="Legals"
+              label={t('header.legals')}
               items={[
                 {
-                  label: 'Privacy Policy',
+                  label: t('header.privacy'),
                   href: '/legals/privacy-policy',
-                  description: 'How we protect your data',
+                  description: t('header.privacyDesc'),
                 },
                 {
-                  label: 'Terms of Service',
+                  label: t('header.terms'),
                   href: '/legals/terms-of-service',
-                  description: 'Platform usage terms',
+                  description: t('header.termsDesc'),
                 },
                 {
-                  label: 'Cookie Policy',
+                  label: t('header.cookies'),
                   href: '/legals/cookie-policy',
-                  description: 'Cookie usage information',
+                  description: t('header.cookiesDesc'),
                 },
                 {
-                  label: 'GDPR Compliance',
+                  label: t('header.gdpr'),
                   href: '/legals/gdpr',
-                  description: 'EU data protection compliance',
+                  description: t('header.gdprDesc'),
                 },
               ]}
             />
@@ -233,7 +235,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
               href="/contact"
               className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
             >
-              Contact
+              {t('header.contact')}
             </Link>
           </nav>
 
@@ -253,14 +255,14 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                     href="/login"
                     className="rounded-md px-2 py-1.5 text-xs text-foreground transition-colors hover:bg-muted/70"
                   >
-                    Log in
+                    {t('header.logIn')}
                   </Link>
                   <Button asChild size="sm" variant="primary">
                     <Link
                       href="/register"
                       className="group/btn inline-flex items-center gap-1"
                     >
-                      Get started
+                      {t('header.getStarted')}
                       <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                     </Link>
                   </Button>
@@ -292,7 +294,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
             menuOpen ? 'opacity-100' : 'opacity-0',
           )}
           onClick={() => setMenuOpen(false)}
-          aria-label="Close navigation"
+          aria-label={t('header.closeNavigation')}
           tabIndex={menuOpen ? 0 : -1}
         />
         <aside
@@ -307,7 +309,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
             <button
               type="button"
               onClick={() => setMenuOpen(false)}
-              aria-label="Close navigation"
+              aria-label={t('header.closeNavigation')}
               className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:text-foreground"
             >
               <X className="h-4 w-4" />
@@ -316,68 +318,68 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
           <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
             <div className="flex flex-col gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Resources
+                {t('header.resources')}
               </span>
               <Link
                 href="/resources/docs"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Documentation
+                {t('header.documentation')}
               </Link>
               <Link
                 href="/resources/help"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Help Center
+                {t('header.helpCenter')}
               </Link>
               <Link
                 href="/resources/changelog"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Changelog
+                {t('header.changelog')}
               </Link>
               <Link
                 href="/resources/blog"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Blog
+                {t('header.blog')}
               </Link>
             </div>
             <div className="flex flex-col gap-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Legals
+                {t('header.legals')}
               </span>
               <Link
                 href="/legals/privacy-policy"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Privacy Policy
+                {t('header.privacy')}
               </Link>
               <Link
                 href="/legals/terms-of-service"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Terms of Service
+                {t('header.terms')}
               </Link>
               <Link
                 href="/legals/cookie-policy"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                Cookie Policy
+                {t('header.cookies')}
               </Link>
               <Link
                 href="/legals/gdpr"
                 className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 onClick={() => setMenuOpen(false)}
               >
-                GDPR Compliance
+                {t('header.gdpr')}
               </Link>
             </div>
             <Link
@@ -385,7 +387,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
               className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
               onClick={() => setMenuOpen(false)}
             >
-              Contact
+              {t('header.contact')}
             </Link>
           </nav>
           <div className="border-t border-border px-4 py-4">
@@ -397,7 +399,9 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                   lastName={user.lastName}
                   size="sm"
                 />
-                <span className="text-xs text-muted-foreground">Signed in</span>
+                <span className="text-xs text-muted-foreground">
+                  {t('header.signedIn')}
+                </span>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -406,7 +410,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                   className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                   onClick={() => setMenuOpen(false)}
                 >
-                  Log in
+                  {t('header.logIn')}
                 </Link>
                 <Button asChild size="sm" variant="primary">
                   <Link
@@ -414,7 +418,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                     className="group/btn inline-flex items-center gap-1"
                     onClick={() => setMenuOpen(false)}
                   >
-                    Get started
+                    {t('header.getStarted')}
                     <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5" />
                   </Link>
                 </Button>

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { cn } from '@/src/lib/utils';
 import { sanitizeHtml } from '@/src/security/validation';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface PracticeQuestion {
   id: string;
@@ -19,6 +20,8 @@ interface PracticeTestViewProps {
 }
 
 export function PracticeTestView({ content, className }: PracticeTestViewProps) {
+  const { t, messages } = useI18n();
+  const copy = messages.materials.practiceTest;
   const questions = useMemo(() => {
     try {
       const parsed = JSON.parse(content);
@@ -36,11 +39,11 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
         ) => ({
           id: q.id ?? `q-${idx}`,
           type: q.type ?? 'multiple_choice',
-          questionHtml: sanitizeHtml(q.question || '(No question text)'),
+          questionHtml: sanitizeHtml(q.question || copy.missingQuestion),
           options: Array.isArray(q.options)
             ? q.options.map((opt, optIdx) => ({
                 id: opt.id ?? `${q.id ?? `q-${idx}`}-opt-${optIdx}`,
-                textHtml: sanitizeHtml(opt.text || '(Empty option)'),
+                textHtml: sanitizeHtml(opt.text || copy.emptyOption),
               }))
             : [],
           correctOptionId: q.correctOptionId,
@@ -49,7 +52,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
     } catch {
       return [];
     }
-  }, [content]);
+  }, [content, copy.emptyOption, copy.missingQuestion]);
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -59,7 +62,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
   if (questions.length === 0) {
     return (
       <p className="text-sm text-muted-foreground italic">
-        No questions in this practice test.
+        {copy.noQuestions}
       </p>
     );
   }
@@ -81,7 +84,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
             className="space-y-3 rounded-md border border-border/60 bg-card p-4"
           >
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Question {idx + 1}
+              {t('materials.practiceTest.questionLabel', { count: idx + 1 })}
             </p>
             <div
               className="document-editor-content practice-test-content text-foreground"
@@ -125,7 +128,11 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
                       />
                       {isRevealed ? (
                         <span className="text-[10px] font-semibold uppercase tracking-wide">
-                          {showCorrect ? 'Correct' : showIncorrect ? 'Your choice' : ''}
+                          {showCorrect
+                            ? copy.correctLabel
+                            : showIncorrect
+                              ? copy.yourChoiceLabel
+                              : ''}
                         </span>
                       ) : null}
                     </label>
@@ -136,7 +143,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
               <input
                 type="text"
                 name={`q-${q.id}`}
-                placeholder="Your answer..."
+                placeholder={copy.answerPlaceholder}
                 className="w-full max-w-md px-3 py-2 text-sm border rounded-md bg-background"
               />
             ) : null}
@@ -151,7 +158,11 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
                     : 'text-muted-foreground',
                 )}
               >
-                {hasSelection ? (isCorrect ? 'Correct' : 'Incorrect') : 'Answer revealed'}
+                {hasSelection
+                  ? isCorrect
+                    ? copy.correctResult
+                    : copy.incorrectResult
+                  : copy.answerRevealed}
               </span>
             ) : null}
           </div>
@@ -181,7 +192,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
             setSubmitting(false);
           }}
         >
-          {hasAnyRevealed ? 'Clear answers' : 'Submit'}
+          {hasAnyRevealed ? copy.clearAnswers : copy.submit}
         </Button>
       </div>
     </form>

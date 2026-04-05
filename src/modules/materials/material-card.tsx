@@ -8,6 +8,8 @@ import { PiLock as Lock, PiCircleNotch as Loader2 } from 'react-icons/pi';
 import { PracticeTestView } from './practice-test-view';
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocaleCode } from '@/src/i18n';
 
 interface MaterialCardProps {
   id: string;
@@ -43,11 +45,22 @@ export function MaterialCard({
   const router = useRouter();
   const [unlocking, setUnlocking] = useState(false);
   const [unlocked, setUnlocked] = useState(isUnlocked);
+  const { locale, t, messages } = useI18n();
+  const detailCopy = messages.materials.detail;
+  const cardCopy = messages.materials.card;
+  const localeCode = getLocaleCode(locale);
+  const publishedLabel = publishedAt
+    ? new Intl.DateTimeFormat(localeCode, {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(new Date(publishedAt))
+    : null;
 
   const handleUnlock = async () => {
     if (unlocked || unlocking) return;
     if (balance !== undefined && balance < estimatedCost) {
-      toast.error('Insufficient credits');
+      toast.error(detailCopy.insufficientCredits);
       return;
     }
     setUnlocking(true);
@@ -55,18 +68,22 @@ export function MaterialCard({
       const res = await fetch(`/api/materials/${id}/unlock`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to unlock');
+        toast.error(detailCopy.unlockFailed);
         return;
       }
       setUnlocked(true);
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
-      toast.success(`Unlocked! (−${Math.round(Number(data.cost ?? estimatedCost))} credits)`);
+      toast.success(
+        t('materials.detail.unlockSuccess', {
+          count: Math.round(Number(data.cost ?? estimatedCost)),
+        }),
+      );
       router.refresh();
       onUnlocked?.();
     } catch {
-      toast.error('Failed to unlock');
+      toast.error(detailCopy.unlockFailed);
     } finally {
       setUnlocking(false);
     }
@@ -82,16 +99,14 @@ export function MaterialCard({
             {title}
           </CardTitle>
           <CardDescription>
-            By {authorName}
-            {publishedAt && <> · {new Date(publishedAt).toLocaleDateString()}</>}
-            {materialType === 'PRACTICE_TEST' && <> · Practice test</>}
+            {t('materials.detail.by', { name: authorName })}
+            {publishedLabel && <> · {publishedLabel}</>}
+            {materialType === 'PRACTICE_TEST' && <> · {detailCopy.practiceTestLabel}</>}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            {isOwn
-              ? 'You published this material. It is always available to you.'
-              : 'Unlock this material to view the full content.'}
+            {isOwn ? cardCopy.ownNotice : cardCopy.lockedNotice}
           </p>
           {!isOwn && (
             <>
@@ -101,15 +116,21 @@ export function MaterialCard({
                 onClick={handleUnlock}
                 disabled={unlocking || (balance !== undefined && balance < estimatedCost)}
               >
-                {unlocking ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>Unlock for {Math.round(Number(estimatedCost))} credits</>
-                )}
+                  {unlocking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                  <>
+                    {t('materials.detail.unlockButton', {
+                      count: Math.round(Number(estimatedCost)),
+                    })}
+                  </>
+                  )}
               </Button>
               {balance !== undefined && balance < estimatedCost && (
                 <p className="text-xs text-destructive mt-2">
-                  You need {Math.round(Number(estimatedCost - balance))} more credits
+                  {t('materials.detail.unlockNeedMore', {
+                    count: Math.round(Number(estimatedCost - balance)),
+                  })}
                 </p>
               )}
             </>
@@ -126,12 +147,12 @@ export function MaterialCard({
           <DifficultyBars difficulty={difficulty ?? 'BASIC'} />
           {title}
         </CardTitle>
-        <CardDescription>
-          By {authorName}
-          {publishedAt && <> · {new Date(publishedAt).toLocaleDateString()}</>}
-          {materialType === 'PRACTICE_TEST' && <> · Practice test</>}
-        </CardDescription>
-      </CardHeader>
+      <CardDescription>
+        {t('materials.detail.by', { name: authorName })}
+        {publishedLabel && <> · {publishedLabel}</>}
+        {materialType === 'PRACTICE_TEST' && <> · {detailCopy.practiceTestLabel}</>}
+      </CardDescription>
+    </CardHeader>
       <CardContent>
         {materialType === 'PRACTICE_TEST' ? (
           <PracticeTestView content={content} />

@@ -8,7 +8,7 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { parentInfoSchema, type ParentInfoInput } from '../schemas/registration';
+import { createParentInfoSchema, type ParentInfoInput } from '../schemas/registration';
 import { registerParentInfo } from '../actions/registration';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,8 +20,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { resolveAuthError } from '@/src/modules/auth/utils/resolve-auth-error';
 
 interface Step2Props {
   userId: string;
@@ -41,9 +43,14 @@ export function Step2ParentInfo({
   onValuesChange,
 }: Step2Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { t, messages } = useI18n();
+  const copy = messages.auth.steps.parentInfo;
+  const placeholders = messages.auth.placeholders;
+  const validation = messages.auth.validation;
+  const validationSchema = useMemo(() => createParentInfoSchema(validation), [validation]);
 
   const form = useForm<ParentInfoInput>({
-    resolver: zodResolver(parentInfoSchema),
+    resolver: zodResolver(validationSchema),
     mode: 'onChange',
     defaultValues: {
       parentFirstName: initialValues?.parentFirstName ?? '',
@@ -66,13 +73,13 @@ export function Step2ParentInfo({
       const result = await registerParentInfo(userId, data);
 
       if (result.success) {
-        toast.success('Parent information saved successfully');
+        toast.success(copy.success);
         onSuccess(data.parentEmail);
       } else {
-        toast.error(result.error || 'Failed to save parent information');
+        toast.error(resolveAuthError(messages, t, copy.failed, result));
       }
     } catch {
-      toast.error('An unexpected error occurred');
+      toast.error(copy.unexpected);
     } finally {
       setIsSubmitting(false);
     }
@@ -83,7 +90,7 @@ export function Step2ParentInfo({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">
-            Please provide the information of a parent or legal guardian who will review your registration.
+            {copy.intro}
           </p>
 
           <div className="grid grid-cols-2 gap-4">
@@ -92,9 +99,9 @@ export function Step2ParentInfo({
               name="parentFirstName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={FIELD_LABEL_CLASS}>Parent/Guardian First Name</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>{copy.firstName}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Jane" className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.parentFirstName} className={INPUT_CLASS} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -106,9 +113,9 @@ export function Step2ParentInfo({
               name="parentLastName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className={FIELD_LABEL_CLASS}>Parent/Guardian Last Name</FormLabel>
+                  <FormLabel className={FIELD_LABEL_CLASS}>{copy.lastName}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Doe" className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.parentLastName} className={INPUT_CLASS} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -121,13 +128,13 @@ export function Step2ParentInfo({
             name="parentEmail"
             render={({ field }) => (
               <FormItem>
-              <FormLabel className={FIELD_LABEL_CLASS}>Parent/Guardian Email Address</FormLabel>
+              <FormLabel className={FIELD_LABEL_CLASS}>{copy.email}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder="jane.doe@example.com" className={INPUT_CLASS} {...field} />
+                <Input type="email" placeholder={placeholders.parentEmail} className={INPUT_CLASS} {...field} />
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
-                This email must be different from your student email.
+                {copy.emailHint}
               </p>
             </FormItem>
           )}
@@ -142,7 +149,7 @@ export function Step2ParentInfo({
             onClick={onPrevious}
             className="h-10 flex-1 text-sm font-semibold"
           >
-            Previous
+            {copy.previous}
           </Button>
           <Button
             type="submit"
@@ -151,7 +158,7 @@ export function Step2ParentInfo({
             className="h-10 flex-1 text-sm font-semibold"
             disabled={isSubmitting || !form.formState.isValid}
           >
-            {isSubmitting ? 'Saving...' : 'Next: Review Consent'}
+            {isSubmitting ? copy.saving : copy.next}
           </Button>
         </div>
       </form>

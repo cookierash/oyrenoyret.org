@@ -109,12 +109,10 @@ export async function GET(request: Request) {
         const authorName =
           [reply.user.firstName, reply.user.lastName].filter(Boolean).join(' ') ||
           reply.user.email.split('@')[0] ||
-          'Student';
+          '';
         const isReplyToUserReply =
           Boolean(reply.parentReplyId) && reply.parentReply?.userId === userId;
-        const contextLabel = isReplyToUserReply
-          ? 'replied to your reply'
-          : 'replied to your discussion';
+        const contextType = isReplyToUserReply ? 'reply' : 'discussion';
         const contentPreview = reply.content
           .replace(/<[^>]*>/g, ' ')
           .replace(/\s+/g, ' ')
@@ -129,8 +127,8 @@ export async function GET(request: Request) {
           createdAt: reply.createdAt.toISOString(),
           authorName,
           discussionTitle: reply.discussion.title,
-          contextLabel,
-          contentPreview: contentPreview || '(No content)',
+          contextType,
+          contentPreview,
         };
       }),
       ...transactions.map((tx) => ({

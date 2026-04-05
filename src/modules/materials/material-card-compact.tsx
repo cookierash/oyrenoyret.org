@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { PiLock as Lock, PiCircleNotch as Loader2, PiUsers as Users, PiArrowSquareOut as ExternalLink, PiUser as User } from 'react-icons/pi';
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { toast } from 'sonner';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface MaterialCardCompactProps {
   id: string;
@@ -52,6 +53,9 @@ export function MaterialCardCompact({
   isUnlockDisabled = false,
 }: MaterialCardCompactProps) {
   const router = useRouter();
+  const { t, messages } = useI18n();
+  const copy = messages.materials.card;
+  const detailCopy = messages.materials.detail;
   const [unlocking, setUnlocking] = useState(false);
   const [unlocked, setUnlocked] = useState(isUnlocked);
   const detailHref = `/catalog/${subjectId}/${topicId}/${id}`;
@@ -65,7 +69,7 @@ export function MaterialCardCompact({
   const handleUnlock = async () => {
     if (unlocked || unlocking || isUnlockDisabled) return;
     if (balance !== undefined && balance < estimatedCost) {
-      toast.error('Insufficient credits');
+      toast.error(detailCopy.insufficientCredits);
       return;
     }
     setUnlocking(true);
@@ -74,18 +78,22 @@ export function MaterialCardCompact({
       const res = await fetch(`/api/materials/${id}/unlock`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to unlock');
+        toast.error(detailCopy.unlockFailed);
         return;
       }
       setUnlocked(true);
       if (typeof data.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(data.balanceAfter);
       }
-      toast.success(`Unlocked! (−${Math.round(Number(data.cost ?? estimatedCost))} credits)`);
+      toast.success(
+        t('materials.detail.unlockSuccess', {
+          count: Math.round(Number(data.cost ?? estimatedCost)),
+        }),
+      );
       router.refresh();
       onUnlocked?.();
     } catch {
-      toast.error('Failed to unlock');
+      toast.error(detailCopy.unlockFailed);
     } finally {
       setUnlocking(false);
       onUnlockEnd?.();
@@ -104,12 +112,15 @@ export function MaterialCardCompact({
             <span
               className={`inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full ${typeBadge}`}
             >
-              {materialType === 'PRACTICE_TEST' ? 'Test' : 'Textual'}
+              {materialType === 'PRACTICE_TEST' ? copy.typeTest : copy.typeTextual}
             </span>
             {isOwn && (
-              <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-primary/15 text-primary" title="You published this">
+              <span
+                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium bg-primary/15 text-primary"
+                title={copy.yoursHint}
+              >
                 <User className="h-3 w-3" />
-                Yours
+                {copy.yours}
               </span>
             )}
           </div>
@@ -119,11 +130,13 @@ export function MaterialCardCompact({
           <DifficultyBars difficulty={difficulty ?? 'BASIC'} className="shrink-0" />
           <span className="flex items-center gap-1">
             <Users className="h-3 w-3" />
-            {unlockCount} unlocked
+            {t('materials.card.unlockedCount', { count: unlockCount })}
           </span>
         </div>
 
-        <p className="text-xs text-muted-foreground truncate">By {authorName}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {t('materials.card.by', { name: authorName })}
+        </p>
 
         <div className="flex flex-wrap gap-2 pt-1">
           {!unlocked && !isOwn && (
@@ -137,20 +150,22 @@ export function MaterialCardCompact({
               {unlocking ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <>Unlock ({Math.round(Number(estimatedCost))} credits)</>
+                <>{t('materials.card.unlockButton', { count: Math.round(Number(estimatedCost)) })}</>
               )}
             </Button>
           )}
           <Button variant="secondary-primary" size="sm" className="h-7 text-xs" asChild>
             <Link href={canViewFull ? detailHref : previewHref}>
-              {canViewFull ? 'View in library' : 'Preview'}
+              {canViewFull ? copy.viewInLibrary : copy.preview}
               <ExternalLink className="h-3 w-3" />
             </Link>
           </Button>
         </div>
 
         {!isOwn && balance !== undefined && balance < estimatedCost && !unlocked && (
-          <p className="text-[10px] text-destructive">Need {Math.round(Number(estimatedCost - balance))} more credits</p>
+          <p className="text-[10px] text-destructive">
+            {t('materials.card.needMoreCredits', { count: Math.round(Number(estimatedCost - balance)) })}
+          </p>
         )}
       </CardContent>
     </Card>

@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/src/lib/utils';
+import { getLocaleCode, type Locale } from '@/src/i18n';
+import { useI18n } from '@/src/i18n/i18n-provider';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -41,13 +43,13 @@ interface DiscussionSummary {
   createdAt: string;
 }
 
-const formatDateTime = (iso: string) => {
+const formatDateTime = (iso: string, locale: Locale) => {
   const date = new Date(iso);
-  const time = new Intl.DateTimeFormat('en-US', {
+  const time = new Intl.DateTimeFormat(getLocaleCode(locale), {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
-  const day = new Intl.DateTimeFormat('en-US', {
+  const day = new Intl.DateTimeFormat(getLocaleCode(locale), {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
@@ -61,6 +63,8 @@ export default function ReplyPage() {
   const id = typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] : '';
   const replyId = typeof rawReplyId === 'string' ? rawReplyId : Array.isArray(rawReplyId) ? rawReplyId[0] : '';
   const router = useRouter();
+  const { locale, messages } = useI18n();
+  const copy = messages.discussions.replyDetail;
 
   const [parentReply, setParentReply] = useState<Reply | null>(null);
   const [previousReply, setPreviousReply] = useState<Reply | null>(null);
@@ -87,7 +91,7 @@ export default function ReplyPage() {
       })
       .then((data) => {
         if (!data?.reply || data.reply.discussionId !== id) {
-          throw new Error('Reply not found');
+        throw new Error('Reply not found');
         }
         setParentReply(data.reply);
         setPreviousReply(data.parentReply ?? null);
@@ -95,7 +99,7 @@ export default function ReplyPage() {
         setThreadPath(Array.isArray(data.threadPath) ? data.threadPath : [replyId]);
       })
       .catch(() => {
-        toast.error('Failed to load reply');
+        toast.error(copy.failedLoadReply);
         setParentReply(null);
         setPreviousReply(null);
         setDiscussionInfo(null);
@@ -113,7 +117,7 @@ export default function ReplyPage() {
       const data = await res.json();
       setChildReplies(data.replies ?? []);
     } catch {
-      toast.error('Failed to load replies');
+      toast.error(copy.failedLoadReplies);
       setChildReplies([]);
     } finally {
       setChildLoading(false);
@@ -147,7 +151,7 @@ export default function ReplyPage() {
       });
       if (!res.ok) throw new Error();
     } catch {
-      toast.error('Failed to vote');
+      toast.error(copy.failedVote);
       setParentReply(parentReply);
     } finally {
       setVoteLoading(false);
@@ -178,7 +182,7 @@ export default function ReplyPage() {
         await loadChildReplies();
       }
     } catch {
-      toast.error('Failed to post reply');
+      toast.error(copy.failedPostReply);
     } finally {
       setSubmitting(false);
     }
@@ -192,7 +196,7 @@ export default function ReplyPage() {
               <Button size="sm" variant="ghost" asChild>
                 <Link href="/discussions" className="inline-flex items-center gap-1">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back
+                  {copy.back}
                 </Link>
               </Button>
             </div>
@@ -228,11 +232,11 @@ export default function ReplyPage() {
             <Button size="sm" variant="ghost" asChild>
               <Link href="/discussions" className="inline-flex items-center gap-1">
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Back
+                {copy.back}
               </Link>
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">Reply not found.</p>
+          <p className="text-sm text-muted-foreground">{copy.notFound}</p>
         </div>
       </DashboardShell>
     );
@@ -242,9 +246,9 @@ export default function ReplyPage() {
   const backHref =
     pathIds.length > 1 ? `/discussions/${id}/replies/${pathIds[pathIds.length - 2]}` : `/discussions/${id}`;
   const threadSteps = [
-    { label: 'Post', href: `/discussions/${id}` },
+    { label: copy.threadPost, href: `/discussions/${id}` },
     ...pathIds.map((stepId, index) => ({
-      label: `Reply ${index + 1}`,
+      label: copy.threadReply.replace('{{count}}', String(index + 1)),
       href: `/discussions/${id}/replies/${stepId}`,
     })),
   ];
@@ -257,7 +261,7 @@ export default function ReplyPage() {
               <Button size="sm" variant="ghost" asChild>
                 <Link href={backHref} className="inline-flex items-center gap-1">
                   <ArrowLeft className="h-3.5 w-3.5" />
-                  Back
+                  {copy.back}
                 </Link>
               </Button>
             </div>
@@ -306,7 +310,7 @@ export default function ReplyPage() {
                     >
                       <div className="flex items-center justify-end gap-3">
                         <span className="text-[11px] text-muted-foreground">
-                          {formatDateTime(previousReply.createdAt)}
+                          {formatDateTime(previousReply.createdAt, locale)}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
@@ -333,7 +337,7 @@ export default function ReplyPage() {
                     >
                       <div className="flex items-center justify-end gap-3">
                         <span className="text-[11px] text-muted-foreground">
-                          {formatDateTime(discussionInfo.createdAt)}
+                          {formatDateTime(discussionInfo.createdAt, locale)}
                         </span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
@@ -367,7 +371,7 @@ export default function ReplyPage() {
                     {parentReply.authorName}
                   </span>
                   <span className="px-1">·</span>
-                  <span>{formatDateTime(parentReply.createdAt)}</span>
+                  <span>{formatDateTime(parentReply.createdAt, locale)}</span>
                 </div>
               </div>
               <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
@@ -381,7 +385,7 @@ export default function ReplyPage() {
                   className="h-8 gap-1 px-2 text-xs"
                 >
                   <MessageSquare className="h-3.5 w-3.5" />
-                  Reply
+                  {copy.replyAction}
                 </Button>
                 <div className="flex items-center overflow-hidden rounded-md border border-border/60 bg-muted/40">
                   <Button
@@ -389,7 +393,7 @@ export default function ReplyPage() {
                     variant="ghost"
                     onClick={() => handleVote(1)}
                     disabled={voteLoading}
-                    aria-label="Upvote"
+                    aria-label={copy.upvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
                       parentReply.userVote === 1 && 'text-primary bg-primary/10'
@@ -414,7 +418,7 @@ export default function ReplyPage() {
                     variant="ghost"
                     onClick={() => handleVote(-1)}
                     disabled={voteLoading}
-                    aria-label="Downvote"
+                    aria-label={copy.downvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
                       parentReply.userVote === -1 && 'text-destructive bg-destructive/10'
@@ -433,26 +437,28 @@ export default function ReplyPage() {
                     <textarea
                       value={replyContent}
                       onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Write a reply"
+                      placeholder={copy.replyPlaceholder}
                       className="w-full min-h-[96px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
                       maxLength={MAX_REPLY_LENGTH}
                     />
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
-                        {replyRemaining <= 100 ? `${replyRemaining} characters left` : ''}
+                        {replyRemaining <= 100
+                          ? copy.charactersLeft.replace('{{count}}', String(replyRemaining))
+                          : ''}
                       </div>
                       <Button size="sm" onClick={() => submitReply(replyContent)} disabled={submitting || !replyContent.trim()}>
-                        Reply
+                        {copy.replyAction}
                       </Button>
                     </div>
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-foreground">Replies</h2>
+                    <h2 className="text-sm font-semibold text-foreground">{copy.repliesTitle}</h2>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Replies to this reply appear below.
+                    {copy.repliesSubtitle}
                   </p>
                 </div>
                 {childLoading ? (
@@ -468,7 +474,7 @@ export default function ReplyPage() {
                     ))}
                   </div>
                 ) : childReplies.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No replies yet.</p>
+                  <p className="text-sm text-muted-foreground">{copy.noReplies}</p>
                 ) : (
                   <div className="space-y-3">
                     {childReplies.map((reply) => (
@@ -489,7 +495,7 @@ export default function ReplyPage() {
                                 {reply.authorName}
                               </span>
                               <span className="px-1">·</span>
-                              <span>{formatDateTime(reply.createdAt)}</span>
+                              <span>{formatDateTime(reply.createdAt, locale)}</span>
                             </div>
                           </div>
                           <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
@@ -508,33 +514,33 @@ export default function ReplyPage() {
         <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Write a reply</AlertDialogTitle>
+              <AlertDialogTitle>{copy.dialogTitle}</AlertDialogTitle>
               <AlertDialogDescription>
-                Share your thoughts on this reply.
+                {copy.dialogDescription}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-3">
               <textarea
                 value={dialogContent}
                 onChange={(e) => setDialogContent(e.target.value)}
-                placeholder="Write your reply..."
+                placeholder={copy.dialogPlaceholder}
                 className="w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
                 maxLength={MAX_REPLY_LENGTH}
               />
               {dialogRemaining <= 100 ? (
                 <div className="text-right text-xs text-muted-foreground">
-                  {dialogRemaining} characters left
+                  {copy.charactersLeft.replace('{{count}}', String(dialogRemaining))}
                 </div>
               ) : null}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
+                  {copy.cancel}
                 </Button>
                 <Button
                   onClick={() => submitReply(dialogContent)}
                   disabled={submitting || !dialogContent.trim()}
                 >
-                  Post reply
+                  {copy.postReply}
                 </Button>
               </div>
             </div>

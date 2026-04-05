@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PiTrendUp as TrendingUp } from 'react-icons/pi';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/src/lib/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface Discussion {
   id: string;
@@ -26,6 +27,7 @@ export function TrendingDiscussions({
   showScore = true,
   showTitle = true,
 }: TrendingDiscussionsProps) {
+  const { t } = useI18n();
   const [items, setItems] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,7 +51,7 @@ export function TrendingDiscussions({
       {showTitle && (
         <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          Trending discussions
+          {t('discussions.trendingTitle')}
         </h2>
       )}
 
@@ -66,7 +68,7 @@ export function TrendingDiscussions({
           ))}
         </div>
       ) : items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No trending discussions yet.</p>
+        <p className="text-xs text-muted-foreground">{t('discussions.trendingEmpty')}</p>
       ) : (
         <div className="space-y-3">
           {items.map((d) => (
@@ -79,7 +81,9 @@ export function TrendingDiscussions({
                 <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {d.title}
                 </p>
-                <p className="text-xs text-muted-foreground">{d.replyCount} replies</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('discussions.repliesLabel', { count: d.replyCount })}
+                </p>
               </div>
               {showScore ? (
                 <span

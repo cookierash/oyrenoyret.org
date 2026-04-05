@@ -9,12 +9,15 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { LandingThemeLock } from '@/src/components/landing/landing-theme-lock';
+import { getI18n } from '@/src/i18n/server';
 
 export default async function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { messages } = await getI18n();
+  const copy = messages.auth.layout;
   return (
     <div className="landing-light min-h-[100dvh] bg-background text-foreground">
       <LandingThemeLock />
@@ -29,7 +32,7 @@ export default async function AuthLayout({
           <div className="relative z-10 flex w-full flex-col items-center justify-center gap-4 px-12 text-center xl:px-16 scale-[1.2] origin-center">
             <Image
               src="/auth-pages-image.svg"
-              alt="oyrenoyret illustration"
+              alt={copy.heroAlt}
               width={240}
               height={240}
               className="h-auto w-full max-w-[220px] animate-figure-drift motion-reduce:animate-none"
@@ -39,7 +42,7 @@ export default async function AuthLayout({
               oyrenoyret
             </h1>
             <p className="max-w-xs text-sm text-muted-foreground">
-              Secure learning for students with guided practice and parent-approved pathways.
+              {copy.heroDescription}
             </p>
           </div>
         </aside>

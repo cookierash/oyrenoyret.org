@@ -4,53 +4,18 @@ import { Button } from '@/components/ui/button';
 import { SiteHeader } from '@/src/components/layout/site-header';
 import { SiteFooter } from '@/src/components/layout/site-footer';
 import { LandingThemeLock } from '@/src/components/landing/landing-theme-lock';
+import { getI18n } from '@/src/i18n/server';
 
 export const metadata = {
   title: 'Learn more about us',
 };
 
-const values = [
-  {
-    title: 'Layered learning',
-    description:
-      'We help students stack concepts in the right order, so every new skill feels like a natural next step.',
-  },
-  {
-    title: 'Parent-guided pathways',
-    description:
-      'Families choose the pace and focus areas, while our platform keeps every practice session aligned.',
-  },
-  {
-    title: 'Confidence through practice',
-    description:
-      'We build momentum with short, focused exercises and gentle feedback that keeps students engaged.',
-  },
-];
+export default async function LearnMorePage() {
+  const { messages } = await getI18n();
+  const copy = messages.learnMore;
 
-const pillars = [
-  {
-    title: 'Clear paths, not chaos',
-    description:
-      'Curated learning maps keep students on track and reduce the overwhelm of endless resources.',
-  },
-  {
-    title: 'Visible progress',
-    description:
-      'Parents and teachers can see milestones, review practice history, and celebrate wins together.',
-  },
-  {
-    title: 'Supportive coaching',
-    description:
-      'Guided prompts, examples, and helpful nudges keep students focused on understanding, not guessing.',
-  },
-  {
-    title: 'Safe by design',
-    description:
-      'We prioritize privacy, moderation, and parent oversight so learning stays secure and age-appropriate.',
-  },
-];
-
-export default function LearnMorePage() {
+  const values = copy.values;
+  const pillars = copy.pillars;
   return (
     <div className="landing-light relative min-h-screen overflow-hidden bg-background text-foreground">
       <LandingThemeLock />
@@ -63,22 +28,20 @@ export default function LearnMorePage() {
         <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-6">
             <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              Learn more
+              {copy.pill}
             </span>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
-              A calmer way to build real understanding.
+              {copy.title}
             </h1>
             <p className="text-base text-muted-foreground sm:text-lg">
-              oyrenoyret.org is a learning companion built for families who want structure
-              without pressure. We help students layer new concepts with clarity, so each
-              lesson builds on the last.
+              {copy.subtitle}
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg" variant="primary">
-                <Link href="/register">Get started for free</Link>
+                <Link href="/register">{copy.ctaPrimary}</Link>
               </Button>
               <Button asChild size="lg" variant="secondary-primary">
-                <Link href="/contact">Talk to us</Link>
+                <Link href="/contact">{copy.ctaSecondary}</Link>
               </Button>
             </div>
           </div>
@@ -87,14 +50,13 @@ export default function LearnMorePage() {
             <div className="relative space-y-6 rounded-3xl border border-border/70 bg-background/90 p-6 shadow-[0_30px_70px_-45px_rgba(15,23,42,0.6)]">
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                  Our focus
+                  {copy.focusLabel}
                 </p>
                 <h2 className="text-xl font-semibold text-foreground">
-                  Guided practice that feels approachable.
+                  {copy.focusTitle}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  We blend structured lessons with gentle coaching so students can revisit
-                  tough topics, master essentials, and keep moving forward with confidence.
+                  {copy.focusBody}
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -113,15 +75,14 @@ export default function LearnMorePage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                Built for clarity, accountability, and care.
+                {copy.pillarsTitle}
               </h2>
               <p className="text-sm text-muted-foreground sm:text-base">
-                Everything on oyrenoyret.org is designed to keep learning focused and
-                families in control.
+                {copy.pillarsSubtitle}
               </p>
             </div>
             <div className="rounded-full border border-border/60 bg-background/70 px-4 py-2 text-xs text-muted-foreground">
-              Parent-first learning
+              {copy.pillarsBadge}
             </div>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
@@ -143,16 +104,14 @@ export default function LearnMorePage() {
         <section className="mt-16 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div className="space-y-4">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              A learning rhythm that respects real life.
+              {copy.rhythmTitle}
             </h2>
             <p className="text-sm text-muted-foreground sm:text-base">
-              We know families juggle school, activities, and downtime. That is why our
-              platform is built for short, focused sessions that add up over time.
+              {copy.rhythmSubtitle}
             </p>
             <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
               <p className="text-sm text-muted-foreground">
-                Parents set the learning path. Students follow guided prompts. Everyone can
-                see progress in one place.
+                {copy.rhythmNote}
               </p>
             </div>
           </div>
@@ -185,19 +144,18 @@ export default function LearnMorePage() {
             <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-center">
               <div className="space-y-3">
                 <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  Ready to explore oyrenoyret.org?
+                  {copy.ctaTitle}
                 </h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
-                  Join families using guided practice to build lasting understanding and
-                  confident learners.
+                  {copy.ctaBody}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 lg:justify-end">
                 <Button asChild size="lg" variant="primary">
-                  <Link href="/register">Start learning</Link>
+                  <Link href="/register">{copy.ctaStart}</Link>
                 </Button>
                 <Button asChild size="lg" variant="secondary-primary">
-                  <Link href="/">Back to home</Link>
+                  <Link href="/">{copy.ctaBack}</Link>
                 </Button>
               </div>
             </div>

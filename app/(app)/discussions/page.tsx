@@ -12,7 +12,9 @@ import { Input } from '@/components/ui/input';
 import { PiMagnifyingGlass as Search, PiX as X } from 'react-icons/pi';
 import { CreateDiscussionDialog } from '@/src/modules/discussions/create-discussion-dialog';
 import { DiscussionList } from '@/src/modules/discussions/discussion-list';
-import { SUBJECTS } from '@/src/config/constants';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { buildTagIndex, normalizeTagToken, TAG_MATCH_REGEX } from '@/src/lib/tagging';
 
 export default function DiscussionsPage() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,6 +23,25 @@ export default function DiscussionsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
+  const { t, messages } = useI18n();
+  const copy = messages.discussions.page;
+  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const subjectTagIndex = useMemo(
+    () =>
+      buildTagIndex(
+        subjects.map((subject) => ({
+          id: subject.id,
+          name: subject.name,
+          tag: subject.tag,
+          aliases: subject.aliases,
+        })),
+      ),
+    [subjects],
+  );
+  const subjectTagLookup = useMemo(
+    () => new Map(subjectTagIndex.map((entry) => [entry.id, entry])),
+    [subjectTagIndex],
+  );
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'production') return;
@@ -57,28 +78,29 @@ export default function DiscussionsPage() {
   }, [searchQuery]);
 
   const tagMatch = useMemo(() => {
-    const matches = Array.from(searchQuery.matchAll(/(?:^|\s)#([a-z0-9-]*)/gi));
+    const matches = Array.from(searchQuery.matchAll(TAG_MATCH_REGEX));
     return matches.length ? matches[matches.length - 1] : null;
   }, [searchQuery]);
-  const tagQuery = tagMatch?.[1]?.toLowerCase() ?? '';
+  const tagQuery = tagMatch?.[1] ? normalizeTagToken(tagMatch[1]) : '';
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const activeSubjects = useMemo(
-    () => SUBJECTS.filter((s) => selectedSubjects.includes(s.id)),
-    [selectedSubjects]
+    () => subjects.filter((subject) => selectedSubjects.includes(subject.id)),
+    [subjects, selectedSubjects],
   );
 
   const subjectSuggestions = useMemo(() => {
     if (!tagMatch) return [];
-    return SUBJECTS
-      .filter((s) => {
+    return subjectTagIndex
+      .filter((entry) => {
         if (!tagQuery) return true;
         return (
-          s.id.includes(tagQuery) ||
-          s.name.toLowerCase().includes(tagQuery)
+          entry.tokens.some((token) => token.includes(tagQuery)) ||
+          normalizeTagToken(entry.name).includes(tagQuery)
         );
       })
-      .slice(0, 8);
-  }, [tagMatch, tagQuery]);
+      .slice(0, 8)
+      .map((entry) => ({ id: entry.id, name: entry.name, tag: entry.tag }));
+  }, [tagMatch, tagQuery, subjectTagIndex]);
 
   const showSuggestions = Boolean(tagMatch) && subjectSuggestions.length > 0;
 
@@ -116,11 +138,11 @@ export default function DiscussionsPage() {
   return (
     <DashboardShell>
       <PageHeader
-        title="Discussions"
-        description="Ask questions, share knowledge."
+        title={copy.title}
+        description={copy.description}
         actions={
           <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
-            New post
+            {copy.newPost}
           </Button>
         }
       />
@@ -140,16 +162,16 @@ export default function DiscussionsPage() {
                   }
                 }}
                 className="rounded-r-none"
-                placeholder="Search discussions or use #subject (e.g., #mathematics)"
+                placeholder={copy.placeholder}
               />
               <button
                 type="button"
                 onClick={submitSearch}
                 className="inline-flex items-center gap-1 rounded-r-md border border-l-0 border-input bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
-                aria-label="Search discussions"
+                aria-label={copy.searchLabel}
               >
                 <Search className="h-4 w-4" />
-                Search
+                {copy.search}
               </button>
             </div>
             {activeSubjects.length > 0 ? (
@@ -159,12 +181,12 @@ export default function DiscussionsPage() {
                     key={subject.id}
                     className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-1 text-xs font-medium text-foreground"
                   >
-                    #{subject.id}
+                    #{subjectTagLookup.get(subject.id)?.tag ?? subject.id}
                     <button
                       type="button"
                       className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
                       onClick={() => removeSubjectTag(subject.id)}
-                      aria-label={`Remove ${subject.name}`}
+                      aria-label={t('discussions.page.remove', { name: subject.name })}
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -175,7 +197,7 @@ export default function DiscussionsPage() {
             {showSuggestions ? (
               <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-md border border-border bg-background shadow-sm">
                 <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
-                  Subjects
+                  {copy.subjects}
                 </div>
                 <div className="max-h-56 overflow-y-auto py-1">
                   {subjectSuggestions.map((subject) => (
@@ -187,12 +209,12 @@ export default function DiscussionsPage() {
                       onClick={() => applySubjectTag(subject.id)}
                     >
                       <div className="min-w-0">
-                        <div className="font-medium">#{subject.id}</div>
+                        <div className="font-medium">#{subject.tag}</div>
                         <div className="text-xs text-muted-foreground">{subject.name}</div>
                       </div>
                       {selectedSubjects.includes(subject.id) ? (
                         <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                          Added
+                          {copy.added}
                         </span>
                       ) : null}
                     </button>
@@ -202,7 +224,7 @@ export default function DiscussionsPage() {
             ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
-            Filter by subject with #subject, like #physics or #azerbaijani-language.
+            {copy.helper}
           </p>
         </div>
         <DiscussionList

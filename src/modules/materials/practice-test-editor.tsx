@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -12,11 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { cn } from '@/src/lib/utils';
-import { SUBJECTS } from '@/src/config/constants';
 import { CREDITS_MATERIAL } from '@/src/config/credits';
-import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { toast } from 'sonner';
 import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextAa as SubscriptIcon, PiTextH as SuperscriptIcon, PiCode as Code, PiEraser as Eraser, PiFunction as Sigma, PiPlus as Plus, PiTrash as Trash2 } from 'react-icons/pi';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { getLocalizedTopics } from '@/src/i18n/topic-utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,22 +84,22 @@ function parseInitialQuestions(initialContent?: string) {
 }
 
 const SCIENCE_SYMBOLS = [
-  { value: '±', label: 'Plus/minus' },
-  { value: '×', label: 'Multiplication' },
-  { value: '÷', label: 'Division' },
-  { value: '≈', label: 'Approximately equal' },
-  { value: '≤', label: 'Less than or equal' },
-  { value: '≥', label: 'Greater than or equal' },
-  { value: '°', label: 'Degrees' },
-  { value: 'µ', label: 'Micro' },
-  { value: 'Ω', label: 'Omega' },
-  { value: 'Δ', label: 'Delta' },
-  { value: 'π', label: 'Pi' },
-  { value: '∞', label: 'Infinity' },
-  { value: '√', label: 'Square root' },
-  { value: '²', label: 'Squared' },
-  { value: '³', label: 'Cubed' },
-];
+  { value: '±', key: 'plusMinus' },
+  { value: '×', key: 'multiplication' },
+  { value: '÷', key: 'division' },
+  { value: '≈', key: 'approximately' },
+  { value: '≤', key: 'lessEqual' },
+  { value: '≥', key: 'greaterEqual' },
+  { value: '°', key: 'degrees' },
+  { value: 'µ', key: 'micro' },
+  { value: 'Ω', key: 'omega' },
+  { value: 'Δ', key: 'delta' },
+  { value: 'π', key: 'pi' },
+  { value: '∞', key: 'infinity' },
+  { value: '√', key: 'sqrt' },
+  { value: '²', key: 'squared' },
+  { value: '³', key: 'cubed' },
+] as const;
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -108,12 +109,23 @@ function hasText(html: string): boolean {
   return stripHtml(html).length > 0;
 }
 
+interface PracticeValidationCopy {
+  addQuestion: string;
+  removeEmpty: string;
+  questionPrompt: string;
+  optionCount: string;
+  selectCorrect: string;
+  minOptions: string;
+  correctNotEmpty: string;
+}
+
 function validateQuestions(
   questions: PracticeQuestion[],
-  enforceComplete: boolean
+  enforceComplete: boolean,
+  copy: PracticeValidationCopy,
 ): { ok: boolean; error?: string; normalized?: PracticeQuestion[] } {
   if (questions.length === 0) {
-    return { ok: false, error: 'Add at least one question.' };
+    return { ok: false, error: copy.addQuestion };
   }
 
   const normalized: PracticeQuestion[] = [];
@@ -126,7 +138,7 @@ function validateQuestions(
 
     if (!questionHasText && !hasAnyOptionText) {
       if (enforceComplete) {
-        return { ok: false, error: 'Remove or complete empty questions before publishing.' };
+        return { ok: false, error: copy.removeEmpty };
       }
       normalized.push({ ...q, options });
       continue;
@@ -134,27 +146,27 @@ function validateQuestions(
 
     if (!questionHasText) {
       if (enforceComplete) {
-        return { ok: false, error: 'Each question needs a prompt.' };
+        return { ok: false, error: copy.questionPrompt };
       }
       normalized.push({ ...q, options });
       continue;
     }
 
     if (options.length < 3 || options.length > 5) {
-      return { ok: false, error: 'Each question must have 3 to 5 options.' };
+      return { ok: false, error: copy.optionCount };
     }
 
     if (!q.correctOptionId || !options.some((o) => o.id === q.correctOptionId)) {
-      return { ok: false, error: 'Select the correct option for each question.' };
+      return { ok: false, error: copy.selectCorrect };
     }
 
     if (enforceComplete) {
       if (filledOptions.length < 3) {
-        return { ok: false, error: 'Each question needs at least 3 filled options.' };
+        return { ok: false, error: copy.minOptions };
       }
       const correctOption = options.find((o) => o.id === q.correctOptionId);
       if (correctOption && !hasText(correctOption.text)) {
-        return { ok: false, error: 'The correct option cannot be empty.' };
+        return { ok: false, error: copy.correctNotEmpty };
       }
     }
 
@@ -166,7 +178,7 @@ function validateQuestions(
 
   const hasUsableQuestion = normalized.some((q) => hasText(q.question));
   if (!hasUsableQuestion) {
-    return { ok: false, error: 'Add at least one question.' };
+    return { ok: false, error: copy.addQuestion };
   }
 
   return { ok: true, normalized };
@@ -189,6 +201,9 @@ function RichTextField({
   minHeightClass = 'min-h-[44px]',
   toolbarVisibility = 'always',
 }: RichTextFieldProps) {
+  const { messages } = useI18n();
+  const toolbar = messages.editor.toolbar;
+  const symbolsCopy = messages.studio.practice.symbols;
   const [showSymbols, setShowSymbols] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -291,9 +306,9 @@ function RichTextField({
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleBold().run()}
             data-active={editor.isActive('bold')}
-            aria-label="Bold"
+            aria-label={toolbar.bold}
             aria-pressed={editor.isActive('bold')}
-            title="Bold"
+            title={toolbar.bold}
           >
             <Bold className="h-3.5 w-3.5" />
           </Button>
@@ -304,9 +319,9 @@ function RichTextField({
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleItalic().run()}
             data-active={editor.isActive('italic')}
-            aria-label="Italic"
+            aria-label={toolbar.italic}
             aria-pressed={editor.isActive('italic')}
-            title="Italic"
+            title={toolbar.italic}
           >
             <Italic className="h-3.5 w-3.5" />
           </Button>
@@ -317,9 +332,9 @@ function RichTextField({
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             data-active={editor.isActive('underline')}
-            aria-label="Underline"
+            aria-label={toolbar.underline}
             aria-pressed={editor.isActive('underline')}
-            title="Underline"
+            title={toolbar.underline}
           >
             <UnderlineIcon className="h-3.5 w-3.5" />
           </Button>
@@ -331,9 +346,9 @@ function RichTextField({
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleSubscript().run()}
             data-active={editor.isActive('subscript')}
-            aria-label="Subscript"
+            aria-label={toolbar.subscript}
             aria-pressed={editor.isActive('subscript')}
-            title="Subscript"
+            title={toolbar.subscript}
           >
             <SubscriptIcon className="h-3.5 w-3.5" />
           </Button>
@@ -344,9 +359,9 @@ function RichTextField({
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleSuperscript().run()}
             data-active={editor.isActive('superscript')}
-            aria-label="Superscript"
+            aria-label={toolbar.superscript}
             aria-pressed={editor.isActive('superscript')}
-            title="Superscript"
+            title={toolbar.superscript}
           >
             <SuperscriptIcon className="h-3.5 w-3.5" />
           </Button>
@@ -357,9 +372,9 @@ function RichTextField({
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleCode().run()}
             data-active={editor.isActive('code')}
-            aria-label="Inline code"
+            aria-label={toolbar.inlineCode}
             aria-pressed={editor.isActive('code')}
-            title="Inline code"
+            title={toolbar.inlineCode}
           >
             <Code className="h-3.5 w-3.5" />
           </Button>
@@ -369,8 +384,8 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={clearFormatting}
-            aria-label="Clear formatting"
-            title="Clear formatting"
+            aria-label={toolbar.clearFormatting}
+            title={toolbar.clearFormatting}
           >
             <Eraser className="h-3.5 w-3.5" />
           </Button>
@@ -384,10 +399,10 @@ function RichTextField({
                 e.stopPropagation();
                 setShowSymbols((s) => !s);
               }}
-              aria-label="Insert symbol"
+              aria-label={toolbar.insertSymbol}
               aria-haspopup="menu"
               aria-expanded={showSymbols}
-              title="Insert symbol"
+              title={toolbar.insertSymbol}
             >
               <Sigma className="h-3.5 w-3.5" />
             </Button>
@@ -399,8 +414,8 @@ function RichTextField({
                     type="button"
                     className="h-8 w-8 rounded-sm border border-border text-base leading-none transition-colors hover:bg-muted flex items-center justify-center"
                     onClick={() => insertSymbol(symbol.value)}
-                    aria-label={symbol.label}
-                    title={symbol.label}
+                    aria-label={symbolsCopy[symbol.key]}
+                    title={symbolsCopy[symbol.key]}
                   >
                     {symbol.value}
                   </button>
@@ -432,6 +447,11 @@ export function PracticeTestEditor({
   initialStatus = 'DRAFT',
   onSaved,
 }: PracticeTestEditorProps) {
+  const { messages, t } = useI18n();
+  const practiceCopy = messages.studio.practice;
+  const editorCopy = messages.studio.editor;
+  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const difficultyCopy = messages.materials.difficulty;
   const router = useRouter();
   const [subjectId, setSubjectId] = useState(initialSubjectId);
   const [topicId, setTopicId] = useState(initialTopicId);
@@ -470,9 +490,7 @@ export function PracticeTestEditor({
     index: number;
   } | null>(null);
 
-  const topics = subjectId
-    ? (CURRICULUM_TOPICS as Record<string, { id: string; name: string }[]>)[subjectId] ?? []
-    : [];
+  const topics = subjectId ? getLocalizedTopics(messages, subjectId) : [];
 
   const addQuestion = useCallback(() => {
     const options = ensureOptions();
@@ -544,15 +562,15 @@ export function PracticeTestEditor({
     strict = false
   ): Promise<string | undefined> => {
     if (!subjectId || !topicId || !title.trim()) {
-      toast.error('Subject, topic, and title are required');
+      toast.error(practiceCopy.toast.requiredFields);
       return;
     }
     const finalObjectives = objectiveSlots.map(s => s.trim()).filter(Boolean).join('\n');
 
     const enforceComplete = strict || andPublish;
-    const validation = validateQuestions(questions, enforceComplete);
+    const validation = validateQuestions(questions, enforceComplete, practiceCopy.validation);
     if (!validation.ok || !validation.normalized) {
-      toast.error(validation.error ?? 'Please complete the questions.');
+      toast.error(validation.error ?? practiceCopy.toast.completeQuestions);
       return;
     }
 
@@ -574,11 +592,11 @@ export function PracticeTestEditor({
             materialType: 'PRACTICE_TEST',
           }),
         });
+        const created = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to create');
+          toast.error(practiceCopy.toast.createFailed);
+          return;
         }
-        const created = await res.json();
 
         setDraftId(created.id);
         setSavedTitle(title);
@@ -587,7 +605,7 @@ export function PracticeTestEditor({
         setSavedQuestionsJson(JSON.stringify(questions));
 
         if (!andPublish && !skipRedirect) {
-          toast.success('Practice test saved');
+          toast.success(practiceCopy.toast.savedPractice);
           onSaved?.(created.id);
           if (created.id) router.push(`/studio/${created.id}`);
         }
@@ -603,8 +621,8 @@ export function PracticeTestEditor({
           }),
         });
         if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'Failed to save');
+          toast.error(practiceCopy.toast.saveFailed);
+          return;
         }
 
         setSavedTitle(title);
@@ -613,7 +631,7 @@ export function PracticeTestEditor({
         setSavedQuestionsJson(JSON.stringify(questions));
 
         if (!andPublish && !skipRedirect) {
-          toast.success('Saved');
+          toast.success(practiceCopy.toast.saved);
           if (mode === 'create') {
             router.push(`/studio/${targetId}`);
           }
@@ -622,8 +640,8 @@ export function PracticeTestEditor({
         onSaved?.(targetId);
         return targetId;
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save');
+    } catch {
+      toast.error(practiceCopy.toast.saveFailed);
     } finally {
       setSaving(false);
     }
@@ -631,17 +649,21 @@ export function PracticeTestEditor({
 
   const publish = useCallback(async (confirmed = false) => {
     if (!subjectId || !topicId || !title.trim()) {
-      toast.error('Subject, topic, and title are required');
+      toast.error(practiceCopy.toast.requiredFields);
       return;
     }
 
-    const publishCheck = validateQuestions(questions, true);
+    const publishCheck = validateQuestions(questions, true, practiceCopy.validation);
     if (!publishCheck.ok) {
-      toast.error(publishCheck.error ?? 'Please complete the questions before publishing.');
+      toast.error(publishCheck.error ?? practiceCopy.toast.completeQuestions);
       return;
     }
     if ((publishCheck.normalized?.length ?? 0) < CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS) {
-      toast.error(`Practice tests must include at least ${CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS} questions to publish`);
+      toast.error(
+        t('studio.practice.toast.minQuestions', {
+          count: CREDITS_MATERIAL.PRACTICE_MIN_QUESTIONS,
+        }),
+      );
       return;
     }
 
@@ -669,7 +691,7 @@ export function PracticeTestEditor({
 
     const finalObjectives = objectiveSlots.map(s => s.trim()).filter(Boolean).join('\n');
     if (objectiveSlots.filter(s => s.trim()).length < 2) {
-      toast.error('Please provide at least 2 learning objectives to publish');
+      toast.error(practiceCopy.toast.objectivesRequired);
       return;
     }
 
@@ -687,10 +709,11 @@ export function PracticeTestEditor({
         body: JSON.stringify({ status: 'PUBLISHED', difficulty, objectives: finalObjectives }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to publish');
+        toast.error(practiceCopy.toast.publishFailed);
+        return;
       }
 
       if (typeof data.balanceAfter === 'number') {
@@ -698,16 +721,15 @@ export function PracticeTestEditor({
       }
       const creditsMsg =
         typeof data.creditsGranted === 'number' && data.creditsGranted > 0
-          ? ` +${Math.round(Number(data.creditsGranted))} credits`
+          ? t('studio.editor.toast.creditsSuffix', { count: Math.round(Number(data.creditsGranted)) })
           : '';
-      toast.success(`Published! Your practice test is now visible in the catalog.${creditsMsg}`);
+      toast.success(t('studio.practice.toast.publishSuccess', { credits: creditsMsg }));
 
       setCurrentStatus('PUBLISHED');
       router.refresh();
       onSaved?.();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to publish';
-      toast.error(msg);
+    } catch {
+      toast.error(practiceCopy.toast.publishFailed);
     } finally {
       setPublishing(false);
     }
@@ -722,14 +744,16 @@ export function PracticeTestEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'DRAFT' }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to unpublish');
-      toast.success('Material moved back to drafts.');
+      if (!res.ok) {
+        toast.error(practiceCopy.toast.unpublishFailed);
+        return;
+      }
+      toast.success(practiceCopy.toast.unpublishSuccess);
       setCurrentStatus('DRAFT');
       router.refresh();
       onSaved?.();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to unpublish');
+    } catch {
+      toast.error(practiceCopy.toast.unpublishFailed);
     } finally {
       setUnpublishing(false);
     }
@@ -740,14 +764,16 @@ export function PracticeTestEditor({
     setDeleting(true);
     try {
       const res = await fetch(`/api/materials/${materialId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to delete');
-      toast.success('Material deleted.');
+      if (!res.ok) {
+        toast.error(practiceCopy.toast.deleteFailed);
+        return;
+      }
+      toast.success(practiceCopy.toast.deleteSuccess);
       setShowDeleteDialog(false);
       router.push('/studio');
       router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete');
+    } catch {
+      toast.error(practiceCopy.toast.deleteFailed);
     } finally {
       setDeleting(false);
     }
@@ -758,9 +784,9 @@ export function PracticeTestEditor({
       <div className="card-frame bg-card p-6 space-y-5 mb-4 flex-shrink-0">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">Test setup</h2>
+            <h2 className="text-lg font-semibold">{practiceCopy.setupTitle}</h2>
             <p className="text-xs text-muted-foreground">
-              Title, subject, and difficulty appear in the catalog and search.
+              {practiceCopy.setupDescription}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -771,7 +797,7 @@ export function PracticeTestEditor({
                   onClick={() => setShowDeleteDialog(true)}
                   disabled={deleting || publishing || unpublishing || saving}
                 >
-                  {deleting ? 'Deleting...' : 'Delete'}
+                  {deleting ? editorCopy.actions.deleting : editorCopy.actions.delete}
                 </Button>
                 {isPublished ? (
                   <Button
@@ -779,13 +805,13 @@ export function PracticeTestEditor({
                     onClick={unpublish}
                     disabled={deleting || publishing || unpublishing || saving}
                   >
-                    {unpublishing ? 'Unpublishing...' : 'Unpublish'}
+                    {unpublishing ? editorCopy.actions.unpublishing : editorCopy.actions.unpublish}
                   </Button>
                 ) : null}
               </>
             ) : null}
             <Button variant="secondary-primary" onClick={() => save(false)} disabled={saving || publishing || unpublishing || deleting}>
-              {saving ? 'Saving...' : 'Save Draft'}
+              {saving ? editorCopy.actions.saving : editorCopy.actions.saveDraft}
             </Button>
             <Button
               variant="primary"
@@ -793,48 +819,48 @@ export function PracticeTestEditor({
               disabled={publishing || saving || unpublishing || deleting || (isPublished && !hasChanges)}
             >
               {publishing
-                ? 'Publishing...'
+                ? editorCopy.actions.publishing
                 : mode === 'create'
-                  ? 'Save & Publish'
+                  ? editorCopy.actions.savePublish
                 : hasChanges
-                    ? 'Save & Publish'
+                    ? editorCopy.actions.savePublish
                     : isPublished
-                      ? 'Published'
-                      : 'Publish'}
+                      ? editorCopy.actions.published
+                      : editorCopy.actions.publish}
             </Button>
           </div>
         </div>
 
         <div className="grid gap-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Title</label>
+            <label className="text-sm font-medium">{editorCopy.labels.title}</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Practice test title"
+              placeholder={editorCopy.labels.titlePlaceholder}
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Subject</label>
+              <label className="text-sm font-medium">{editorCopy.labels.subject}</label>
               <Select
                 value={subjectId}
                 onChange={(e) => { setSubjectId(e.target.value); setTopicId(''); }}
-                placeholder="Select subject"
+                placeholder={editorCopy.labels.subjectPlaceholder}
                 disabled={mode === 'edit' || Boolean(draftId)}
               >
-                {SUBJECTS.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                {subjects.map((subject) => (
+                  <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
                 ))}
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Topic</label>
+              <label className="text-sm font-medium">{editorCopy.labels.topic}</label>
               <Select
                 value={topicId}
                 onChange={(e) => setTopicId(e.target.value)}
                 disabled={!subjectId || mode === 'edit' || Boolean(draftId)}
-                placeholder="Select topic"
+                placeholder={editorCopy.labels.topicPlaceholder}
               >
                 {topics.map((t) => (
                   <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
@@ -842,15 +868,15 @@ export function PracticeTestEditor({
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Difficulty</label>
+              <label className="text-sm font-medium">{editorCopy.labels.difficulty}</label>
               <Select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')}
-                placeholder="Select difficulty"
+                placeholder={editorCopy.labels.difficultyPlaceholder}
               >
-                <SelectItem value="BASIC">Basic</SelectItem>
-                <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
-                <SelectItem value="ADVANCED">Advanced</SelectItem>
+                <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
+                <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
+                <SelectItem value="ADVANCED">{difficultyCopy.ADVANCED}</SelectItem>
               </Select>
             </div>
           </div>
@@ -860,27 +886,27 @@ export function PracticeTestEditor({
       <div className="flex-1 min-h-[500px] space-y-6 pb-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">Questions</h2>
+            <h2 className="text-lg font-semibold">{practiceCopy.questionsTitle}</h2>
             <p className="text-xs text-muted-foreground">
-              Use the toolbar to add subscripts, superscripts, and science symbols.
+              {practiceCopy.questionsDescription}
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={addQuestion}>
             <Plus className="h-4 w-4 mr-1" />
-            Add question
+            {practiceCopy.addQuestion}
           </Button>
         </div>
 
         {questions.length === 0 ? (
           <div className="card-frame border-dashed bg-muted/20 px-6 py-10 text-center space-y-3">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">No questions yet</p>
+              <p className="text-sm font-medium text-foreground">{practiceCopy.noQuestionsTitle}</p>
               <p className="text-xs text-muted-foreground">
-                Add your first question to start building the test.
+                {practiceCopy.noQuestionsDescription}
               </p>
             </div>
             <Button variant="primary" size="sm" onClick={addQuestion}>
-              Add your first question
+              {practiceCopy.addFirstQuestion}
             </Button>
           </div>
         ) : (
@@ -890,10 +916,10 @@ export function PracticeTestEditor({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Question {i + 1}
+                      {t('studio.practice.questionLabel', { count: i + 1 })}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Write the prompt and select the correct answer.
+                      {practiceCopy.questionHint}
                     </p>
                   </div>
                   <Button
@@ -901,28 +927,28 @@ export function PracticeTestEditor({
                     size="icon"
                     className="text-destructive hover:text-destructive"
                     onClick={() => setQuestionToRemove({ id: q.id, index: i })}
-                    aria-label={`Remove question ${i + 1}`}
+                    aria-label={t('studio.practice.removeQuestionAria', { count: i + 1 })}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Prompt</label>
+                  <label className="text-sm font-medium">{practiceCopy.promptLabel}</label>
                   <RichTextField
                     value={q.question}
                     onChange={(html) => updateQuestion(q.id, { question: html })}
-                    placeholder="Write the question prompt..."
-                    ariaLabel={`Question ${i + 1} prompt`}
+                    placeholder={practiceCopy.promptPlaceholder}
+                    ariaLabel={t('studio.practice.promptAriaLabel', { count: i + 1 })}
                     minHeightClass="min-h-[88px]"
                     toolbarVisibility="always"
                   />
                 </div>
 
                 <fieldset className="space-y-3">
-                  <legend className="text-sm font-medium">Answer choices</legend>
+                  <legend className="text-sm font-medium">{practiceCopy.answerChoicesLabel}</legend>
                   <p id={`correct-help-${q.id}`} className="text-xs text-muted-foreground">
-                    Select the correct answer. You can include scientific notation in each option.
+                    {practiceCopy.answerChoicesHelp}
                   </p>
                   <div className="space-y-3">
                     {q.options?.map((opt, optionIndex) => {
@@ -939,7 +965,7 @@ export function PracticeTestEditor({
                               className="h-4 w-4 accent-primary"
                               checked={q.correctOptionId === opt.id}
                               onChange={() => updateQuestion(q.id, { correctOptionId: opt.id })}
-                              aria-label={`Mark option ${optionLabel} as correct`}
+                              aria-label={t('studio.practice.optionCorrectAria', { label: optionLabel })}
                               aria-describedby={`correct-help-${q.id}`}
                             />
                             <span className="text-xs font-semibold text-muted-foreground w-6">
@@ -950,8 +976,8 @@ export function PracticeTestEditor({
                             <RichTextField
                               value={opt.text}
                               onChange={(html) => updateOption(q.id, opt.id, html)}
-                              placeholder={`Option ${optionLabel}`}
-                              ariaLabel={`Option ${optionLabel} for question ${i + 1}`}
+                              placeholder={t('studio.practice.optionLabel', { label: optionLabel })}
+                              ariaLabel={t('studio.practice.optionAriaLabel', { label: optionLabel, count: i + 1 })}
                               minHeightClass="min-h-[44px]"
                               toolbarVisibility="focus"
                             />
@@ -962,7 +988,7 @@ export function PracticeTestEditor({
                             className="shrink-0"
                             onClick={() => removeOption(q.id, opt.id)}
                             disabled={(q.options?.length ?? 0) <= 3}
-                            aria-label={`Remove option ${optionLabel}`}
+                            aria-label={t('studio.practice.removeOptionAria', { label: optionLabel })}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -977,7 +1003,7 @@ export function PracticeTestEditor({
                     disabled={(q.options?.length ?? 0) >= 5}
                   >
                     <Plus className="h-3 w-3 mr-1" />
-                    Add option
+                    {practiceCopy.addOption}
                   </Button>
                 </fieldset>
               </div>
@@ -988,7 +1014,7 @@ export function PracticeTestEditor({
         <div className="flex justify-center pb-8">
           <Button variant="outline" size="sm" onClick={addQuestion}>
             <Plus className="h-4 w-4 mr-1" />
-            Add another question
+            {practiceCopy.addAnotherQuestion}
           </Button>
         </div>
       </div>
@@ -998,10 +1024,10 @@ export function PracticeTestEditor({
           <div className="space-y-6">
             <header className="space-y-1">
               <AlertDialogTitle>
-                Ready to publish?
+                {editorCopy.dialog.publishTitle}
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Provide learning objectives to help learners understand what they will achieve. Please enter at least two objectives.
+                {editorCopy.dialog.publishDescription}
               </AlertDialogDescription>
             </header>
             <div className="space-y-4">
@@ -1015,7 +1041,7 @@ export function PracticeTestEditor({
                         newSlots[idx] = e.target.value;
                         setObjectiveSlots(newSlots);
                       }}
-                      placeholder={`Objective ${idx + 1}`}
+                      placeholder={t('studio.editor.placeholders.objective', { count: idx + 1 })}
                       className={cn(
                         "h-10 text-sm transition-all duration-200 flex-1 focus:border-primary/50"
                       )}
@@ -1033,7 +1059,7 @@ export function PracticeTestEditor({
                 onClick={() => setShowPublishDialog(false)}
                 disabled={publishing}
               >
-                Cancel
+                {editorCopy.dialog.cancel}
               </Button>
               <Button
                 variant="primary"
@@ -1045,12 +1071,12 @@ export function PracticeTestEditor({
                 disabled={publishing || (isPublished && !hasChanges) || objectiveSlots.filter(s => s.trim()).length < 2}
               >
                 {publishing
-                  ? 'Publishing...'
+                  ? editorCopy.actions.publishing
                   : hasChanges
-                    ? 'Save & Publish'
+                    ? editorCopy.actions.savePublish
                   : isPublished
-                    ? 'Already Published'
-                      : 'Publish'}
+                    ? editorCopy.actions.alreadyPublished
+                      : editorCopy.dialog.publish}
               </Button>
             </div>
           </div>
@@ -1060,10 +1086,8 @@ export function PracticeTestEditor({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete material?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this material. This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{editorCopy.deleteDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>{editorCopy.deleteDialog.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex justify-end gap-2 pt-4">
             <Button
@@ -1072,7 +1096,7 @@ export function PracticeTestEditor({
               onClick={() => setShowDeleteDialog(false)}
               disabled={deleting}
             >
-              Cancel
+              {editorCopy.deleteDialog.cancel}
             </Button>
             <Button
               variant="danger"
@@ -1080,7 +1104,7 @@ export function PracticeTestEditor({
               onClick={deleteMaterial}
               disabled={deleting}
             >
-              {deleting ? 'Deleting...' : 'Delete'}
+              {deleting ? editorCopy.actions.deleting : editorCopy.deleteDialog.confirm}
             </Button>
           </div>
         </AlertDialogContent>
@@ -1094,14 +1118,14 @@ export function PracticeTestEditor({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove question?</AlertDialogTitle>
+            <AlertDialogTitle>{practiceCopy.dialogs.removeQuestionTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the selected question and its options.
+              {practiceCopy.dialogs.removeQuestionDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="pt-4">
             <AlertDialogCancel onClick={() => setQuestionToRemove(null)}>
-              Cancel
+              {practiceCopy.dialogs.cancel}
             </AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -1112,7 +1136,7 @@ export function PracticeTestEditor({
                 }
               }}
             >
-              Remove question
+              {practiceCopy.dialogs.confirmRemove}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

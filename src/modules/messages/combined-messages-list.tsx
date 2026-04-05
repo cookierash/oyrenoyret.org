@@ -11,6 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectItem } from '@/components/ui/select';
 import { dispatchCreditsUpdated } from '@/src/lib/credits-events';
 import { cn } from '@/src/lib/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { useSettings } from '@/src/components/settings/settings-provider';
+import { getLocaleCode } from '@/src/i18n';
 
 type ReplyNotificationItem = {
   type: 'reply';
@@ -20,7 +23,7 @@ type ReplyNotificationItem = {
   createdAt: string;
   authorName: string;
   discussionTitle: string;
-  contextLabel: string;
+  contextType: 'reply' | 'discussion';
   contentPreview: string;
 };
 
@@ -47,47 +50,6 @@ type SprintEnrollmentItem = {
 
 type CombinedMessageItem = ReplyNotificationItem | CreditActivityItem | SprintEnrollmentItem;
 
-const TRANSACTION_LABELS: Record<string, string> = {
-  REGISTRATION: 'Registration bonus',
-  MATERIAL_PUBLISH: 'Material published',
-  MATERIAL_PASSIVE: 'Earned from material unlock',
-  MATERIAL_UNLOCK: 'Unlocked material',
-  DISCUSSION_CREATE: 'Created discussion',
-  DISCUSSION_REFUND: 'Discussion refund (no replies)',
-  DISCUSSION_HELP: 'Helpful reply reward',
-  GROUP_SESSION_PARTICIPATE: 'Group session participation',
-  GROUP_SESSION_FACILITATE: 'Group session facilitation',
-  SPRINT_ENTRY: 'Sprint entry',
-  SPRINT_PAYOUT: 'Sprint payout',
-  SPECIAL_EVENT: 'Special event',
-};
-
-const SPRINT_RULES_TEXT = `
-Please review the sprint procedures and policies before confirming:
-
-1. Your spot is reserved only after confirmation.
-2. Credits are deducted immediately after confirmation.
-3. Credits are non-refundable once the sprint is confirmed.
-4. Join on time; missed sessions are not refunded.
-5. Keep communication respectful and focused.
-6. You are responsible for stable internet and a working device.
-`;
-
-function formatDate(date: Date) {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function formatTime(date: Date) {
-  return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-}
-
 function SprintEnrollmentRow({
   item,
   onRefresh,
@@ -95,6 +57,30 @@ function SprintEnrollmentRow({
   item: SprintEnrollmentItem;
   onRefresh?: () => void;
 }) {
+  const { locale, messages, t } = useI18n();
+  const { timeFormat } = useSettings();
+  const copy = messages.recentActivities.sprint;
+  const localeCode = getLocaleCode(locale);
+  const hour12 =
+    timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+    [localeCode],
+  );
+  const timeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        hour: 'numeric',
+        minute: '2-digit',
+        ...(hour12 === undefined ? {} : { hour12 }),
+      }),
+    [localeCode, hour12],
+  );
   const [open, setOpen] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [rulesRead, setRulesRead] = useState(false);
@@ -123,15 +109,15 @@ function SprintEnrollmentRow({
   const handleConfirm = async () => {
     if (submitting) return;
     if (isCancelled) {
-      toast.error('This registration was cancelled. Please register again from Live Activities.');
+      toast.error(copy.cancelledToast);
       return;
     }
     if (!accepted) {
-      toast.error('Please accept the sprint rules to continue.');
+      toast.error(copy.acceptRulesToast);
       return;
     }
     if (!item.liveEventId) {
-      toast.error('Missing sprint information. Please refresh the page.');
+      toast.error(copy.missingInfoToast);
       return;
     }
 
@@ -145,21 +131,21 @@ function SprintEnrollmentRow({
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 402) {
-          toast.error('Insufficient credits to complete registration.');
+          toast.error(copy.insufficientCreditsToast);
         } else {
-          toast.error(data.error ?? 'Failed to complete registration.');
+          toast.error(copy.completeFailedToast);
         }
         return;
       }
       if (typeof data.balanceAfter === 'number') {
         dispatchCreditsUpdated(data.balanceAfter);
       }
-      toast.success('Registration completed. See you at the sprint!');
+      toast.success(copy.completedToast);
       setOpen(false);
       setAccepted(false);
       onRefresh?.();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to complete registration.');
+    } catch {
+      toast.error(copy.completeFailedToast);
     } finally {
       setSubmitting(false);
     }
@@ -173,31 +159,33 @@ function SprintEnrollmentRow({
         </div>
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm font-medium text-foreground">
-            {isCancelled ? 'Registration cancelled' : 'Complete your sprint registration'}
+            {isCancelled ? copy.cancelledTitle : copy.pendingTitle}
           </p>
           <p className="text-xs text-muted-foreground">{item.topic}</p>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
               <Calendar className="h-3 w-3" />
-              {formatDate(eventDate)}
+              {dateFormatter.format(eventDate)}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
               <Clock className="h-3 w-3" />
-              {formatTime(eventDate)}
+              {timeFormatter.format(eventDate)}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
               <Clock className="h-3 w-3" />
-              {item.durationMinutes} min
+              {t('recentActivities.sprint.durationLabel', { count: item.durationMinutes })}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
               <Coins className="h-3 w-3" />
-              {Math.round(item.creditCost)} credits
+              {t('recentActivities.sprint.creditsLabel', {
+                count: Math.round(item.creditCost),
+              })}
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground">
             {isCancelled
-              ? 'This registration was cancelled. Return to Live Activities to register again.'
-              : 'A confirmation is required before credits are deducted.'}
+              ? copy.cancelledHint
+              : copy.pendingHint}
           </p>
         </div>
         <div className="shrink-0 text-right">
@@ -206,10 +194,10 @@ function SprintEnrollmentRow({
             variant={isCancelled ? 'outline' : 'secondary'}
             onClick={() => setOpen(true)}
           >
-            {isCancelled ? 'View details' : 'Complete registration'}
+            {isCancelled ? copy.viewDetails : copy.completeRegistration}
           </Button>
           <p suppressHydrationWarning className="mt-1 text-[10px] text-muted-foreground">
-            {formatTime(createdTime)}
+            {timeFormatter.format(createdTime)}
           </p>
         </div>
       </div>
@@ -228,11 +216,11 @@ function SprintEnrollmentRow({
       >
         <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-          <AlertDialogTitle>Confirm sprint registration</AlertDialogTitle>
+          <AlertDialogTitle>{copy.confirmTitle}</AlertDialogTitle>
           <AlertDialogDescription>
             {isCancelled
-              ? 'This registration was cancelled. Please register again from Live Activities.'
-              : 'Review the rules and policies before completing your registration.'}
+              ? copy.cancelledToast
+              : copy.confirmDescription}
           </AlertDialogDescription>
         </AlertDialogHeader>
           <div className="space-y-4">
@@ -242,19 +230,24 @@ function SprintEnrollmentRow({
                   <ShieldCheck className="h-4 w-4" />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium">Sprint summary</p>
+                  <p className="text-sm font-medium">{copy.summaryTitle}</p>
                   <p className="text-xs text-muted-foreground">
-                    {item.topic} on {formatDate(eventDate)} at {formatTime(eventDate)}
+                    {t('recentActivities.sprint.summaryLine', {
+                      topic: item.topic,
+                      date: dateFormatter.format(eventDate),
+                      time: timeFormatter.format(eventDate),
+                    })}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Credits required: {Math.round(item.creditCost)} (no refunds)
+                    {t('recentActivities.sprint.creditsRequired', {
+                      count: Math.round(item.creditCost),
+                    })}
                   </p>
                 </div>
               </div>
               {isCancelled ? (
                 <p className="mt-3 text-sm text-muted-foreground">
-                  This request was cancelled and cannot be confirmed. Visit Live Activities to
-                  register again.
+                  {copy.cancelledSummary}
                 </p>
               ) : (
                 <>
@@ -264,12 +257,12 @@ function SprintEnrollmentRow({
                     className="mt-3 max-h-40 overflow-auto rounded-lg border border-border/60 bg-background/60 p-3"
                   >
                     <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                      {SPRINT_RULES_TEXT}
+                      {copy.rulesText}
                     </p>
                   </div>
                   {!rulesRead ? (
                     <p className="mt-2 text-[11px] text-muted-foreground">
-                      Scroll to the end to enable confirmation.
+                      {copy.scrollHint}
                     </p>
                   ) : null}
                 </>
@@ -292,19 +285,19 @@ function SprintEnrollmentRow({
                   />
                   <div className="space-y-1 leading-none flex-1">
                     <p className="text-sm font-medium">
-                      I have read and agree to the sprint rules and policies
+                      {copy.agreeTitle}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Credits will be deducted immediately and are non-refundable.
+                      {copy.agreeHint}
                     </p>
                     {!rulesRead ? (
                       <p className="text-[11px] text-muted-foreground">
-                        Read all rules to unlock the confirmation checkbox.
+                        {copy.agreeLocked}
                       </p>
                     ) : null}
                   </div>
                   <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Required
+                    {copy.required}
                   </span>
                 </div>
               </div>
@@ -313,14 +306,14 @@ function SprintEnrollmentRow({
 
           <AlertDialogFooter className="mt-4">
             <AlertDialogCancel onClick={() => setOpen(false)}>
-              {isCancelled ? 'Close' : 'Not now'}
+              {isCancelled ? copy.close : copy.notNow}
             </AlertDialogCancel>
             {isCancelled ? null : (
               <AlertDialogAction
                 onClick={handleConfirm}
                 disabled={!rulesRead || !accepted || submitting}
               >
-                {submitting ? 'Completing...' : 'Complete registration'}
+                {submitting ? copy.completing : copy.confirmAction}
               </AlertDialogAction>
             )}
           </AlertDialogFooter>
@@ -336,6 +329,30 @@ interface CombinedMessagesListProps {
 }
 
 export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListProps) {
+  const { locale, messages, t } = useI18n();
+  const { timeFormat } = useSettings();
+  const copy = messages.recentActivities;
+  const localeCode = getLocaleCode(locale);
+  const hour12 =
+    timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
+  const dateLabelFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      }),
+    [localeCode],
+  );
+  const timeFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(localeCode, {
+        hour: '2-digit',
+        minute: '2-digit',
+        ...(hour12 === undefined ? {} : { hour12 }),
+      }),
+    [localeCode, hour12],
+  );
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const isEmpty = items.length === 0;
 
@@ -352,11 +369,7 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
     for (const item of sorted) {
       const d = new Date(item.createdAt);
       const dateKey = d.toLocaleDateString('en-CA');
-      const dateLabel = d.toLocaleDateString('en-US', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
+      const dateLabel = dateLabelFormatter.format(d);
 
       let group = groupMap.get(dateKey);
       if (!group) {
@@ -368,33 +381,33 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
     }
 
     return groups;
-  }, [items, sortOrder]);
+  }, [items, sortOrder, dateLabelFormatter]);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
           <label htmlFor="recent-activities-sort" className="text-sm text-muted-foreground whitespace-nowrap">
-            Sort by
+            {copy.sortLabel}
           </label>
           <Select
             id="recent-activities-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
             className="w-[180px]"
-            aria-label="Sort recent activities"
+            aria-label={copy.sortLabel}
           >
-            <SelectItem value="newest">Newest first</SelectItem>
-            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="newest">{copy.sortNewest}</SelectItem>
+            <SelectItem value="oldest">{copy.sortOldest}</SelectItem>
           </Select>
         </div>
       </div>
       {isEmpty ? (
         <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
           <MessageSquare className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground font-medium">No recent activities yet.</p>
+          <p className="text-sm text-muted-foreground font-medium">{copy.emptyTitle}</p>
           <p className="text-xs text-muted-foreground/60 mt-1">
-            Notifications and credit activity will appear here.
+            {copy.emptyDescription}
           </p>
         </div>
       ) : (
@@ -417,6 +430,11 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                   <ul className="divide-y divide-border">
                     {group.items.map((item) => {
                       if (item.type === 'reply') {
+                        const contextLabel =
+                          item.contextType === 'reply'
+                            ? copy.replyContext.reply
+                            : copy.replyContext.discussion;
+                        const authorName = item.authorName || messages.materials.authorFallback;
                         return (
                           <li key={`reply-${item.id}`}>
                             <Link
@@ -428,20 +446,17 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-foreground truncate">
-                                  {item.authorName} {item.contextLabel}
+                                  {authorName} {contextLabel}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground truncate">
                                   {item.discussionTitle}
                                 </p>
                                 <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
-                                  {item.contentPreview}
+                                  {item.contentPreview || copy.noContent}
                                 </p>
                               </div>
                               <div className="shrink-0 text-[11px] text-muted-foreground">
-                                {new Date(item.createdAt).toLocaleTimeString('en-US', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
+                                {timeFormatter.format(new Date(item.createdAt))}
                               </div>
                             </Link>
                           </li>
@@ -459,12 +474,9 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
 
                       const isGain = item.amount > 0;
                       const absAmount = Math.abs(item.amount);
-                      const label = TRANSACTION_LABELS[item.label] ?? item.label;
-                      const creditMessage = isGain ? 'Credits added' : 'Credits spent';
-                      const creditTime = new Date(item.createdAt).toLocaleTimeString('en-US', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      });
+                      const label = copy.transactions[item.label as keyof typeof copy.transactions] ?? item.label;
+                      const creditMessage = isGain ? copy.credits.added : copy.credits.spent;
+                      const creditTime = timeFormatter.format(new Date(item.createdAt));
 
                       return (
                         <li key={`credit-${item.id}`}>
@@ -493,10 +505,12 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                                 )}
                               >
                                 {isGain ? '+' : '−'}
-                                {Math.round(absAmount)} credits
+                                {t('recentActivities.credits.creditsLabel', { count: Math.round(absAmount) })}
                               </span>
                               <p className="text-[10px] text-muted-foreground">
-                                Balance: {Math.round(item.balanceAfter)}
+                                {t('recentActivities.credits.balance', {
+                                  count: Math.round(item.balanceAfter),
+                                })}
                               </p>
                             </div>
                           </div>

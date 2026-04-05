@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectItem } from '@/components/ui/select';
 import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/difficulty-bars';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 interface LiveEvent {
   id: string;
@@ -89,6 +90,9 @@ interface LiveEventsAdminPanelProps {
 }
 
 function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelProps) {
+  const { messages } = useI18n();
+  const difficultyCopy = messages.materials.difficulty;
+  const adminCopy = messages.liveActivities.admin;
   const initialForm = useMemo(
     () => ({
       topic: '',
@@ -143,34 +147,34 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
   const handleCreateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!eventForm.topic.trim()) {
-      toast.error('Topic is required.');
+      toast.error(adminCopy.toasts.topicRequired);
       return;
     }
     if (!eventForm.date) {
-      toast.error('Date and time are required.');
+      toast.error(adminCopy.toasts.dateRequired);
       return;
     }
     const parsedDate = new Date(eventForm.date);
     if (Number.isNaN(parsedDate.getTime())) {
-      toast.error('Please enter a valid date.');
+      toast.error(adminCopy.toasts.invalidDate);
       return;
     }
     if (parsedDate.getTime() < Date.now()) {
-      toast.error('Please choose a date and time in the future.');
+      toast.error(adminCopy.toasts.futureDate);
       return;
     }
     const duration = Number(eventForm.durationMinutes);
     const creditCost = Number(eventForm.creditCost);
     if (!Number.isFinite(duration) || duration <= 0) {
-      toast.error('Duration must be a positive number.');
+      toast.error(adminCopy.toasts.durationPositive);
       return;
     }
     if (!Number.isInteger(duration)) {
-      toast.error('Duration must be a whole number of minutes.');
+      toast.error(adminCopy.toasts.durationWhole);
       return;
     }
     if (!Number.isFinite(creditCost) || creditCost < 0 || !Number.isInteger(creditCost)) {
-      toast.error('Credit cost must be a whole number 0 or greater.');
+      toast.error(adminCopy.toasts.creditCostWhole);
       return;
     }
 
@@ -187,17 +191,16 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
           type,
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to create event.');
+        toast.error(adminCopy.toasts.createEventFailed);
         return;
       }
-      toast.success('Event created.');
+      toast.success(adminCopy.toasts.eventCreated);
       setEventForm(initialForm);
       setEventDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create event.');
+      toast.error(adminCopy.toasts.createEventFailed);
     }
   };
 
@@ -205,7 +208,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     try {
       const sanitizedId = typeof eventId === 'string' ? eventId.trim() : '';
       if (!sanitizedId) {
-        toast.error('Missing event id. Please refresh and try again.');
+        toast.error(adminCopy.toasts.missingEventId);
         return;
       }
       const res = await fetch(`/api/live-events/${encodeURIComponent(sanitizedId)}`, {
@@ -213,22 +216,21 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: sanitizedId }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to delete event.');
+        toast.error(adminCopy.toasts.deleteEventFailed);
         return;
       }
-      toast.success('Event removed.');
+      toast.success(adminCopy.toasts.eventRemoved);
       loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete event.');
+      toast.error(adminCopy.toasts.deleteEventFailed);
     }
   };
 
   const requestDelete = (event: LiveEvent) => {
     const sanitizedId = typeof event.id === 'string' ? event.id.trim() : '';
     if (!sanitizedId) {
-      toast.error('Missing event id. Please refresh and try again.');
+      toast.error(adminCopy.toasts.missingEventId);
       return;
     }
     setDeleteTarget({ id: sanitizedId, topic: event.topic, date: event.date });
@@ -251,7 +253,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     if (event.type !== 'PROBLEM_SPRINT') return;
     const sanitizedId = typeof event.id === 'string' ? event.id.trim() : '';
     if (!sanitizedId) {
-      toast.error('Missing event id. Please refresh and try again.');
+      toast.error(adminCopy.toasts.missingEventId);
       return;
     }
     setPayoutTarget(event);
@@ -271,12 +273,12 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     };
     const values = [trimmed.first, trimmed.second, trimmed.third].filter(Boolean);
     if (values.length === 0) {
-      toast.error('Please enter at least one winner.');
+      toast.error(adminCopy.toasts.payoutNeedWinner);
       return;
     }
     const normalized = values.map((value) => value.toLowerCase());
     if (new Set(normalized).size !== normalized.length) {
-      toast.error('Each rank must have a unique winner.');
+      toast.error(adminCopy.toasts.payoutUniqueWinner);
       return;
     }
     setPayingOut(true);
@@ -286,18 +288,17 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(trimmed),
       });
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to pay out winners.');
+        toast.error(adminCopy.toasts.payoutFailed);
         return;
       }
-      toast.success('Payouts completed.');
+      toast.success(adminCopy.toasts.payoutCompleted);
       setPayoutDialogOpen(false);
       setPayoutTarget(null);
       setPayoutForm({ first: '', second: '', third: '' });
       loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to pay out winners.');
+      toast.error(adminCopy.toasts.payoutFailed);
     } finally {
       setPayingOut(false);
     }
@@ -393,9 +394,9 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                     }))
                   }
                 >
-                  <SelectItem value="BASIC">Basic</SelectItem>
-                  <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
-                  <SelectItem value="ADVANCED">Advanced</SelectItem>
+                  <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
+                  <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
+                  <SelectItem value="ADVANCED">{difficultyCopy.ADVANCED}</SelectItem>
                 </Select>
               </div>
               <div className="grid gap-2">
@@ -739,6 +740,8 @@ export function EventsAdminPanel() {
 }
 
 export function AnnouncementsAdminPanel() {
+  const { messages } = useI18n();
+  const adminCopy = messages.liveActivities.admin;
   const [announcements, setAnnouncements] = useState<LiveAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -766,7 +769,7 @@ export function AnnouncementsAdminPanel() {
   const handleCreateAnnouncement = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!announcementForm.title.trim() || !announcementForm.body.trim()) {
-      toast.error('Title and announcement text are required.');
+      toast.error(adminCopy.toasts.announcementFieldsRequired);
       return;
     }
     try {
@@ -778,32 +781,30 @@ export function AnnouncementsAdminPanel() {
           body: announcementForm.body,
         }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to create announcement.');
+        toast.error(adminCopy.toasts.announcementCreateFailed);
         return;
       }
-      toast.success('Announcement published.');
+      toast.success(adminCopy.toasts.announcementPublished);
       setAnnouncementForm({ title: '', body: '' });
       setAnnouncementDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to create announcement.');
+      toast.error(adminCopy.toasts.announcementCreateFailed);
     }
   };
 
   const handleDeleteAnnouncement = async (announcementId: string) => {
     try {
       const res = await fetch(`/api/live-announcements/${announcementId}`, { method: 'DELETE' });
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to delete announcement.');
+        toast.error(adminCopy.toasts.announcementDeleteFailed);
         return;
       }
-      toast.success('Announcement removed.');
+      toast.success(adminCopy.toasts.announcementRemoved);
       loadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete announcement.');
+      toast.error(adminCopy.toasts.announcementDeleteFailed);
     }
   };
 

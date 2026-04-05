@@ -11,10 +11,13 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { AcademicRecord } from '@prisma/client';
+import { getI18n } from '@/src/i18n/server';
 
 export default async function AcademicRecordPage() {
   const userId = await getCurrentSession();
   if (!userId) redirect('/login');
+  const { messages } = await getI18n();
+  const copy = messages.app.academicRecord;
 
   const records: AcademicRecord[] = await prisma.academicRecord.findMany({
     where: { userId, deletedAt: null },
@@ -29,18 +32,18 @@ export default async function AcademicRecordPage() {
   return (
     <DashboardShell>
       <PageHeader
-        title="Academic record"
-        description="Your grades and academic progress."
+        title={copy.title}
+        description={copy.description}
       />
       <main className="space-y-4 pt-2">
         {user?.publicId ? (
           <p className="text-xs text-muted-foreground font-mono">
-            Your ID: {user.publicId}
+            {copy.idLabel} {user.publicId}
           </p>
         ) : null}
         {records.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No academic records yet. Records will appear here when added.
+            {copy.empty}
           </p>
         ) : (
           <div className="space-y-4">
@@ -48,13 +51,14 @@ export default async function AcademicRecordPage() {
               <Card key={r.id}>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">
-                    {r.subject ?? 'Subject'} {r.grade ? `· Grade ${r.grade}` : ''}
+                    {r.subject ?? copy.subjectFallback}{' '}
+                    {r.grade ? `· ${copy.gradeLabel} ${r.grade}` : ''}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-1">
                   {r.score != null && (
                     <p className="text-sm">
-                      <span className="text-muted-foreground">Score:</span> {r.score}
+                      <span className="text-muted-foreground">{copy.scoreLabel}</span> {r.score}
                     </p>
                   )}
                   {r.notes && (

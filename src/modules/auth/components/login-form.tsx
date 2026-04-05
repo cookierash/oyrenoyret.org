@@ -8,7 +8,7 @@
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema, type LoginInput } from '../schemas/registration';
+import { createLoginSchema, type LoginInput } from '../schemas/registration';
 import { login } from '../actions/login';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,18 +21,25 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { PasswordInput } from '@/src/modules/auth/components/password-input';
 import { isStaff } from '@/src/lib/permissions';
+import { useI18n } from '@/src/i18n/i18n-provider';
+import { resolveAuthError } from '@/src/modules/auth/utils/resolve-auth-error';
 
 export function LoginForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const { t, messages } = useI18n();
+  const copy = messages.auth.loginForm;
+  const placeholders = messages.auth.placeholders;
+  const validation = messages.auth.validation;
+  const validationSchema = useMemo(() => createLoginSchema(validation), [validation]);
 
   const form = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(validationSchema),
     defaultValues: {
       email: '',
       password: '',
@@ -45,15 +52,15 @@ export function LoginForm() {
       const result = await login(data);
 
       if (result.success) {
-        toast.success('Login successful!');
+        toast.success(copy.success);
         const destination = result.role && isStaff(result.role) ? '/admin/dashboard' : '/dashboard';
         router.push(destination);
         router.refresh();
       } else {
-        toast.error(result.error || 'Login failed');
+        toast.error(resolveAuthError(messages, t, copy.failed, result));
       }
     } catch {
-      toast.error('An unexpected error occurred');
+      toast.error(copy.unexpected);
     } finally {
       setIsSubmitting(false);
     }
@@ -62,10 +69,8 @@ export function LoginForm() {
   return (
     <div className="space-y-4">
       <header className="space-y-1">
-        <h1 className="text-3xl font-semibold tracking-tight">Welcome back</h1>
-        <p className="text-sm text-muted-foreground">
-          Use your student account to continue your learning journey.
-        </p>
+        <h1 className="text-3xl font-semibold tracking-tight">{copy.title}</h1>
+        <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
       </header>
 
       <Form {...form}>
@@ -76,12 +81,12 @@ export function LoginForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-xs font-medium text-muted-foreground">
-                  Email address
+                  {copy.emailLabel}
                 </FormLabel>
                 <FormControl>
                   <Input
                     type="email"
-                    placeholder="john.doe@example.com"
+                    placeholder={placeholders.email}
                     className="h-10 rounded-lg bg-background/70"
                     {...field}
                   />
@@ -97,11 +102,11 @@ export function LoginForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="text-xs font-medium text-muted-foreground">
-                  Password
+                  {copy.passwordLabel}
                 </FormLabel>
                 <FormControl>
                   <PasswordInput
-                    placeholder="••••••••"
+                    placeholder={placeholders.password}
                     className="h-10 rounded-lg bg-background/70"
                     {...field}
                   />
@@ -113,7 +118,7 @@ export function LoginForm() {
 
           <div className="text-xs text-muted-foreground text-right">
             <Link href="/forgot-password" className="text-primary hover:underline font-medium">
-              Forgot your password?
+              {copy.forgotPassword}
             </Link>
           </div>
 
@@ -121,11 +126,11 @@ export function LoginForm() {
             type="submit"
             variant="primary"
             size="lg"
-            className="h-10 w-full text-sm font-semibold"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Logging in...' : 'Login'}
-          </Button>
+          className="h-10 w-full text-sm font-semibold"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? copy.loggingIn : copy.login}
+        </Button>
         </form>
       </Form>
     </div>
