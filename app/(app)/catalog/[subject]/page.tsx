@@ -17,6 +17,8 @@ import { PiBookOpen as BookOpen, PiCaretRight as ChevronRight } from 'react-icon
 import { CatalogSearch } from '@/src/modules/materials/catalog-search';
 import { prisma } from '@/src/db/client';
 
+export const dynamic = 'force-dynamic';
+
 interface SubjectPageProps {
   params: Promise<{ subject: string }>;
 }
