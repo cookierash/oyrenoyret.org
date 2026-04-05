@@ -18,6 +18,7 @@ import { CatalogSearch } from '@/src/modules/materials/catalog-search';
 import { prisma } from '@/src/db/client';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface SubjectPageProps {
   params: Promise<{ subject: string }>;
