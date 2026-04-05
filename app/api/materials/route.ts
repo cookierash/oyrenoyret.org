@@ -30,10 +30,14 @@ export async function GET(request: Request) {
     const topicId = searchParams.get('topicId');
     const takeRaw = searchParams.get('take');
     const skipRaw = searchParams.get('skip');
-    const takeParam = takeRaw ? Number(takeRaw) : undefined;
-    const skipParam = skipRaw ? Number(skipRaw) : undefined;
-    const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : undefined;
-    const skip = Number.isFinite(skipParam) && skipParam > 0 ? skipParam : undefined;
+    const takeParam = takeRaw ? Number(takeRaw) : null;
+    const skipParam = skipRaw ? Number(skipRaw) : null;
+    const take = takeParam !== null && Number.isFinite(takeParam)
+      ? Math.min(Math.max(takeParam, 1), 200)
+      : undefined;
+    const skip = skipParam !== null && Number.isFinite(skipParam) && skipParam > 0
+      ? skipParam
+      : undefined;
     const includeAccess =
       searchParams.get('includeAccess') === '1' ||
       searchParams.get('includeAccess') === 'true' ||
