@@ -4,10 +4,6 @@ import './globals.css';
 import { ThemeProvider } from '@/src/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeDebugLogger } from '@/src/components/debug/theme-debug-logger';
-import { SettingsProvider } from '@/src/components/settings/settings-provider';
-import { getSettingsPreferences } from '@/src/lib/settings-preferences-server';
-import { I18nProvider } from '@/src/i18n/i18n-provider';
-import { normalizeLocale } from '@/src/i18n';
 import { Analytics } from '@vercel/analytics/react';
 
 const inter = Inter({
@@ -40,21 +36,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { language, timeFormat } = await getSettingsPreferences();
-  const locale = normalizeLocale(language);
   return (
-    <html lang={locale} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${comfortaa.variable} font-sans antialiased`}>
         <ThemeProvider>
           <ThemeDebugLogger />
-          <SettingsProvider language={language} timeFormat={timeFormat}>
-            <I18nProvider locale={locale}>{children}</I18nProvider>
-          </SettingsProvider>
+          {children}
           <Toaster />
           <Analytics />
         </ThemeProvider>
