@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectItem } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -13,12 +15,59 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Logo } from '@/src/components/ui/logo';
+import { useSettings } from '@/src/components/settings/settings-provider';
+import { SUPPORTED_LOCALES } from '@/src/i18n';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import type { SettingsLanguage } from '@/src/lib/settings-preferences';
+
+interface CurrentUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+}
 
 export function SiteFooter() {
+  const router = useRouter();
   const year = new Date().getFullYear();
   const [cookieOpen, setCookieOpen] = useState(false);
-  const { t } = useI18n();
+  const { t, messages } = useI18n();
+  const { language } = useSettings();
+  const [currentLanguage, setCurrentLanguage] = useState<SettingsLanguage>(language);
+  const [pending, startTransition] = useTransition();
+  const [user, setUser] = useState<CurrentUser | null | undefined>(undefined);
+  const languageOptions = SUPPORTED_LOCALES.map((locale) => ({
+    value: locale,
+    label: messages.settings.languageNames[locale] ?? locale,
+  }));
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((res) => res.json())
+      .then((data) => setUser(data.user ?? null))
+      .catch(() => setUser(null));
+  }, []);
+
+  useEffect(() => {
+    setCurrentLanguage(language);
+  }, [language]);
+
+  const updatePreferences = async (payload: Partial<{ language: SettingsLanguage }>) => {
+    await fetch('/api/settings/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+  };
+
+  const handleLanguageChange = (value: SettingsLanguage) => {
+    setCurrentLanguage(value);
+    startTransition(async () => {
+      await updatePreferences({ language: value });
+      router.refresh();
+    });
+  };
 
   return (
     <footer className="border-t border-border/60 bg-background">
@@ -36,6 +85,23 @@ export function SiteFooter() {
               </button>
               <p>© {year} oyrenoyret.org</p>
             </div>
+            {user === null ? (
+              <div className="max-w-[200px]">
+                <Select
+                  id="footer-language"
+                  aria-label={t('settings.languageTime.defaultLanguageLabel')}
+                  value={currentLanguage}
+                  onChange={(event) => handleLanguageChange(event.target.value as SettingsLanguage)}
+                  disabled={pending}
+                >
+                  {languageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-10 lg:grid-cols-5">

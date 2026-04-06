@@ -626,6 +626,7 @@ export const AZ_MESSAGES = {
         'Təkmilləşdirmə:\n' +
         '- Qlobal naviqasiya və düzən yeniləndi: tətbiq çərçivəsi, yan panel, başlıq/altlıq və sağ panellər.\n' +
         '- Qeydiyyat və giriş axınları daha aydın mərhələlər, gücləndirilmiş doğrulama və lokallaşdırılmış mesajlarla təkmilləşdirildi.\n' +
+        '- Sistemə daxil olmayan istifadəçilər üçün sayt altlığında dil seçimi əlavə edildi.\n' +
         '- Materiallar, müzakirələr, canlı fəaliyyətlər, mesajlar, onboarding və əsas tətbiq səhifələri yeni vizual sistemə uyğunlaşdırıldı.\n' +
         '- Resurs və siyasət səhifələrinin strukturu və mətnləri yeniləndi.\n' +
         'Düzəliş:\n' +

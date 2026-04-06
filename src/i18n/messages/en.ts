@@ -623,6 +623,7 @@ export const EN_MESSAGES = {
         'Improvement:\n' +
         '- Refined global navigation and layout across the app shell, sidebar, header/footer, and right-side panels.\n' +
         '- Enhanced registration and sign-in flows with clearer steps, stronger validation, and localized messaging.\n' +
+        '- Added a language selector to the public-site footer for signed-out visitors.\n' +
         '- Updated materials, discussions, live activities, messages, onboarding, and core app pages to align with the new visual system.\n' +
         '- Refreshed public resources and policy pages with updated structure and copy.\n' +
         'Fix:\n' +
