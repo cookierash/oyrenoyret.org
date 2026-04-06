@@ -18,6 +18,7 @@ import { cn } from '@/src/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getLocaleCode, type Locale } from '@/src/i18n';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -65,6 +66,9 @@ const formatDateTime = (iso: string, locale: Locale) => {
   }).format(date);
   return `${time} · ${day}`;
 };
+
+const formatReplyContent = (content: string) =>
+  content.replace(/<br\s*\/?>/gi, '\n');
 
 export default function DiscussionDetailPage() {
   const MAX_REPLY_LENGTH = 2000;
@@ -149,9 +153,10 @@ export default function DiscussionDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: newVote ?? 0 }),
       });
-      if (!res.ok) throw new Error('Failed to vote');
-    } catch {
-      toast.error(copy.failedVote);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+    } catch (error) {
+      toast.error(formatErrorToast(copy.failedVote, error instanceof Error ? error.message : null));
       setDiscussion(discussion);
     } finally {
       setVoteLoading(null);
@@ -166,12 +171,15 @@ export default function DiscussionDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ replyId }),
       });
-      if (!res.ok) throw new Error('Failed to accept');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
       router.refresh();
       fetchDiscussion();
       toast.success(copy.markedBest);
-    } catch {
-      toast.error(copy.failedAccept);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.failedAccept, error instanceof Error ? error.message : null),
+      );
     } finally {
       setAcceptingReplyId(null);
     }
@@ -189,8 +197,8 @@ export default function DiscussionDetailPage() {
           parentReplyId: parentReplyId || undefined,
         }),
       });
-      const created = await res.json();
-      if (!res.ok) throw new Error('Failed to reply');
+      const created = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(created) ?? '');
       setInlineReply('');
       setDialogContent('');
       setDialogOpen(false);
@@ -200,8 +208,10 @@ export default function DiscussionDetailPage() {
       } else {
         fetchDiscussion();
       }
-    } catch {
-      toast.error(copy.failedReply);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.failedReply, error instanceof Error ? error.message : null),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -432,7 +442,7 @@ export default function DiscussionDetailPage() {
                             </div>
                           </div>
                           <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
-                            {reply.content}
+                            {formatReplyContent(reply.content)}
                           </p>
                           {currentUserId === discussion?.authorId &&
                             reply.authorId !== discussion.authorId &&

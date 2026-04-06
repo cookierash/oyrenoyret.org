@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectItem } from '@/components/ui/select';
 import { dispatchCreditsUpdated } from '@/src/lib/credits-events';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { useSettings } from '@/src/components/settings/settings-provider';
@@ -128,12 +129,13 @@ function SprintEnrollmentRow({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accepted: true, liveEventId: item.liveEventId }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        const reason = extractErrorMessage(data);
         if (res.status === 402) {
-          toast.error(copy.insufficientCreditsToast);
+          toast.error(formatErrorToast(copy.insufficientCreditsToast, reason));
         } else {
-          toast.error(copy.completeFailedToast);
+          toast.error(formatErrorToast(copy.completeFailedToast, reason));
         }
         return;
       }
@@ -144,8 +146,13 @@ function SprintEnrollmentRow({
       setOpen(false);
       setAccepted(false);
       onRefresh?.();
-    } catch {
-      toast.error(copy.completeFailedToast);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          copy.completeFailedToast,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setSubmitting(false);
     }

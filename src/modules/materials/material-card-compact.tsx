@@ -9,6 +9,7 @@ import { PiLock as Lock, PiCircleNotch as Loader2, PiUsers as Users, PiArrowSqua
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface MaterialCardCompactProps {
   id: string;
@@ -76,9 +77,9 @@ export function MaterialCardCompact({
     onUnlockStart?.();
     try {
       const res = await fetch(`/api/materials/${id}/unlock`, { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(detailCopy.unlockFailed);
+        toast.error(formatErrorToast(detailCopy.unlockFailed, extractErrorMessage(data)));
         return;
       }
       setUnlocked(true);
@@ -92,8 +93,13 @@ export function MaterialCardCompact({
       );
       router.refresh();
       onUnlocked?.();
-    } catch {
-      toast.error(detailCopy.unlockFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          detailCopy.unlockFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setUnlocking(false);
       onUnlockEnd?.();

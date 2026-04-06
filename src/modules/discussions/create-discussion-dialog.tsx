@@ -15,6 +15,7 @@ import { Select, SelectItem } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface CreateDiscussionDialogProps {
   open: boolean;
@@ -56,9 +57,9 @@ export function CreateDiscussionDialog({
           subjectId: subjectId || undefined,
         }),
       });
-      const created = await res.json();
+      const created = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(copy.createFailed);
+        toast.error(formatErrorToast(copy.createFailed, extractErrorMessage(created)));
         return;
       }
       if (typeof created.balanceAfter === 'number') {
@@ -72,8 +73,10 @@ export function CreateDiscussionDialog({
       router.refresh();
       onCreated?.();
       router.push(`/discussions/${created.id}`);
-    } catch {
-      toast.error(copy.createFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.createFailed, error instanceof Error ? error.message : null),
+      );
     } finally {
       setSubmitting(false);
     }

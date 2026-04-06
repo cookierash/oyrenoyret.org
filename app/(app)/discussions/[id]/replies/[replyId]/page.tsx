@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/src/lib/utils';
 import { getLocaleCode, type Locale } from '@/src/i18n';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -57,6 +58,9 @@ const formatDateTime = (iso: string, locale: Locale) => {
   return `${time} · ${day}`;
 };
 
+const formatReplyContent = (content: string) =>
+  content.replace(/<br\s*\/?>/gi, '\n');
+
 export default function ReplyPage() {
   const MAX_REPLY_LENGTH = 2000;
   const { id: rawId, replyId: rawReplyId } = useParams();
@@ -85,9 +89,10 @@ export default function ReplyPage() {
     if (!id || !replyId) return;
     setLoading(true);
     fetch(`/api/discussions/replies/${replyId}?discussionId=${id}`)
-      .then((res) => {
-        if (!res.ok) throw new Error();
-        return res.json();
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+        return data;
       })
       .then((data) => {
         if (!data?.reply || data.reply.discussionId !== id) {
@@ -98,8 +103,10 @@ export default function ReplyPage() {
         setDiscussionInfo(data.discussion ?? null);
         setThreadPath(Array.isArray(data.threadPath) ? data.threadPath : [replyId]);
       })
-      .catch(() => {
-        toast.error(copy.failedLoadReply);
+      .catch((error) => {
+        toast.error(
+          formatErrorToast(copy.failedLoadReply, error instanceof Error ? error.message : null),
+        );
         setParentReply(null);
         setPreviousReply(null);
         setDiscussionInfo(null);
@@ -113,11 +120,13 @@ export default function ReplyPage() {
     setChildLoading(true);
     try {
       const res = await fetch(`/api/discussions/${id}/replies?parentReplyId=${replyId}`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
       setChildReplies(data.replies ?? []);
-    } catch {
-      toast.error(copy.failedLoadReplies);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.failedLoadReplies, error instanceof Error ? error.message : null),
+      );
       setChildReplies([]);
     } finally {
       setChildLoading(false);
@@ -149,9 +158,10 @@ export default function ReplyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: newVote ?? 0 }),
       });
-      if (!res.ok) throw new Error();
-    } catch {
-      toast.error(copy.failedVote);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+    } catch (error) {
+      toast.error(formatErrorToast(copy.failedVote, error instanceof Error ? error.message : null));
       setParentReply(parentReply);
     } finally {
       setVoteLoading(false);
@@ -170,8 +180,8 @@ export default function ReplyPage() {
           parentReplyId: replyId,
         }),
       });
-      const created = await res.json();
-      if (!res.ok) throw new Error('Failed to reply');
+      const created = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(created) ?? '');
       setReplyContent('');
       setDialogContent('');
       setDialogOpen(false);
@@ -181,8 +191,10 @@ export default function ReplyPage() {
         router.refresh();
         await loadChildReplies();
       }
-    } catch {
-      toast.error(copy.failedPostReply);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.failedPostReply, error instanceof Error ? error.message : null),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -499,7 +511,7 @@ export default function ReplyPage() {
                             </div>
                           </div>
                           <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
-                            {reply.content}
+                            {formatReplyContent(reply.content)}
                           </p>
                         </div>
                       </Link>

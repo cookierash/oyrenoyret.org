@@ -21,6 +21,7 @@ import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 import { getLocalizedTopicNameMap } from '@/src/i18n/topic-utils';
 import { getLocaleCode } from '@/src/i18n';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface Material {
   id: string;
@@ -189,7 +190,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(copy.toast.publishFailed);
+        toast.error(formatErrorToast(copy.toast.publishFailed, extractErrorMessage(data)));
         return;
       }
       if (typeof data.balanceAfter === 'number') {
@@ -206,8 +207,13 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       router.refresh();
       fetchMaterials();
       onRefresh?.();
-    } catch {
-      toast.error(copy.toast.publishFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          copy.toast.publishFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setPublishing(null);
     }
@@ -221,16 +227,22 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'DRAFT' }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(copy.toast.unpublishFailed);
+        toast.error(formatErrorToast(copy.toast.unpublishFailed, extractErrorMessage(data)));
         return;
       }
       toast.success(copy.toast.unpublishSuccess);
       router.refresh();
       fetchMaterials();
       onRefresh?.();
-    } catch {
-      toast.error(copy.toast.unpublishFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          copy.toast.unpublishFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setPublishing(null);
     }
@@ -240,8 +252,9 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     setDeleting(id);
     try {
       const res = await fetch(`/api/materials/${id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(copy.toast.deleteFailed);
+        toast.error(formatErrorToast(copy.toast.deleteFailed, extractErrorMessage(data)));
         return;
       }
       toast.success(copy.toast.deleteSuccess);
@@ -250,8 +263,10 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       onRefresh?.();
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
-    } catch {
-      toast.error(copy.toast.deleteFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.toast.deleteFailed, error instanceof Error ? error.message : null),
+      );
     } finally {
       setDeleting(null);
     }

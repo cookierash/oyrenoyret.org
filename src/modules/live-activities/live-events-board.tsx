@@ -10,6 +10,7 @@ import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/diff
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { useSettings } from '@/src/components/settings/settings-provider';
 import { getLocaleCode } from '@/src/i18n';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface LiveEvent {
   id: string;
@@ -87,10 +88,11 @@ export function LiveEventsBoard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        const reason = extractErrorMessage(data);
         if (res.status === 402) {
-          toast.error(copy.toastInsufficientCredits);
+          toast.error(formatErrorToast(copy.toastInsufficientCredits, reason));
         } else {
-          toast.error(copy.toastFailedRegister);
+          toast.error(formatErrorToast(copy.toastFailedRegister, reason));
         }
         return;
       }
@@ -114,8 +116,13 @@ export function LiveEventsBoard() {
           : copy.toastRegistrationStarted
       );
       fetchEvents();
-    } catch {
-      toast.error(copy.toastFailedRegister);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          copy.toastFailedRegister,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setActionId(null);
     }

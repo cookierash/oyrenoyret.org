@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { sanitizeHtml } from '@/src/security/validation';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocaleCode } from '@/src/i18n';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface MaterialDetailViewProps {
   id: string;
@@ -156,9 +157,9 @@ export function MaterialDetailView({
     setUnlocking(true);
     try {
       const res = await fetch(`/api/materials/${id}/unlock`, { method: 'POST' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(copy.unlockFailed);
+        toast.error(formatErrorToast(copy.unlockFailed, extractErrorMessage(data)));
         return;
       }
       setUnlocked(true);
@@ -171,8 +172,10 @@ export function MaterialDetailView({
         }),
       );
       router.refresh();
-    } catch {
-      toast.error(copy.unlockFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(copy.unlockFailed, error instanceof Error ? error.message : null),
+      );
     } finally {
       setUnlocking(false);
     }

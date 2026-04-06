@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectItem } from '@/components/ui/select';
 import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/difficulty-bars';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface LiveEvent {
   id: string;
@@ -191,8 +192,11 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
           type,
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(adminCopy.toasts.createEventFailed);
+        toast.error(
+          formatErrorToast(adminCopy.toasts.createEventFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(adminCopy.toasts.eventCreated);
@@ -200,7 +204,12 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       setEventDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(adminCopy.toasts.createEventFailed);
+      toast.error(
+        formatErrorToast(
+          adminCopy.toasts.createEventFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
@@ -216,14 +225,22 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: sanitizedId }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(adminCopy.toasts.deleteEventFailed);
+        toast.error(
+          formatErrorToast(adminCopy.toasts.deleteEventFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(adminCopy.toasts.eventRemoved);
       loadData();
     } catch (error) {
-      toast.error(adminCopy.toasts.deleteEventFailed);
+      toast.error(
+        formatErrorToast(
+          adminCopy.toasts.deleteEventFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
@@ -288,8 +305,11 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(trimmed),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(adminCopy.toasts.payoutFailed);
+        toast.error(
+          formatErrorToast(adminCopy.toasts.payoutFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(adminCopy.toasts.payoutCompleted);
@@ -298,7 +318,12 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       setPayoutForm({ first: '', second: '', third: '' });
       loadData();
     } catch (error) {
-      toast.error(adminCopy.toasts.payoutFailed);
+      toast.error(
+        formatErrorToast(
+          adminCopy.toasts.payoutFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setPayingOut(false);
     }
@@ -781,8 +806,11 @@ export function AnnouncementsAdminPanel() {
           body: announcementForm.body,
         }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(adminCopy.toasts.announcementCreateFailed);
+        toast.error(
+          formatErrorToast(adminCopy.toasts.announcementCreateFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(adminCopy.toasts.announcementPublished);
@@ -790,21 +818,34 @@ export function AnnouncementsAdminPanel() {
       setAnnouncementDialogOpen(false);
       loadData();
     } catch (error) {
-      toast.error(adminCopy.toasts.announcementCreateFailed);
+      toast.error(
+        formatErrorToast(
+          adminCopy.toasts.announcementCreateFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
   const handleDeleteAnnouncement = async (announcementId: string) => {
     try {
       const res = await fetch(`/api/live-announcements/${announcementId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(adminCopy.toasts.announcementDeleteFailed);
+        toast.error(
+          formatErrorToast(adminCopy.toasts.announcementDeleteFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(adminCopy.toasts.announcementRemoved);
       loadData();
     } catch (error) {
-      toast.error(adminCopy.toasts.announcementDeleteFailed);
+      toast.error(
+        formatErrorToast(
+          adminCopy.toasts.announcementDeleteFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 

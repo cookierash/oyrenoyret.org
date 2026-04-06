@@ -14,6 +14,7 @@ import { Select, SelectItem } from '@/components/ui/select';
 import { cn } from '@/src/lib/utils';
 import { CREDITS_MATERIAL } from '@/src/config/credits';
 import { toast } from 'sonner';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextAa as SubscriptIcon, PiTextH as SuperscriptIcon, PiCode as Code, PiEraser as Eraser, PiFunction as Sigma, PiPlus as Plus, PiTrash as Trash2 } from 'react-icons/pi';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
@@ -594,7 +595,9 @@ export function PracticeTestEditor({
         });
         const created = await res.json().catch(() => ({}));
         if (!res.ok) {
-          toast.error(practiceCopy.toast.createFailed);
+          toast.error(
+            formatErrorToast(practiceCopy.toast.createFailed, extractErrorMessage(created)),
+          );
           return;
         }
 
@@ -620,8 +623,9 @@ export function PracticeTestEditor({
             content,
           }),
         });
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          toast.error(practiceCopy.toast.saveFailed);
+          toast.error(formatErrorToast(practiceCopy.toast.saveFailed, extractErrorMessage(data)));
           return;
         }
 
@@ -640,8 +644,13 @@ export function PracticeTestEditor({
         onSaved?.(targetId);
         return targetId;
       }
-    } catch {
-      toast.error(practiceCopy.toast.saveFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          practiceCopy.toast.saveFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -712,7 +721,9 @@ export function PracticeTestEditor({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        toast.error(practiceCopy.toast.publishFailed);
+        toast.error(
+          formatErrorToast(practiceCopy.toast.publishFailed, extractErrorMessage(data)),
+        );
         return;
       }
 
@@ -728,8 +739,13 @@ export function PracticeTestEditor({
       setCurrentStatus('PUBLISHED');
       router.refresh();
       onSaved?.();
-    } catch {
-      toast.error(practiceCopy.toast.publishFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          practiceCopy.toast.publishFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setPublishing(false);
     }
@@ -744,16 +760,24 @@ export function PracticeTestEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'DRAFT' }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(practiceCopy.toast.unpublishFailed);
+        toast.error(
+          formatErrorToast(practiceCopy.toast.unpublishFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(practiceCopy.toast.unpublishSuccess);
       setCurrentStatus('DRAFT');
       router.refresh();
       onSaved?.();
-    } catch {
-      toast.error(practiceCopy.toast.unpublishFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          practiceCopy.toast.unpublishFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setUnpublishing(false);
     }
@@ -764,16 +788,22 @@ export function PracticeTestEditor({
     setDeleting(true);
     try {
       const res = await fetch(`/api/materials/${materialId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(practiceCopy.toast.deleteFailed);
+        toast.error(formatErrorToast(practiceCopy.toast.deleteFailed, extractErrorMessage(data)));
         return;
       }
       toast.success(practiceCopy.toast.deleteSuccess);
       setShowDeleteDialog(false);
       router.push('/studio');
       router.refresh();
-    } catch {
-      toast.error(practiceCopy.toast.deleteFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          practiceCopy.toast.deleteFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setDeleting(false);
     }

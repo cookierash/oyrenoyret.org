@@ -9,6 +9,7 @@ import { cn } from '@/src/lib/utils';
 import { DocumentEditor } from './document-editor';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 import { getLocalizedTopics } from '@/src/i18n/topic-utils';
 import {
@@ -106,7 +107,9 @@ export function StudioEditor({
         });
         const created = await res.json().catch(() => ({}));
         if (!res.ok) {
-          toast.error(editorCopy.toast.createFailed);
+          toast.error(
+            formatErrorToast(editorCopy.toast.createFailed, extractErrorMessage(created)),
+          );
           return;
         }
 
@@ -132,8 +135,9 @@ export function StudioEditor({
             content: html,
           }),
         });
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          toast.error(editorCopy.toast.saveFailed);
+          toast.error(formatErrorToast(editorCopy.toast.saveFailed, extractErrorMessage(data)));
           return;
         }
 
@@ -152,8 +156,13 @@ export function StudioEditor({
         onSaved?.(targetId);
         return targetId;
       }
-    } catch {
-      toast.error(editorCopy.toast.saveFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          editorCopy.toast.saveFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setSaving(false);
     }
@@ -210,7 +219,7 @@ export function StudioEditor({
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        toast.error(editorCopy.toast.publishFailed);
+        toast.error(formatErrorToast(editorCopy.toast.publishFailed, extractErrorMessage(data)));
         return;
       }
 
@@ -226,8 +235,13 @@ export function StudioEditor({
       setCurrentStatus('PUBLISHED');
       router.refresh();
       onSaved?.();
-    } catch {
-      toast.error(editorCopy.toast.publishFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          editorCopy.toast.publishFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setPublishing(false);
     }
@@ -242,16 +256,24 @@ export function StudioEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'DRAFT' }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(editorCopy.toast.unpublishFailed);
+        toast.error(
+          formatErrorToast(editorCopy.toast.unpublishFailed, extractErrorMessage(data)),
+        );
         return;
       }
       toast.success(editorCopy.toast.unpublishSuccess);
       setCurrentStatus('DRAFT');
       router.refresh();
       onSaved?.();
-    } catch {
-      toast.error(editorCopy.toast.unpublishFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          editorCopy.toast.unpublishFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setUnpublishing(false);
     }
@@ -262,16 +284,22 @@ export function StudioEditor({
     setDeleting(true);
     try {
       const res = await fetch(`/api/materials/${materialId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(editorCopy.toast.deleteFailed);
+        toast.error(formatErrorToast(editorCopy.toast.deleteFailed, extractErrorMessage(data)));
         return;
       }
       toast.success(editorCopy.toast.deleteSuccess);
       setShowDeleteDialog(false);
       router.push('/studio');
       router.refresh();
-    } catch {
-      toast.error(editorCopy.toast.deleteFailed);
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          editorCopy.toast.deleteFailed,
+          error instanceof Error ? error.message : null,
+        ),
+      );
     } finally {
       setDeleting(false);
     }

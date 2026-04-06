@@ -8,6 +8,7 @@ import { cn } from '@/src/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 
 interface DiscussionFeedItemProps {
     id: string;
@@ -54,12 +55,15 @@ export function DiscussionFeedItem({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ value: newVote ?? 0 }),
             });
-            if (!res.ok) throw new Error();
-        } catch {
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+        } catch (error) {
             // revert
             setScore((s) => s - delta);
             setUserVote(userVote);
-            toast.error(copy.voteFailed);
+            toast.error(
+              formatErrorToast(copy.voteFailed, error instanceof Error ? error.message : null),
+            );
         } finally {
             setVoteLoading(false);
         }
