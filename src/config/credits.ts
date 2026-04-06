@@ -46,7 +46,7 @@ export const CREDITS_MATERIAL = {
   /** Base credit value for textual materials (used for unlock cost + publish reward) */
   TEXTUAL_BASE_VALUE: 1,
   /** Minimum textual content (words) */
-  TEXTUAL_MIN_WORDS: 300,
+  TEXTUAL_MIN_WORDS: 150,
   /** Words per +1 credit */
   TEXTUAL_STEP_WORDS: 1000,
   /** Minimum practice test questions */
