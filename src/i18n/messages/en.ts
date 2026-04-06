@@ -624,6 +624,7 @@ export const EN_MESSAGES = {
         '- Refined global navigation and layout across the app shell, sidebar, header/footer, and right-side panels.\n' +
         '- Enhanced registration and sign-in flows with clearer steps, stronger validation, and localized messaging.\n' +
         '- Added a language selector to the public-site footer for signed-out visitors.\n' +
+        '- Added a live online user indicator for discussions.\n' +
         '- Updated materials, discussions, live activities, messages, onboarding, and core app pages to align with the new visual system.\n' +
         '- Refreshed public resources and policy pages with updated structure and copy.\n' +
         'Fix:\n' +
@@ -1275,6 +1276,7 @@ export const EN_MESSAGES = {
       subjects: 'Subjects',
       added: 'Added',
       helper: 'Filter by subject with #subject, like #physics or #azerbaijani.',
+      onlineNow: '{{count}} more users online now',
     },
     relativeTime: {
       now: 'now',
