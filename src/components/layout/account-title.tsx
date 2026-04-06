@@ -9,6 +9,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
   const map: Record<string, MessageKey> = {
     '/dashboard': 'pages.dashboard',
     '/studio': 'pages.studio',
+    '/leaderboard': 'pages.leaderboard',
     '/catalog': 'pages.catalog',
     '/library': 'pages.library',
     '/live-activities': 'pages.liveActivities',
@@ -26,6 +27,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
 
   if (pathname in map) return t(map[pathname]);
   if (pathname.startsWith('/catalog/')) return t('pages.catalog');
+  if (pathname.startsWith('/leaderboard')) return t('pages.leaderboard');
   if (pathname.startsWith('/preview/')) return t('pages.preview');
   if (pathname.startsWith('/library/')) return t('pages.library');
   if (pathname.startsWith('/discussions/')) return t('pages.discussion');

@@ -301,6 +301,7 @@ export const AZ_MESSAGES = {
   sidebar: {
     dashboard: 'İdarəetmə paneli',
     studio: 'oyrenoyret studio',
+    leaderboard: 'Liderlər cədvəli',
     catalog: 'Kataloq',
     library: 'Kitabxana',
     liveActivities: 'Canlı fəaliyyətlər',
@@ -318,6 +319,7 @@ export const AZ_MESSAGES = {
   pages: {
     dashboard: 'İdarəetmə paneli',
     studio: 'Studio',
+    leaderboard: 'Liderlər cədvəli',
     catalog: 'Kataloq',
     library: 'Kitabxana',
     liveActivities: 'Canlı fəaliyyətlər',
@@ -1449,6 +1451,19 @@ export const AZ_MESSAGES = {
         afternoon: 'Gününüz xeyir',
         evening: 'Axşamınız xeyir',
       },
+    },
+    leaderboard: {
+      title: 'Liderlər cədvəli',
+      description: 'Ümumi kreditlərinə görə ilk 10 şagird.',
+      badge: 'İlk 10',
+      rankLabel: 'Sıra',
+      learnerLabel: 'Şagird',
+      creditsLabel: 'Kreditlər',
+      creditsCaption: 'Ümumi kredit',
+      rankValue: 'Sıra #{{rank}}',
+      fallbackName: 'Şagird',
+      emptyTitle: 'Hələ liderlər yoxdur.',
+      emptyDescription: 'Şagirdlər kredit qazandıqca burada görünəcəklər.',
     },
   },
   notFound: {

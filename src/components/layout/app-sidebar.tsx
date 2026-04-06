@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiBookOpen as BookOpen, PiBooks as Library, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiPalette as Palette, PiTranslate as Translate } from 'react-icons/pi';
+import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiTrophy as Trophy, PiBookOpen as BookOpen, PiBooks as Library, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiPalette as Palette, PiTranslate as Translate } from 'react-icons/pi';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
 import { Logo } from '@/src/components/ui/logo';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -66,6 +66,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const navItems = [
     { href: '/dashboard', label: t('sidebar.dashboard'), icon: LayoutDashboard },
     { href: '/studio', label: t('sidebar.studio'), icon: Sparkles, isBrand: true },
+    { href: '/leaderboard', label: t('sidebar.leaderboard'), icon: Trophy },
     { href: '/catalog', label: t('sidebar.catalog'), icon: BookOpen },
     { href: '/library', label: t('sidebar.library'), icon: Library },
     { href: '/live-activities', label: t('sidebar.liveActivities'), icon: CalendarDays },
@@ -157,7 +158,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     >
       <div className="flex h-14 items-center border-b border-border px-4">
         {isSettingsRoute ? (
-          <div className="relative flex w-full items-center justify-center">
+          <div className="relative flex w-full items-center justify-start">
             <div className="flex items-center gap-2">
               <Logo size="sm" showText textSize="sm" />
               <span className="text-[11px] font-semibold text-foreground tracking-tight whitespace-nowrap">

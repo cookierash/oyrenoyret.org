@@ -301,6 +301,7 @@ export const EN_MESSAGES = {
   sidebar: {
     dashboard: 'Dashboard',
     studio: 'oyrenoyret studio',
+    leaderboard: 'Leaderboard',
     catalog: 'Catalog',
     library: 'Library',
     liveActivities: 'Live Activities',
@@ -318,6 +319,7 @@ export const EN_MESSAGES = {
   pages: {
     dashboard: 'Dashboard',
     studio: 'Studio',
+    leaderboard: 'Leaderboard',
     catalog: 'Catalog',
     library: 'Library',
     liveActivities: 'Live Activities',
@@ -1443,6 +1445,19 @@ export const EN_MESSAGES = {
         afternoon: 'Good afternoon',
         evening: 'Good evening',
       },
+    },
+    leaderboard: {
+      title: 'Leaderboard',
+      description: 'Top 10 learners ranked by total credits earned.',
+      badge: 'Top 10',
+      rankLabel: 'Rank',
+      learnerLabel: 'Learner',
+      creditsLabel: 'Credits',
+      creditsCaption: 'Total credits',
+      rankValue: 'Rank #{{rank}}',
+      fallbackName: 'Learner',
+      emptyTitle: 'No leaderboard data yet.',
+      emptyDescription: 'Once learners start earning credits, they will appear here.',
     },
   },
   notFound: {

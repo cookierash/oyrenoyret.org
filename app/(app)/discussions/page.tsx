@@ -22,7 +22,6 @@ export default function DiscussionsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
-  const [onlineCount, setOnlineCount] = useState<number | null>(null);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
   const { t, messages } = useI18n();
   const copy = messages.discussions.page;
@@ -60,32 +59,6 @@ export default function DiscussionsPage() {
     runCleanup();
     return () => {
       active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    const ping = async () => {
-      try {
-        const res = await fetch('/api/online-users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-        });
-        const data = await res.json().catch(() => ({}));
-        if (active && typeof data?.count === 'number') {
-          setOnlineCount(data.count);
-        }
-      } catch {
-        if (active) setOnlineCount(null);
-      }
-    };
-
-    ping();
-    const interval = setInterval(ping, 30000);
-    return () => {
-      active = false;
-      clearInterval(interval);
     };
   }, []);
 
@@ -167,11 +140,6 @@ export default function DiscussionsPage() {
       <PageHeader
         title={copy.title}
         description={copy.description}
-        badge={
-          onlineCount !== null
-            ? t('discussions.page.onlineNow', { count: onlineCount })
-            : undefined
-        }
         actions={
           <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
             {copy.newPost}
@@ -180,16 +148,6 @@ export default function DiscussionsPage() {
       />
 
       <main className="min-w-0 space-y-4 pt-2">
-        {onlineCount !== null ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-            <span>
-              {t('discussions.page.onlineNow', {
-                count: Math.max(onlineCount - 1, 0),
-              })}
-            </span>
-          </div>
-        ) : null}
         <div className="space-y-2">
           <div className="relative">
             <div className="flex w-full items-stretch">
