@@ -19,6 +19,8 @@ import { Prisma } from '@prisma/client';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+export const runtime = 'nodejs';
+
 async function findPublishedMaterialsPublic(options: {
   subjectId: string;
   topicId: string;
