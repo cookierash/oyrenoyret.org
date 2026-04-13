@@ -14,6 +14,26 @@ const SESSION_TOKEN_LENGTH = 32;
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (common for educational/SaaS)
 const SESSION_CACHE_TTL_MS = Number(process.env.SESSION_CACHE_TTL_MS ?? 60_000);
 
+function isDbUnreachable(error: unknown): boolean {
+  const code =
+    error && typeof error === 'object' && 'code' in error && typeof (error as any).code === 'string'
+      ? String((error as any).code)
+      : '';
+
+  if (code === 'P1001') return true;
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+
+  if (!message) return false;
+  const lowered = message.toLowerCase();
+  return lowered.includes("can't reach database server") || lowered.includes('cannot reach database server');
+}
+
 const globalForSessionCache = globalThis as unknown as {
   sessionCache?: Map<string, { userId: string; expiresAt: number; cachedAt: number }>;
 };
@@ -169,6 +189,10 @@ export async function validateSession(token: string): Promise<string | null> {
       select: hashedSelect as any,
     });
   } catch (error) {
+    if (isDbUnreachable(error)) {
+      sessionCache.delete(token);
+      return null;
+    }
     if (isTokenHashUnsupportedError(error) || isTokenHashMissingColumnError(error)) {
       session = null;
     } else {
@@ -184,6 +208,10 @@ export async function validateSession(token: string): Promise<string | null> {
         select: { ...baseSelect, token: true } as any,
       });
     } catch (error) {
+      if (isDbUnreachable(error)) {
+        sessionCache.delete(token);
+        return null;
+      }
       throw error;
     }
   }
@@ -195,7 +223,11 @@ export async function validateSession(token: string): Promise<string | null> {
 
   // Check if session is expired
   if (session.expiresAt < new Date()) {
-    await prisma.authSession.delete({ where: { id: session.id } });
+    try {
+      await prisma.authSession.delete({ where: { id: session.id } });
+    } catch (error) {
+      if (!isDbUnreachable(error)) throw error;
+    }
     sessionCache.delete(token);
     return null;
   }
@@ -209,6 +241,10 @@ export async function validateSession(token: string): Promise<string | null> {
       select: { status: true, suspensionUntil: true } as any,
     });
   } catch (error) {
+    if (isDbUnreachable(error)) {
+      sessionCache.delete(token);
+      return null;
+    }
     if (isDbSchemaMismatch(error)) {
       try {
         userStatus = await prisma.user.findUnique({
@@ -216,6 +252,10 @@ export async function validateSession(token: string): Promise<string | null> {
           select: { status: true } as any,
         });
       } catch (fallbackError) {
+        if (isDbUnreachable(fallbackError)) {
+          sessionCache.delete(token);
+          return null;
+        }
         if (!isDbSchemaMismatch(fallbackError)) throw fallbackError;
         userStatus = { status: 'ACTIVE' } as any;
       }
@@ -230,12 +270,20 @@ export async function validateSession(token: string): Promise<string | null> {
   const status = userStatus?.status as string | undefined;
   if (!status) {
     // If the user was deleted, the session is no longer valid.
-    await prisma.authSession.delete({ where: { id: session.id } });
+    try {
+      await prisma.authSession.delete({ where: { id: session.id } });
+    } catch (error) {
+      if (!isDbUnreachable(error)) throw error;
+    }
     sessionCache.delete(token);
     return null;
   }
   if (status === 'INACTIVE') {
-    await prisma.authSession.delete({ where: { id: session.id } });
+    try {
+      await prisma.authSession.delete({ where: { id: session.id } });
+    } catch (error) {
+      if (!isDbUnreachable(error)) throw error;
+    }
     sessionCache.delete(token);
     return null;
   }
@@ -251,6 +299,7 @@ export async function validateSession(token: string): Promise<string | null> {
           select: { id: true },
         });
       } catch (error) {
+        if (isDbUnreachable(error)) return session.userId;
         if (!isDbSchemaMismatch(error)) throw error;
         // If migrations aren't applied yet, ignore and keep the session usable.
       }
@@ -290,7 +339,15 @@ export async function getCurrentSession(): Promise<string | null> {
     return null;
   }
 
-  const userId = await validateSession(token);
+  let userId: string | null = null;
+  try {
+    userId = await validateSession(token);
+  } catch (error) {
+    if (isDbUnreachable(error)) {
+      return null;
+    }
+    throw error;
+  }
 
   if (!userId) {
     // Best-effort cleanup of stale cookies to avoid redirect loops from edge proxy.

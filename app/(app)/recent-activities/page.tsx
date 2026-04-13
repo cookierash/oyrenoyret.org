@@ -1,31 +1,12 @@
 /**
- * Recent Activities Page
+ * Recent Activities Page (legacy)
  *
- * Lists notifications and credit activity.
+ * Redirects to /notifications.
  */
 
-import { DashboardShell } from '@/src/components/ui/dashboard-shell';
-import { PageHeader } from '@/src/components/ui/page-header';
-import { MessagesClient } from '@/src/modules/messages/messages-client';
-import { getI18n } from '@/src/i18n/server';
-
-export const metadata = {
-  title: 'Recent Activities',
-};
+import { redirect } from 'next/navigation';
 
 export default async function RecentActivitiesPage() {
-  const { messages } = await getI18n();
-  const copy = messages.app.recentActivities;
-  return (
-    <DashboardShell>
-      <PageHeader
-        title={copy.title}
-        description={copy.description}
-      />
-
-      <main className="space-y-4 pt-2">
-        <MessagesClient />
-      </main>
-    </DashboardShell>
-  );
+  redirect('/notifications');
 }
+

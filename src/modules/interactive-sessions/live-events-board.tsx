@@ -332,7 +332,7 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
             </Button>
           ) : isPending ? (
             <Button asChild size="sm" variant="secondary" disabled={isBusy}>
-              <Link href="/recent-activities">{copy.completeRegistration}</Link>
+              <Link href="/notifications">{copy.completeRegistration}</Link>
             </Button>
           ) : (
             <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy || !canWrite}>

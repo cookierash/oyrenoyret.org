@@ -82,7 +82,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     { href: '/library/guided-group-sessions', label: t('sidebar.guidedGroupSessions'), icon: UsersThree },
     { href: '/interactive-sessions', label: t('sidebar.liveActivities'), icon: CalendarDays },
     { href: '/discussions', label: t('sidebar.discussions'), icon: MessageSquare },
-    { href: '/recent-activities', label: t('sidebar.recentActivities'), icon: Receipt },
+    { href: '/notifications', label: t('sidebar.recentActivities'), icon: Receipt },
     { href: '/academic-record', label: t('sidebar.academicRecord'), icon: GraduationCap },
   ];
 

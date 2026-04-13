@@ -472,7 +472,16 @@ export function CurriculumAdminPanel() {
                       >
                         <div className="min-w-0">
                           <div className="font-medium text-foreground truncate">{subject.nameEn}</div>
-                          <div className="text-xs text-muted-foreground truncate">{subject.slug}</div>
+                          <div className="text-xs text-muted-foreground truncate">{subject.nameAz}</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground truncate">
+                            <span className="font-mono">{subject.slug}</span>
+                            {subject.slugAz && subject.slugAz !== subject.slug ? (
+                              <>
+                                {' '}
+                                · <span className="font-mono">{subject.slugAz}</span>
+                              </>
+                            ) : null}
+                          </div>
                         </div>
                         <div className="text-xs text-muted-foreground whitespace-nowrap">
                           {subject.topics.length} topics
@@ -739,7 +748,16 @@ export function CurriculumAdminPanel() {
                       >
                         <div className="min-w-0">
                           <div className="font-medium text-foreground truncate">{topic.nameEn}</div>
-                          <div className="text-xs text-muted-foreground truncate">{topic.slug}</div>
+                          <div className="text-xs text-muted-foreground truncate">{topic.nameAz}</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground truncate">
+                            <span className="font-mono">{topic.slug}</span>
+                            {topic.slugAz && topic.slugAz !== topic.slug ? (
+                              <>
+                                {' '}
+                                · <span className="font-mono">{topic.slugAz}</span>
+                              </>
+                            ) : null}
+                          </div>
                         </div>
                       </button>
                     );

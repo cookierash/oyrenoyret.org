@@ -19,7 +19,7 @@ export function MessagesClient({ refreshKey = 0 }: MessagesClientProps) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetch('/api/recent-activities', { cache: 'no-store' })
+    fetch('/api/notifications', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : Promise.reject(res)))
       .then((data) => {
         if (!active) return;

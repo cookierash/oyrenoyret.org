@@ -22,7 +22,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
     '/admin/interactive-sessions/announcements': 'pages.announcements',
     '/admin/interactive-sessions/events': 'pages.events',
     '/discussions': 'pages.discussions',
-    '/recent-activities': 'pages.recentActivities',
+    '/notifications': 'pages.recentActivities',
     '/academic-record': 'pages.academicRecord',
     '/settings': 'pages.settings',
   };
@@ -33,6 +33,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
   if (pathname.startsWith('/preview/')) return t('pages.preview');
   if (pathname.startsWith('/library/')) return t('pages.library');
   if (pathname.startsWith('/discussions/')) return t('pages.discussion');
+  if (pathname.startsWith('/notifications')) return t('pages.recentActivities');
   if (pathname.startsWith('/recent-activities')) return t('pages.recentActivities');
   if (pathname.startsWith('/cms/sprint/')) return t('pages.problemSprint');
   if (pathname.startsWith('/sprints/')) return t('pages.problemSprint');
