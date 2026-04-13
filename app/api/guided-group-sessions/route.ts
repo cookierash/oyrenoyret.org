@@ -77,6 +77,9 @@ export async function GET(request: Request) {
           durationMinutes: true,
           learnerCapacity: true,
           status: true,
+          createdAt: true,
+          ratingAvg: true,
+          ratingCount: true,
           facilitatorId: true,
           facilitator: {
             select: { firstName: true, lastName: true, email: true, avatarVariant: true },
@@ -139,6 +142,9 @@ export async function GET(request: Request) {
         durationMinutes: s.durationMinutes,
         learnerCapacity: s.learnerCapacity,
         status: s.status,
+        createdAt: s.createdAt ? s.createdAt.toISOString() : null,
+        ratingAvg: typeof s.ratingAvg === 'number' ? s.ratingAvg : 0,
+        ratingCount: typeof s.ratingCount === 'number' ? s.ratingCount : 0,
         facilitator: {
           id: s.facilitatorId,
           name: facilitatorName,

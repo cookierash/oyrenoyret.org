@@ -407,7 +407,7 @@ export const AZ_MESSAGES = {
     interactiveSessionsCardDescription:
       'Problem sprintlərini, elanları və canlı tədbirləri yaradın və idarə edin.',
     guidedGroupSessionsCardDescription:
-      'Bələdçili qrup sessiyaları üçün fasilitator müraciətlərini nəzərdən keçirin və idarə edin.',
+      'Bələdçili qrup sessiyaları üçün bələdçi şagird müraciətlərini nəzərdən keçirin və idarə edin.',
     curriculumCardDescription:
       'Fənləri və mövzuları əlavə edin, silin və ya adını dəyişin (marşrutlara və teqlərə təsir edir).',
     reportsCardDescription: 'İstifadəçi şikayətlərini nəzərdən keçirin və həll edin.',
@@ -415,7 +415,7 @@ export const AZ_MESSAGES = {
     interactiveSessionsManageDescription:
       'Problem sprintlərini, elanları və canlı tədbirləri yaradın və idarə edin.',
     guidedGroupSessionsDescription:
-      'Fasilitator müraciətlərini nəzərdən keçirin və bələdçili qrup sessiyalarını idarə edin.',
+      'Bələdçi şagird müraciətlərini nəzərdən keçirin və bələdçili qrup sessiyalarını idarə edin.',
     curriculumDescription:
       'Fənləri və mövzuları əlavə edin, silin və ya adını dəyişin. Bu dəyişikliklər marşrutlara və teqlərə təsir edir.',
     reportsDescription: 'İstifadəçi şikayətlərini nəzərdən keçirin və həll edin.',
@@ -1695,8 +1695,9 @@ export const AZ_MESSAGES = {
       ctaBrowse: 'İnteraktiv sessiyalara bax',
       ctaDiscuss: 'Müzakirələrdə soruş',
       facilitatorApplication: {
-        title: 'Fasilitator müraciəti',
-        description: 'Bələdçili qrup sessiyalarını idarə etmək üçün müraciət edin. Adminlər müraciətinizi yoxlayacaq.',
+        title: 'Bələdçi şagird müraciəti',
+        description:
+          'Bələdçili qrup sessiyalarını idarə etmək üçün bələdçi şagird kimi müraciət edin. Adminlər müraciətinizi yoxlayacaq.',
         verifiedSubjectsLabel: 'Təsdiqlənmiş fənlər',
         statusLabel: 'Yeniləmə',
         changesRequestedLabel: 'Dəyişiklik tələb olunur',
