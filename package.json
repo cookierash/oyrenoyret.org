@@ -8,7 +8,7 @@
     "dev:turbo": "next dev",
     "prebuild": "prisma generate",
     "build": "next build --webpack",
-    "vercel-build": "prisma migrate deploy && prisma generate && next build --webpack",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint",
