@@ -6,30 +6,20 @@
  */
 
 import { NextResponse } from 'next/server';
-import { prisma } from '@/src/db/client';
-import { getCurrentSession } from '@/src/modules/auth/utils/session';
-import { calcMaterialUnlockCost, getBalance, roundCredits } from '@/src/modules/credits';
-import { SUBJECTS, CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
-import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
-import { getPrivateNoStoreHeaders, getPublicCacheHeaders } from '@/src/lib/http-cache';
-import { sanitizeInput, sanitizePracticeTestContent, sanitizeRichTextHtml } from '@/src/security/validation';
-import { getPracticeTestQuestionCount } from '@/src/modules/materials/utils';
-import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
-import { Prisma } from '@prisma/client';
-import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
-import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export const runtime = 'nodejs';
 
 const DEFAULT_TAKE = 60;
 
 async function findPublishedMaterialsPublic(options: {
+  prisma: any;
+  isDbSchemaMismatch: (error: unknown) => boolean;
   subjectId: string;
   topicId: string;
   take?: number;
   skip?: number;
 }): Promise<any[]> {
-  const { subjectId, topicId, take, skip } = options;
+  const { prisma, isDbSchemaMismatch, subjectId, topicId, take, skip } = options;
   const orderBy = { publishedAt: 'desc' } as const;
 
   const selectCore = {
@@ -100,12 +90,14 @@ async function findPublishedMaterialsPublic(options: {
 }
 
 async function findPublishedMaterialsWithAccess(options: {
+  prisma: any;
+  isDbSchemaMismatch: (error: unknown) => boolean;
   subjectId: string;
   topicId: string;
   take?: number;
   skip?: number;
 }): Promise<any[]> {
-  const { subjectId, topicId, take, skip } = options;
+  const { prisma, isDbSchemaMismatch, subjectId, topicId, take, skip } = options;
   const orderBy = { publishedAt: 'desc' } as const;
 
   const selectCore = {
@@ -206,6 +198,12 @@ async function findPublishedMaterialsWithAccess(options: {
 
 export async function GET(request: Request) {
   try {
+    const { prisma } = await import('@/src/db/client');
+    const { RATE_LIMITS } = await import('@/src/config/constants');
+    const { getPrivateNoStoreHeaders, getPublicCacheHeaders } = await import('@/src/lib/http-cache');
+    const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
+    const { isDbSchemaMismatch } = await import('@/src/db/schema-mismatch');
+
     const identifier = getRateLimitIdentifier(request);
     const rateLimit = await checkRateLimit(`materials:list:${identifier}`, RATE_LIMITS.GENERAL);
     if (!rateLimit.allowed) {
@@ -240,7 +238,7 @@ export async function GET(request: Request) {
     }
 
     if (!includeAccess) {
-      const materials = await findPublishedMaterialsPublic({ subjectId, topicId, take, skip });
+      const materials = await findPublishedMaterialsPublic({ prisma, isDbSchemaMismatch, subjectId, topicId, take, skip });
 
       return NextResponse.json(
         materials.map((m) => ({
@@ -256,7 +254,10 @@ export async function GET(request: Request) {
       );
     }
 
-    const materials = await findPublishedMaterialsWithAccess({ subjectId, topicId, take, skip });
+    const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
+    const { calcMaterialUnlockCost, getBalance, roundCredits } = await import('@/src/modules/credits');
+
+    const materials = await findPublishedMaterialsWithAccess({ prisma, isDbSchemaMismatch, subjectId, topicId, take, skip });
 
     const userId = await getCurrentSession();
     const materialIds = materials.map((m) => m.id);
@@ -317,9 +318,15 @@ export async function GET(request: Request) {
         { status: 500 }
       );
     }
+    const code = error && typeof error === 'object' && 'code' in error ? String((error as any).code) : '';
     const looksLikeMissingMigration =
-      (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') ||
-      /column .* does not exist/i.test(message);
+      code === 'P2021' ||
+      code === 'P2022' ||
+      code === 'P1012' ||
+      code === '42P01' ||
+      code === '42703' ||
+      /column .* does not exist/i.test(message) ||
+      /table .* does not exist/i.test(message);
     if (looksLikeMissingMigration) {
       return NextResponse.json(
         { error: 'Database schema out of date', code: 'DB_MIGRATION_REQUIRED' },
@@ -335,6 +342,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const { prisma } = await import('@/src/db/client');
+    const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
+    const { requireVerifiedEmailForWrite } = await import('@/src/modules/auth/utils/write-access');
+    const { SUBJECTS, CONTENT_LIMITS, RATE_LIMITS } = await import('@/src/config/constants');
+    const { CURRICULUM_TOPICS } = await import('@/src/config/curriculum');
+    const { getPracticeTestQuestionCount } = await import('@/src/modules/materials/utils');
+    const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
+    const { sanitizeInput, sanitizePracticeTestContent, sanitizeRichTextHtml } = await import('@/src/security/validation');
+    const { isDbSchemaMismatch } = await import('@/src/db/schema-mismatch');
+
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
