@@ -294,7 +294,9 @@ export const prisma: PrismaClient = new Proxy(
     get(_target, prop) {
       const client = getPrismaClient() as unknown as Record<string, unknown>;
       const value = client[prop as keyof typeof client];
-      return typeof value === 'function' ? (value as Function).bind(client) : value;
+      if (typeof value !== 'function') return value;
+      const fn = value as (...args: unknown[]) => unknown;
+      return fn.bind(client);
     },
   }
 );

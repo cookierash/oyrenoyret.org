@@ -16,6 +16,26 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 const STATUSES = new Set(['PENDING', 'CHANGES_REQUESTED', 'APPROVED', 'REJECTED', 'ALL']);
 
+function isDbUnreachable(error: unknown): boolean {
+  const code =
+    error && typeof error === 'object' && 'code' in error && typeof (error as any).code === 'string'
+      ? String((error as any).code)
+      : '';
+
+  if (code === 'P1001') return true;
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+
+  if (!message) return false;
+  const lowered = message.toLowerCase();
+  return lowered.includes("can't reach database server") || lowered.includes('cannot reach database server');
+}
+
 export async function GET(request: Request) {
   const userId = await getCurrentSession();
   if (!userId) {
@@ -44,7 +64,13 @@ export async function GET(request: Request) {
       | { findMany: (args: unknown) => Promise<any[]> }
       | undefined;
     if (!facilitatorApplicationDelegate) {
-      return NextResponse.json([], { headers: getPrivateNoStoreHeaders() });
+      return NextResponse.json(
+        {
+          error: 'Guided group sessions are not available yet. Database migrations may be missing.',
+          errorKey: 'DB_SCHEMA_MISMATCH',
+        },
+        { status: 503, headers: getPrivateNoStoreHeaders() },
+      );
     }
 
     const { searchParams } = new URL(request.url);
@@ -106,7 +132,24 @@ export async function GET(request: Request) {
         },
       });
     } catch (error) {
-      if (isDbSchemaMismatch(error)) return NextResponse.json([], { headers: getPrivateNoStoreHeaders() });
+      if (isDbSchemaMismatch(error)) {
+        return NextResponse.json(
+          {
+            error: 'Guided group sessions are not available yet. Database migrations may be missing.',
+            errorKey: 'DB_SCHEMA_MISMATCH',
+          },
+          { status: 503, headers: getPrivateNoStoreHeaders() },
+        );
+      }
+      if (isDbUnreachable(error)) {
+        return NextResponse.json(
+          {
+            error: 'Database is unreachable. Please check your DATABASE_URL and network access.',
+            errorKey: 'DB_UNREACHABLE',
+          },
+          { status: 503, headers: getPrivateNoStoreHeaders() },
+        );
+      }
       throw error;
     }
 

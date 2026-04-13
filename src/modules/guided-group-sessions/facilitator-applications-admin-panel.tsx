@@ -69,6 +69,7 @@ export function FacilitatorApplicationsAdminPanel() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<ApplicationRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const [subjects, setSubjects] = useState<CurriculumSubject[]>([]);
@@ -110,12 +111,17 @@ export function FacilitatorApplicationsAdminPanel() {
       const res = await fetch(`/api/admin/facilitator-applications?${params.toString()}`, { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(formatErrorToast(copy?.toasts?.loadFailed ?? 'Failed to load applications.', extractErrorMessage(data)));
+        const message = extractErrorMessage(data);
+        setLoadError(message || (copy?.toasts?.loadFailed ?? 'Failed to load applications.'));
+        toast.error(formatErrorToast(copy?.toasts?.loadFailed ?? 'Failed to load applications.', message));
         setRows([]);
         return;
       }
+      setLoadError(null);
       setRows(Array.isArray(data) ? (data as ApplicationRow[]) : []);
     } catch (error) {
+      const message = error instanceof Error ? error.message : null;
+      setLoadError(message || (copy?.toasts?.loadFailed ?? 'Failed to load applications.'));
       toast.error(formatErrorToast(copy?.toasts?.loadFailed ?? 'Failed to load applications.', error instanceof Error ? error.message : null));
       setRows([]);
     } finally {
@@ -235,6 +241,15 @@ export function FacilitatorApplicationsAdminPanel() {
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-4 w-64" />
           <Skeleton className="h-20 w-full" />
+        </div>
+      ) : loadError ? (
+        <div className="card-frame border-dashed bg-muted/20 px-5 py-10">
+          <p className="text-sm font-medium text-foreground">
+            {copy?.toasts?.loadFailed ?? 'Failed to load applications.'}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/80 whitespace-pre-wrap">
+            {loadError}
+          </p>
         </div>
       ) : rows.length === 0 ? (
         <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
@@ -468,4 +483,3 @@ export function FacilitatorApplicationsAdminPanel() {
     </div>
   );
 }
-
