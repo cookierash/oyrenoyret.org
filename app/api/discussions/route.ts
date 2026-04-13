@@ -6,9 +6,30 @@
  */
 
 import { NextResponse } from 'next/server';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 // NOTE: Keep heavy dependencies inside handlers to avoid module-init crashes.
 
 export const runtime = 'nodejs';
+
+function classifyDiscussionsListError(error: unknown): { status: number; code: string; message: string } {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+  const message = rawMessage || 'Internal server error';
+
+  if (rawMessage.includes('DATABASE_URL is not set')) {
+    return { status: 503, code: 'DB_NOT_CONFIGURED', message: 'Database is not configured.' };
+  }
+
+  if (isDbSchemaMismatch(error)) {
+    return { status: 503, code: 'DB_SCHEMA_MISMATCH', message: 'Database schema is out of date.' };
+  }
+
+  return { status: 500, code: 'INTERNAL', message };
+}
 
 export async function GET(request: Request) {
   try {
@@ -18,7 +39,6 @@ export async function GET(request: Request) {
     const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
     const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
     const { sanitizeInput } = await import('@/src/security/validation');
-    const { isDbSchemaMismatch } = await import('@/src/db/schema-mismatch');
     const { Prisma } = await import('@prisma/client');
 
     const { searchParams } = new URL(request.url);
@@ -330,11 +350,9 @@ export async function GET(request: Request) {
     const headers = getPrivateNoStoreHeaders();
     return NextResponse.json(result, { headers });
   } catch (error) {
+    const classified = classifyDiscussionsListError(error);
     console.error('Error fetching discussions:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: classified.message, code: classified.code }, { status: classified.status });
   }
 }
 

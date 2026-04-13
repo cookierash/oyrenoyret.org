@@ -9,8 +9,29 @@ import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { refundDiscussionCreate } from '@/src/modules/credits';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export const runtime = 'nodejs';
+
+function classifyDiscussionDetailError(error: unknown): { status: number; code: string; message: string } {
+  const rawMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+  const message = rawMessage || 'Internal server error';
+
+  if (rawMessage.includes('DATABASE_URL is not set')) {
+    return { status: 503, code: 'DB_NOT_CONFIGURED', message: 'Database is not configured.' };
+  }
+
+  if (isDbSchemaMismatch(error)) {
+    return { status: 503, code: 'DB_SCHEMA_MISMATCH', message: 'Database schema is out of date.' };
+  }
+
+  return { status: 500, code: 'INTERNAL', message };
+}
 
 export async function GET(
   request: Request,
@@ -204,11 +225,9 @@ export async function GET(
       currentUserId: currentUserId ?? null,
     }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
+    const classified = classifyDiscussionDetailError(error);
     console.error('Error fetching discussion:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: classified.message, code: classified.code }, { status: classified.status });
   }
 }
 
