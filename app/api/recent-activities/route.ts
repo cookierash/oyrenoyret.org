@@ -1,8 +1,7 @@
 /**
- * Recent Activities API (legacy)
+ * Notifications API (legacy path: /api/recent-activities)
  *
- * Alias for /api/notifications/recent-activities.
+ * Alias for /api/notifications.
  */
 
-export { GET } from '../notifications/recent-activities/route';
-
+export { GET } from '../notifications/route';

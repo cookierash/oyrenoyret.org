@@ -15,7 +15,7 @@ export const metadata = {
 
 export default async function NotificationsPage() {
   const { messages } = await getI18n();
-  const copy = messages.app.recentActivities;
+  const copy = messages.app.notifications;
   return (
     <DashboardShell>
       <PageHeader title={copy.title} description={copy.description} />
@@ -26,4 +26,3 @@ export default async function NotificationsPage() {
     </DashboardShell>
   );
 }
-

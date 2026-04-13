@@ -9,7 +9,7 @@ import {
   PiCalendar as CalendarDays,
   PiGraduationCap as GraduationCap,
   PiChatCircle as MessageSquare,
-  PiReceipt as Receipt,
+  PiBell as Bell,
   PiSparkle as Sparkles,
 } from 'react-icons/pi';
 import {
@@ -104,9 +104,9 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
             icon: MessageSquare,
           },
           {
-            title: copy.steps.community.highlights.recentActivities.title,
-            description: copy.steps.community.highlights.recentActivities.description,
-            icon: Receipt,
+            title: copy.steps.community.highlights.notifications.title,
+            description: copy.steps.community.highlights.notifications.description,
+            icon: Bell,
           },
           {
             title: copy.steps.community.highlights.credits.title,

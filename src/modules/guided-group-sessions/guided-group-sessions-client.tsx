@@ -72,6 +72,22 @@ type GuidedGroupSessionRow = {
   approvedCount: number;
 };
 
+function parseSubjectFromBrowseQuery(
+  rawQuery: string,
+  subjects: CurriculumSubject[],
+): { subjectId: string; textQuery: string } {
+  const trimmed = rawQuery.trim();
+  if (!trimmed) return { subjectId: '', textQuery: '' };
+  if (!trimmed.startsWith('#')) return { subjectId: '', textQuery: trimmed };
+
+  const [token, ...rest] = trimmed.split(/\s+/);
+  const slug = token.slice(1).trim().toLowerCase();
+  if (!slug) return { subjectId: '', textQuery: trimmed };
+  if (!subjects.some((s) => s.slug === slug)) return { subjectId: '', textQuery: trimmed };
+
+  return { subjectId: slug, textQuery: rest.join(' ').trim() };
+}
+
 export function GuidedGroupSessionsClient({
   profile,
 }: {
@@ -124,8 +140,15 @@ export function GuidedGroupSessionsClient({
   const [creatingSession, setCreatingSession] = useState(false);
 
   const [browseQuery, setBrowseQuery] = useState('');
-  const [browseSubjectId, setBrowseSubjectId] = useState('');
   const [browseTopicId, setBrowseTopicId] = useState('');
+  const parsedBrowse = useMemo(
+    () => parseSubjectFromBrowseQuery(browseQuery, subjects),
+    [browseQuery, subjects],
+  );
+  const browseSubjectId = parsedBrowse.subjectId;
+  const browseTextQuery = parsedBrowse.textQuery;
+
+  const [sessionSubjectSearch, setSessionSubjectSearch] = useState('');
 
   const localeCode = getLocaleCode(locale);
   const hour12 = timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -196,7 +219,15 @@ export function GuidedGroupSessionsClient({
     if (sessionSubjectId && subjects.some((s) => s.slug === sessionSubjectId)) return;
     const firstVerified = verifiedSubjectIds.find((id) => subjects.some((s) => s.slug === id)) ?? '';
     setSessionSubjectId(firstVerified);
+    setSessionSubjectSearch(firstVerified);
   }, [scheduleDialogOpen, sessionSubjectId, subjects, verifiedSubjectIds]);
+
+  useEffect(() => {
+    if (!scheduleDialogOpen) return;
+    if (sessionSubjectId && sessionSubjectSearch !== sessionSubjectId) {
+      setSessionSubjectSearch(sessionSubjectId);
+    }
+  }, [scheduleDialogOpen, sessionSubjectId, sessionSubjectSearch]);
 
   useEffect(() => {
     if (!sessionSubjectId) {
@@ -216,7 +247,7 @@ export function GuidedGroupSessionsClient({
   }, [sessionSubjectId, sessionTopicId, subjects]);
 
   const filteredSessions = useMemo(() => {
-    const query = browseQuery.trim().toLowerCase();
+    const query = browseTextQuery.trim().toLowerCase();
     const q = query.length > 0 ? query : null;
     return sessions.filter((s) => {
       if (browseSubjectId && s.subjectId !== browseSubjectId) return false;
@@ -225,7 +256,7 @@ export function GuidedGroupSessionsClient({
       const haystack = `${s.title} ${s.facilitator?.name ?? ''}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [sessions, browseQuery, browseSubjectId, browseTopicId]);
+  }, [sessions, browseTextQuery, browseSubjectId, browseTopicId]);
 
   const liveNowSessions = useMemo(() => {
     return [...filteredSessions]
@@ -679,12 +710,16 @@ export function GuidedGroupSessionsClient({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-[220px] flex-1">
             <Input
               value={browseQuery}
               onChange={(e) => setBrowseQuery(e.target.value)}
-              placeholder={locale === 'az' ? 'Sessiya axtar…' : 'Search sessions…'}
+              placeholder={
+                locale === 'az'
+                  ? 'Sessiya axtar… (fənn üçün: #fənn-slug)'
+                  : 'Search sessions… (subject: #subject-slug)'
+              }
               disabled={loading}
             />
           </div>
@@ -707,18 +742,7 @@ export function GuidedGroupSessionsClient({
         </div>
 
         <div className="grid gap-2 sm:grid-cols-3">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Fənn' : 'Subject'}</label>
-            <Select value={browseSubjectId} onChange={(e) => setBrowseSubjectId(e.target.value)} disabled={loading}>
-              <SelectItem value="">{locale === 'az' ? 'Bütün fənlər' : 'All subjects'}</SelectItem>
-              {subjects.map((s) => (
-                <SelectItem key={`browse-subject-${s.slug}`} value={s.slug}>
-                  {subjectNameById.get(s.slug) ?? s.slug}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
-          <div>
+          <div className="sm:col-span-2">
             <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Mövzu' : 'Topic'}</label>
             <Select
               value={browseTopicId}
@@ -740,7 +764,6 @@ export function GuidedGroupSessionsClient({
               className="w-full"
               onClick={() => {
                 setBrowseQuery('');
-                setBrowseSubjectId('');
                 setBrowseTopicId('');
               }}
               disabled={loading || (!browseQuery && !browseSubjectId && !browseTopicId)}
@@ -990,31 +1013,62 @@ export function GuidedGroupSessionsClient({
                 </Select>
               </div>
 
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Fənn' : 'Subject'}</label>
-                <Select
-                  value={sessionSubjectId}
-                  onChange={(e) => setSessionSubjectId(e.target.value)}
-                  disabled={loading || creatingSession}
-                  placeholder={locale === 'az' ? 'Fənn seçin' : 'Select subject'}
-                >
-                  {subjects.map((s) => {
-                    const isVerified = verifiedSubjectSet.has(s.slug);
-                    const baseLabel = subjectNameById.get(s.slug) ?? s.slug;
-                    const label = isVerified
-                      ? baseLabel
-                      : `${baseLabel} · ${locale === 'az' ? 'təsdiqlənməyib' : 'not verified'}`;
-                    return (
-                      <SelectItem key={s.slug} value={s.slug} disabled={!isVerified}>
-                        {label}
-                      </SelectItem>
-                    );
-                  })}
-                </Select>
-                {!isVerifiedGuideStudent ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {locale === 'az'
-                      ? 'Sessiya planlamaq üçün ən azı bir fənn üzrə təsdiqlənməlisiniz.'
+	              <div>
+	                <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Fənn' : 'Subject'}</label>
+	                <Input
+	                  value={sessionSubjectSearch}
+	                  onChange={(e) => {
+	                    const next = e.target.value.trim().toLowerCase();
+	                    setSessionSubjectSearch(next);
+	                    if (subjects.some((s) => s.slug === next)) {
+	                      setSessionSubjectId(next);
+	                    } else if (!next) {
+	                      setSessionSubjectId('');
+	                    }
+	                  }}
+	                  placeholder={locale === 'az' ? 'məs. mathematics' : 'e.g. mathematics'}
+	                  disabled={loading || creatingSession}
+	                />
+	                <div className="mt-2 grid gap-1">
+	                  {(sessionSubjectSearch ? subjects : subjects.slice(0, 8))
+	                    .filter((s) => {
+	                      if (!sessionSubjectSearch) return true;
+	                      const needle = sessionSubjectSearch.toLowerCase();
+	                      return (
+	                        s.slug.toLowerCase().includes(needle) ||
+	                        (subjectNameById.get(s.slug) ?? s.slug).toLowerCase().includes(needle)
+	                      );
+	                    })
+	                    .slice(0, 8)
+	                    .map((s) => {
+	                      const isVerified = verifiedSubjectSet.has(s.slug);
+	                      const label = subjectNameById.get(s.slug) ?? s.slug;
+	                      return (
+	                        <button
+	                          key={`schedule-subject-${s.slug}`}
+	                          type="button"
+	                          disabled={loading || creatingSession || !isVerified}
+	                          onClick={() => {
+	                            setSessionSubjectId(s.slug);
+	                            setSessionSubjectSearch(s.slug);
+	                          }}
+	                          className={cn(
+	                            'flex items-center justify-between rounded-md border px-3 py-2 text-left text-xs transition-colors',
+	                            isVerified
+	                              ? 'border-border bg-card hover:bg-muted/30'
+	                              : 'border-border/60 bg-muted/10 opacity-60',
+	                          )}
+	                        >
+	                          <span className="truncate">{label}</span>
+	                          <span className="ml-3 shrink-0 text-[11px] text-muted-foreground">{s.slug}</span>
+	                        </button>
+	                      );
+	                    })}
+	                </div>
+	                {!isVerifiedGuideStudent ? (
+	                  <p className="mt-2 text-xs text-muted-foreground">
+	                    {locale === 'az'
+	                      ? 'Sessiya planlamaq üçün ən azı bir fənn üzrə təsdiqlənməlisiniz.'
                       : 'To schedule, you must be verified for at least one subject.'}
                   </p>
                 ) : null}

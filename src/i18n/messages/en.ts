@@ -36,7 +36,7 @@ export const EN_MESSAGES = {
     learning: 'Learning',
     studio: 'Studio',
     myMaterials: 'My materials',
-    recentActivities: 'Notifications',
+    notifications: 'Notifications',
     academicRecord: 'Academic record',
     settings: 'Settings',
     account: 'Account',
@@ -362,7 +362,7 @@ export const EN_MESSAGES = {
     guidedGroupSessions: 'Guided group sessions',
     liveActivities: 'Interactive sessions',
     discussions: 'Discussions',
-    recentActivities: 'Notifications',
+    notifications: 'Notifications',
     academicRecord: 'Academic record',
     adminDashboard: 'Dashboard',
     adminHome: 'Admin',
@@ -394,7 +394,7 @@ export const EN_MESSAGES = {
     announcements: 'Announcements',
     events: 'Events',
     discussions: 'Discussions',
-    recentActivities: 'Notifications',
+    notifications: 'Notifications',
     academicRecord: 'Academic record',
     settings: 'Settings',
     preview: 'Preview',
@@ -1724,7 +1724,7 @@ export const EN_MESSAGES = {
         toastSubmitted: 'Application submitted.',
       },
     },
-    recentActivities: {
+    notifications: {
       title: 'Notifications',
       description: 'Your latest notifications and credit activity.',
     },
@@ -1917,11 +1917,11 @@ export const EN_MESSAGES = {
     idLabel: 'Certificate ID: {{id}}',
     backToRecord: 'Back to Academic Record',
   },
-  recentActivities: {
+  notifications: {
     sortLabel: 'Sort by',
     sortNewest: 'Newest first',
     sortOldest: 'Oldest first',
-    emptyTitle: 'No recent activities yet.',
+    emptyTitle: 'No notifications yet.',
     emptyDescription: 'Notifications and credit activity will appear here.',
     replyContext: {
       reply: 'replied to your reply',
@@ -2040,7 +2040,7 @@ export const EN_MESSAGES = {
             title: 'Discussions',
             description: 'Post questions and learn from peer answers.',
           },
-          recentActivities: {
+          notifications: {
             title: 'Notifications',
             description: 'Stay up to date with replies and updates.',
           },
@@ -2072,7 +2072,7 @@ export const EN_MESSAGES = {
       eventTypeLiveEvent: 'Live event',
       durationLabel: '{{minutes}} min solution window',
       creditsLabel: '{{count}} credits',
-      pendingNotice: 'A confirmation request was sent to your recent activities inbox.',
+      pendingNotice: 'A confirmation request was sent to your notifications inbox.',
       cancelledNotice: 'This registration was cancelled. You can register again.',
       readyNotice: 'Ready when you are.',
       enterSprint: 'Enter sprint',
@@ -2083,7 +2083,7 @@ export const EN_MESSAGES = {
       toastInsufficientCredits: 'Insufficient credits to register.',
       toastFailedRegister: 'Failed to register.',
       toastAlreadyEnrolled: 'You are already enrolled in this session.',
-      toastRegistrationStarted: 'Registration started. Check your recent activities to complete.',
+      toastRegistrationStarted: 'Registration started. Check your notifications to complete.',
     },
     announcements: {
       empty: 'No announcements yet.',

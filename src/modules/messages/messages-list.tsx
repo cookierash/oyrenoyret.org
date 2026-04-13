@@ -77,17 +77,17 @@ export function MessagesList({ transactions }: MessagesListProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
           <label
-            htmlFor="recent-activities-sort"
+            htmlFor="notifications-sort"
             className="text-sm text-muted-foreground whitespace-nowrap"
           >
             Sort by
           </label>
           <Select
-            id="recent-activities-sort"
+            id="notifications-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as SortOrder)}
             className="w-[180px]"
-            aria-label="Sort recent activities"
+            aria-label="Sort notifications"
           >
             <SelectItem value="newest">Newest first</SelectItem>
             <SelectItem value="oldest">Oldest first</SelectItem>

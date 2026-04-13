@@ -159,7 +159,7 @@ export function SiteFooter() {
                 </li>
                 <li>
                   <Link href="/notifications" className="transition-colors hover:text-foreground">
-                    {t('footer.recentActivities')}
+                    {t('footer.notifications')}
                   </Link>
                 </li>
                 <li>

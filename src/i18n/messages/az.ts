@@ -36,7 +36,7 @@ export const AZ_MESSAGES = {
     learning: 'Öyrənmə',
     studio: 'Studio',
     myMaterials: 'Mənim materiallarım',
-    recentActivities: 'Bildirişlər',
+    notifications: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     settings: 'Tənzimləmələr',
     account: 'Hesab',
@@ -362,7 +362,7 @@ export const AZ_MESSAGES = {
     guidedGroupSessions: 'Bələdçili qrup sessiyaları',
     liveActivities: 'İnteraktiv sessiyalar',
     discussions: 'Müzakirələr',
-    recentActivities: 'Bildirişlər',
+    notifications: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     adminDashboard: 'Admin paneli',
     adminHome: 'Admin',
@@ -394,7 +394,7 @@ export const AZ_MESSAGES = {
     announcements: 'Elanlar',
     events: 'Tədbirlər',
     discussions: 'Müzakirələr',
-    recentActivities: 'Bildirişlər',
+    notifications: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     settings: 'Tənzimləmələr',
     preview: 'Ön baxış',
@@ -1731,7 +1731,7 @@ export const AZ_MESSAGES = {
         toastSubmitted: 'Müraciət göndərildi.',
       },
     },
-    recentActivities: {
+    notifications: {
       title: 'Bildirişlər',
       description: 'Ən son bildirişləriniz və kredit fəaliyyətləriniz.',
     },
@@ -1924,11 +1924,11 @@ export const AZ_MESSAGES = {
     idLabel: 'Sertifikat ID: {{id}}',
     backToRecord: 'Akademik qeydə qayıt',
   },
-  recentActivities: {
+  notifications: {
     sortLabel: 'Sıralama',
     sortNewest: 'Ən yenilər əvvəl',
     sortOldest: 'Ən köhnələr əvvəl',
-    emptyTitle: 'Hələ son fəaliyyət yoxdur.',
+    emptyTitle: 'Hələ bildiriş yoxdur.',
     emptyDescription: 'Bildirişlər və kredit fəaliyyətləri burada görünəcək.',
     replyContext: {
       reply: 'cavabınıza cavab verdi',
@@ -2049,7 +2049,7 @@ export const AZ_MESSAGES = {
             title: 'Müzakirələr',
             description: 'Sual paylaşın və həmyaşıd cavablarından öyrənin.',
           },
-          recentActivities: {
+          notifications: {
             title: 'Bildirişlər',
             description: 'Cavablar və yeniliklərdən xəbərdar olun.',
           },

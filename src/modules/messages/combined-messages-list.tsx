@@ -74,7 +74,7 @@ function SprintEnrollmentRow({
 }) {
   const { locale, messages, t } = useI18n();
   const { timeFormat } = useSettings();
-  const copy = messages.recentActivities.sprint;
+  const copy = messages.notifications.sprint;
   const localeCode = getLocaleCode(locale);
   const hour12 =
     timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -194,11 +194,11 @@ function SprintEnrollmentRow({
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
               <Clock className="h-3 w-3" />
-              {t('recentActivities.sprint.durationLabel', { count: item.durationMinutes })}
+              {t('notifications.sprint.durationLabel', { count: item.durationMinutes })}
             </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
               <Coins className="h-3 w-3" />
-              {t('recentActivities.sprint.creditsLabel', {
+              {t('notifications.sprint.creditsLabel', {
                 count: Math.round(item.creditCost),
               })}
             </span>
@@ -253,14 +253,14 @@ function SprintEnrollmentRow({
                 <div className="space-y-1">
                   <p className="text-sm font-medium">{copy.summaryTitle}</p>
                   <p className="text-xs text-muted-foreground">
-                    {t('recentActivities.sprint.summaryLine', {
+                    {t('notifications.sprint.summaryLine', {
                       topic: item.topic,
                       date: dateFormatter.format(eventDate),
                       time: timeFormatter.format(eventDate),
                     })}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {t('recentActivities.sprint.creditsRequired', {
+                    {t('notifications.sprint.creditsRequired', {
                       count: Math.round(item.creditCost),
                     })}
                   </p>
@@ -352,7 +352,7 @@ interface CombinedMessagesListProps {
 export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListProps) {
   const { locale, messages, t } = useI18n();
   const { timeFormat } = useSettings();
-  const copy = messages.recentActivities;
+  const copy = messages.notifications;
   const localeCode = getLocaleCode(locale);
   const hour12 =
     timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -408,11 +408,11 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-2">
-          <label htmlFor="recent-activities-sort" className="text-sm text-muted-foreground whitespace-nowrap">
+          <label htmlFor="notifications-sort" className="text-sm text-muted-foreground whitespace-nowrap">
             {copy.sortLabel}
           </label>
           <Select
-            id="recent-activities-sort"
+            id="notifications-sort"
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value as 'newest' | 'oldest')}
             className="w-[180px]"
@@ -562,10 +562,10 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                                 )}
                               >
                                 {isGain ? '+' : '−'}
-                                {t('recentActivities.credits.creditsLabel', { count: Math.round(absAmount) })}
+                                {t('notifications.credits.creditsLabel', { count: Math.round(absAmount) })}
                               </span>
                               <p className="text-[10px] text-muted-foreground">
-                                {t('recentActivities.credits.balance', {
+                                {t('notifications.credits.balance', {
                                   count: Math.round(item.balanceAfter),
                                 })}
                               </p>

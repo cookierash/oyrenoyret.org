@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiTrophy as Trophy, PiBookOpen as BookOpen, PiBooks as Library, PiUsersThree as UsersThree, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiBell as Bell, PiPalette as Palette, PiTranslate as Translate, PiArrowLeft as ArrowLeft, PiWarningCircle as WarningCircle } from 'react-icons/pi';
+import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiTrophy as Trophy, PiBookOpen as BookOpen, PiBooks as Library, PiUsersThree as UsersThree, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiBell as Bell, PiPalette as Palette, PiTranslate as Translate, PiArrowLeft as ArrowLeft, PiWarningCircle as WarningCircle } from 'react-icons/pi';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
 import { Logo } from '@/src/components/ui/logo';
 import { cn } from '@/src/lib/utils';
@@ -82,7 +82,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     { href: '/library/guided-group-sessions', label: t('sidebar.guidedGroupSessions'), icon: UsersThree },
     { href: '/interactive-sessions', label: t('sidebar.liveActivities'), icon: CalendarDays },
     { href: '/discussions', label: t('sidebar.discussions'), icon: MessageSquare },
-    { href: '/notifications', label: t('sidebar.recentActivities'), icon: Receipt },
+    { href: '/notifications', label: t('sidebar.notifications'), icon: Bell },
     { href: '/academic-record', label: t('sidebar.academicRecord'), icon: GraduationCap },
   ];
 
