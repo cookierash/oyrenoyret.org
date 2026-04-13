@@ -13,13 +13,15 @@ import { SUBJECTS, CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { getPrivateNoStoreHeaders, getPublicCacheHeaders } from '@/src/lib/http-cache';
 import { sanitizeInput, sanitizePracticeTestContent, sanitizeRichTextHtml } from '@/src/security/validation';
-import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
+import { getPracticeTestQuestionCount } from '@/src/modules/materials/utils';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { Prisma } from '@prisma/client';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export const runtime = 'nodejs';
+
+const DEFAULT_TAKE = 60;
 
 async function findPublishedMaterialsPublic(options: {
   subjectId: string;
@@ -33,7 +35,6 @@ async function findPublishedMaterialsPublic(options: {
   const selectCore = {
     id: true,
     title: true,
-    content: true,
     materialType: true,
     publishedAt: true,
     user: {
@@ -111,7 +112,6 @@ async function findPublishedMaterialsWithAccess(options: {
     id: true,
     userId: true,
     title: true,
-    content: true,
     materialType: true,
     publishedAt: true,
     user: {
@@ -220,9 +220,10 @@ export async function GET(request: Request) {
     const skipRaw = searchParams.get('skip');
     const takeParam = takeRaw ? Number(takeRaw) : null;
     const skipParam = skipRaw ? Number(skipRaw) : null;
-    const take = takeParam !== null && Number.isFinite(takeParam)
-      ? Math.min(Math.max(takeParam, 1), 200)
-      : undefined;
+    const take =
+      takeParam !== null && Number.isFinite(takeParam)
+        ? Math.min(Math.max(takeParam, 1), 200)
+        : DEFAULT_TAKE;
     const skip = skipParam !== null && Number.isFinite(skipParam) && skipParam > 0
       ? skipParam
       : undefined;
@@ -245,7 +246,6 @@ export async function GET(request: Request) {
         materials.map((m) => ({
           id: m.id,
           title: m.title,
-          content: m.content,
           materialType: m.materialType,
           publishedAt: m.publishedAt,
           ratingAvg: typeof m.ratingAvg === 'number' ? m.ratingAvg : 0,
@@ -272,11 +272,12 @@ export async function GET(request: Request) {
     const unlockedIds = new Set(unlockedForUser.map((a) => a.materialId));
 
     const mappedMaterials = materials.map((m) => {
-      const questionCount =
-        m.materialType === 'PRACTICE_TEST'
-          ? (typeof m.questionCount === 'number' ? m.questionCount : getPracticeTestQuestionCount(m.content))
-          : 0;
-      const wordCount = m.materialType === 'TEXTUAL' ? getTextWordCount(m.content) : 0;
+      const questionCount = m.materialType === 'PRACTICE_TEST'
+        ? (typeof m.questionCount === 'number' ? m.questionCount : 0)
+        : 0;
+      // NOTE: List responses intentionally do not fetch full `content` (can be large and crash serverless functions).
+      // Unlock cost is always computed server-side in `/api/materials/[materialId]/unlock`.
+      const wordCount = 0;
       return {
         id: m.id,
         userId: m.userId,
