@@ -10,6 +10,8 @@ import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { refundDiscussionCreate } from '@/src/modules/credits';
 
+export const runtime = 'nodejs';
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

@@ -15,6 +15,8 @@ import { grantDiscussionReply } from '@/src/modules/credits';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 
+export const runtime = 'nodejs';
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

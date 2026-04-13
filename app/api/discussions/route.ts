@@ -8,6 +8,8 @@
 import { NextResponse } from 'next/server';
 // NOTE: Keep heavy dependencies inside handlers to avoid module-init crashes.
 
+export const runtime = 'nodejs';
+
 export async function GET(request: Request) {
   try {
     const { prisma } = await import('@/src/db/client');

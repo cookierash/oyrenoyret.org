@@ -14,6 +14,8 @@ import { refundDiscussionCreate } from '@/src/modules/credits';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
+export const runtime = 'nodejs';
+
 const DEFAULT_INACTIVITY_HOURS = 24;
 const parsedHours = Number(process.env.DISCUSSION_INACTIVITY_HOURS);
 const inactivityHours =

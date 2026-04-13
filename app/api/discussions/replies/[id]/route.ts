@@ -9,6 +9,8 @@ import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
+export const runtime = 'nodejs';
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

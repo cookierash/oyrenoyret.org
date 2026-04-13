@@ -10,6 +10,8 @@ import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 
+export const runtime = 'nodejs';
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
