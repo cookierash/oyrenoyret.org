@@ -25,9 +25,14 @@ function pickRandomVariant() {
   return AVATAR_VARIANTS[Math.floor(Math.random() * AVATAR_VARIANTS.length)];
 }
 
+function isValidVariant(value) {
+  return typeof value === 'string' && AVATAR_VARIANTS.includes(value);
+}
+
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
   const onlyMissing = process.argv.includes('--only-missing');
+  const onlyDefault = process.argv.includes('--only-default');
   const overwrite = process.argv.includes('--overwrite');
   const random = process.argv.includes('--random');
 
@@ -49,10 +54,14 @@ async function main() {
     ),
   });
   try {
-    const where = onlyMissing ? { avatarVariant: null } : {};
-
-    const total = await prisma.user.count({ where });
-    console.log(`[avatars] target users: ${total}${dryRun ? ' (dry-run)' : ''}`);
+    // Note: In some deployments `avatarVariant` may be non-nullable in Prisma schema,
+    // so filtering with `{ avatarVariant: null }` can throw. We filter in JS instead.
+    const total = await prisma.user.count();
+    console.log(
+      `[avatars] scanning users: ${total}${dryRun ? ' (dry-run)' : ''} ` +
+        `(mode: ${overwrite ? 'overwrite' : onlyMissing ? 'only-missing' : onlyDefault ? 'only-default' : 'all'}) ` +
+        `(variant: ${random ? 'random' : 'stable'})`,
+    );
 
     const take = 500;
     let cursor = undefined;
@@ -61,7 +70,6 @@ async function main() {
 
     while (true) {
       const users = await prisma.user.findMany({
-        where,
         take,
         ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
         orderBy: { id: 'asc' },
@@ -71,15 +79,34 @@ async function main() {
       if (users.length === 0) break;
 
       for (const user of users) {
-        const nextVariant = random ? pickRandomVariant() : pickStableVariant(user.id);
+        const current = user.avatarVariant;
+        const computed = random ? pickRandomVariant() : pickStableVariant(user.id);
+
         processed += 1;
         if (dryRun) continue;
 
-        if (!overwrite && user.avatarVariant != null) continue;
+        const missingOrInvalid =
+          current == null || (typeof current === 'string' && current.trim() === '') || !isValidVariant(current);
+        const isDefault = current === 'regular';
+
+        const shouldUpdate =
+          overwrite ||
+          (onlyMissing ? missingOrInvalid : false) ||
+          (onlyDefault ? isDefault : false) ||
+          (!onlyMissing && !onlyDefault);
+
+        if (!shouldUpdate) continue;
+        if (!overwrite && !missingOrInvalid && !onlyDefault && current != null) {
+          // Safety: if user didn't ask to overwrite, don't touch already-set values.
+          continue;
+        }
+
+        // Idempotent in stable mode: if it's already the computed value, skip.
+        if (!random && current === computed) continue;
 
         await prisma.user.update({
           where: { id: user.id },
-          data: { avatarVariant: nextVariant },
+          data: { avatarVariant: computed },
           select: { id: true },
         });
         updated += 1;
