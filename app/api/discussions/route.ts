@@ -18,6 +18,7 @@ export async function GET(request: Request) {
     const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
     const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
     const { sanitizeInput } = await import('@/src/security/validation');
+    const { isDbSchemaMismatch } = await import('@/src/db/schema-mismatch');
     const { Prisma } = await import('@prisma/client');
 
     const { searchParams } = new URL(request.url);
@@ -68,7 +69,7 @@ export async function GET(request: Request) {
     };
 
     const discussions: DiscussionBase[] = await (async () => {
-      if (query) {
+      const runFullText = async () => {
         type Row = DiscussionBase & { rank: number };
         const vectorExpr = Prisma.sql`to_tsvector('simple', concat_ws(' ', d.title, d.content))`;
         const baseWhere = Prisma.sql`d."removedAt" IS NULL`;
@@ -84,119 +85,197 @@ export async function GET(request: Request) {
               ? Prisma.sql`websearch_to_tsquery('simple', ${query})`
               : Prisma.sql`plainto_tsquery('simple', ${query})`;
           return prisma.$queryRaw<Row[]>(Prisma.sql`
-            SELECT
-              d.id,
-              d.title,
-              d.content,
-              d."subjectId" as "subjectId",
-              d."topicId" as "topicId",
-              d."lastActivityAt" as "lastActivityAt",
-              d."archivedAt" as "archivedAt",
-              d."createdAt" as "createdAt",
-              u.id as "authorId",
-              u."firstName" as "authorFirstName",
-              u."lastName" as "authorLastName",
-              u.email as "authorEmail",
-              u."avatarVariant" as "authorAvatarVariant",
-              ts_rank_cd(${vectorExpr}, ${tsQuery}) as rank
-            FROM "Discussion" d
-            JOIN "User" u ON u.id = d."userId"
-            WHERE ${baseWhere}
-              AND ${vectorExpr} @@ ${tsQuery}
-              ${subjectFilter}
-              ${topicFilter}
-            ORDER BY rank DESC, d."lastActivityAt" DESC
-            LIMIT ${take}
-            OFFSET ${skip}
-          `);
+              SELECT
+                d.id,
+                d.title,
+                d.content,
+                d."subjectId" as "subjectId",
+                d."topicId" as "topicId",
+                d."lastActivityAt" as "lastActivityAt",
+                d."archivedAt" as "archivedAt",
+                d."createdAt" as "createdAt",
+                u.id as "authorId",
+                u."firstName" as "authorFirstName",
+                u."lastName" as "authorLastName",
+                u.email as "authorEmail",
+                u."avatarVariant" as "authorAvatarVariant",
+                ts_rank_cd(${vectorExpr}, ${tsQuery}) as rank
+              FROM "Discussion" d
+              JOIN "User" u ON u.id = d."userId"
+              WHERE ${baseWhere}
+                AND ${vectorExpr} @@ ${tsQuery}
+                ${subjectFilter}
+                ${topicFilter}
+              ORDER BY rank DESC, d."lastActivityAt" DESC
+              LIMIT ${take}
+              OFFSET ${skip}
+            `);
         };
 
         try {
-          const rows = await runQuery('websearch_to_tsquery');
-          return rows;
+          return await runQuery('websearch_to_tsquery');
         } catch {
-          const rows = await runQuery('plainto_tsquery');
-          return rows;
+          return await runQuery('plainto_tsquery');
         }
-      }
+      };
 
-      const rows = await prisma.discussion.findMany({
-        where: {
-          removedAt: null,
-          ...(combinedSubjectIds.length > 0 ? { subjectId: { in: combinedSubjectIds } } : {}),
-          ...(topicId && { topicId }),
-        },
-        orderBy: { lastActivityAt: 'desc' },
-        take,
-        skip,
-        select: {
-          id: true,
-          title: true,
-          content: true,
-          subjectId: true,
-          topicId: true,
-          lastActivityAt: true,
-          archivedAt: true,
-          createdAt: true,
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              avatarVariant: true,
+      const runFindMany = async () => {
+        const rows = await prisma.discussion.findMany({
+          where: {
+            removedAt: null,
+            ...(combinedSubjectIds.length > 0 ? { subjectId: { in: combinedSubjectIds } } : {}),
+            ...(topicId && { topicId }),
+          },
+          orderBy: { lastActivityAt: 'desc' },
+          take,
+          skip,
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            subjectId: true,
+            topicId: true,
+            lastActivityAt: true,
+            archivedAt: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                avatarVariant: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      return rows.map((row) => ({
-        id: row.id,
-        title: row.title,
-        content: row.content,
-        subjectId: row.subjectId,
-        topicId: row.topicId,
-        lastActivityAt: row.lastActivityAt,
-        archivedAt: row.archivedAt,
-        createdAt: row.createdAt,
-        authorId: row.user.id,
-        authorFirstName: row.user.firstName,
-        authorLastName: row.user.lastName,
-        authorEmail: row.user.email,
-        authorAvatarVariant: row.user.avatarVariant,
-      }));
+        return rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          content: row.content,
+          subjectId: row.subjectId,
+          topicId: row.topicId,
+          lastActivityAt: row.lastActivityAt,
+          archivedAt: row.archivedAt,
+          createdAt: row.createdAt,
+          authorId: row.user.id,
+          authorFirstName: row.user.firstName,
+          authorLastName: row.user.lastName,
+          authorEmail: row.user.email,
+          authorAvatarVariant: row.user.avatarVariant,
+        }));
+      };
+
+      try {
+        return query ? await runFullText() : await runFindMany();
+      } catch (error) {
+        if (!isDbSchemaMismatch(error)) throw error;
+
+        // Safe rollout fallback: if prod DB/client is behind (missing archivedAt/avatarVariant, etc.),
+        // return a narrower shape instead of a hard 500.
+        const rows = await prisma.discussion.findMany({
+          where: {
+            removedAt: null,
+            ...(combinedSubjectIds.length > 0 ? { subjectId: { in: combinedSubjectIds } } : {}),
+            ...(topicId && { topicId }),
+            ...(query
+              ? {
+                  OR: [
+                    { title: { contains: query, mode: 'insensitive' } },
+                    { content: { contains: query, mode: 'insensitive' } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: { lastActivityAt: 'desc' },
+          take,
+          skip,
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            subjectId: true,
+            topicId: true,
+            lastActivityAt: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
+          },
+        });
+
+        return rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          content: row.content,
+          subjectId: row.subjectId,
+          topicId: row.topicId,
+          lastActivityAt: row.lastActivityAt,
+          archivedAt: null,
+          createdAt: row.createdAt,
+          authorId: row.user.id,
+          authorFirstName: row.user.firstName,
+          authorLastName: row.user.lastName,
+          authorEmail: row.user.email,
+          authorAvatarVariant: null,
+        }));
+      }
     })();
 
     const discussionIds = discussions.map((d) => d.id);
-    const voteScores = discussionIds.length
-      ? await prisma.discussionVote.groupBy({
-        by: ['discussionId'],
-        where: { discussionId: { in: discussionIds } },
-        _sum: { value: true },
-      })
-      : [];
+    const voteScores = await (async () => {
+      if (!discussionIds.length) return [];
+      try {
+        return await prisma.discussionVote.groupBy({
+          by: ['discussionId'],
+          where: { discussionId: { in: discussionIds } },
+          _sum: { value: true },
+        });
+      } catch (error) {
+        if (isDbSchemaMismatch(error)) return [];
+        throw error;
+      }
+    })();
     const scoreMap = Object.fromEntries(
       voteScores.map((v) => [v.discussionId, v._sum.value ?? 0])
     );
 
-    const replyRows = discussionIds.length
-      ? await prisma.discussionReply.findMany({
-        where: { discussionId: { in: discussionIds } },
-        select: { id: true, discussionId: true },
-      })
-      : [];
+    const replyRows = await (async () => {
+      if (!discussionIds.length) return [];
+      try {
+        return await prisma.discussionReply.findMany({
+          where: { discussionId: { in: discussionIds } },
+          select: { id: true, discussionId: true },
+        });
+      } catch (error) {
+        if (isDbSchemaMismatch(error)) return [];
+        throw error;
+      }
+    })();
     const replyCountMap = replyRows.reduce<Record<string, number>>((acc, row) => {
       acc[row.discussionId] = (acc[row.discussionId] ?? 0) + 1;
       return acc;
     }, {});
     const replyIds = replyRows.map((r) => r.id);
-    const replyVoteScores = replyIds.length
-      ? await prisma.replyVote.groupBy({
-        by: ['replyId'],
-        where: { replyId: { in: replyIds } },
-        _sum: { value: true },
-      })
-      : [];
+    const replyVoteScores = await (async () => {
+      if (!replyIds.length) return [];
+      try {
+        return await prisma.replyVote.groupBy({
+          by: ['replyId'],
+          where: { replyId: { in: replyIds } },
+          _sum: { value: true },
+        });
+      } catch (error) {
+        if (isDbSchemaMismatch(error)) return [];
+        throw error;
+      }
+    })();
     const replyScoreMap = Object.fromEntries(
       replyVoteScores.map((v) => [v.replyId, v._sum.value ?? 0])
     );
@@ -207,13 +286,18 @@ export async function GET(request: Request) {
     }, {});
 
     const currentUserId = includeVotes ? sessionUserId : null;
-    const currentUserVotes =
-      includeVotes && currentUserId && discussionIds.length
-        ? await prisma.discussionVote.findMany({
+    const currentUserVotes = await (async () => {
+      if (!includeVotes || !currentUserId || !discussionIds.length) return [];
+      try {
+        return await prisma.discussionVote.findMany({
           where: { userId: currentUserId, discussionId: { in: discussionIds } },
           select: { discussionId: true, value: true },
-        })
-        : [];
+        });
+      } catch (error) {
+        if (isDbSchemaMismatch(error)) return [];
+        throw error;
+      }
+    })();
     const currentUserVoteMap = Object.fromEntries(
       currentUserVotes.map((v) => [v.discussionId, v.value])
     );
