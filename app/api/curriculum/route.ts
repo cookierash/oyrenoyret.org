@@ -54,6 +54,7 @@ export async function GET(request: Request) {
         orderBy: { slug: 'asc' },
         select: {
           slug: true,
+          slugAz: true,
           nameEn: true,
           nameAz: true,
           descriptionEn: true,
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
             orderBy: { slug: 'asc' },
             select: {
               slug: true,
+              slugAz: true,
               nameEn: true,
               nameAz: true,
             },
@@ -84,12 +86,14 @@ export async function GET(request: Request) {
       const topics = (CURRICULUM_TOPICS as Record<string, Array<{ id: string }>>)[subject.id] ?? [];
       return {
         slug: subject.id,
+        slugAz: subject.id,
         nameEn: en.name,
         nameAz: az.name,
         descriptionEn: en.description,
         descriptionAz: az.description,
         topics: topics.map((topic) => ({
           slug: topic.id,
+          slugAz: topic.id,
           nameEn: getFallbackTopicName(subject.id, topic.id, 'en'),
           nameAz: getFallbackTopicName(subject.id, topic.id, 'az'),
         })),

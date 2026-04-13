@@ -55,13 +55,17 @@ export async function PATCH(
 
     const subject = await prisma.subject.findFirst({
       where: { slug: currentSlug, deletedAt: null },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
 
     const body = await request.json().catch(() => ({}));
     const nextSlug = body?.slug ? normalizeSlug(body.slug) : null;
     if (nextSlug && !isValidSlug(nextSlug)) {
+      return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
+    }
+    const nextSlugAz = body?.slugAz ? normalizeSlug(body.slugAz) : null;
+    if (nextSlugAz && !isValidSlug(nextSlugAz)) {
       return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
     }
 
@@ -82,7 +86,25 @@ export async function PATCH(
 
     if (nextSlug && nextSlug !== subject.slug) {
       const existing = await prisma.subject.findFirst({
-        where: { slug: nextSlug, deletedAt: null },
+        where: {
+          deletedAt: null,
+          id: { not: subject.id },
+          OR: [{ slug: nextSlug }, { slugAz: nextSlug }],
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        return NextResponse.json({ error: 'Subject slug already exists' }, { status: 409 });
+      }
+    }
+
+    if (nextSlugAz && nextSlugAz !== subject.slugAz) {
+      const existing = await prisma.subject.findFirst({
+        where: {
+          deletedAt: null,
+          id: { not: subject.id },
+          OR: [{ slug: nextSlugAz }, { slugAz: nextSlugAz }],
+        },
         select: { id: true },
       });
       if (existing) {
@@ -95,6 +117,7 @@ export async function PATCH(
         where: { id: subject.id },
         data: {
           ...(nextSlug && nextSlug !== subject.slug ? { slug: nextSlug } : {}),
+          ...(nextSlugAz && nextSlugAz !== subject.slugAz ? { slugAz: nextSlugAz } : {}),
           ...(nameEn !== undefined ? { nameEn } : {}),
           ...(nameAz !== undefined ? { nameAz } : {}),
           ...(descriptionEn !== undefined ? { descriptionEn } : {}),
@@ -102,6 +125,7 @@ export async function PATCH(
         },
         select: {
           slug: true,
+          slugAz: true,
           nameEn: true,
           nameAz: true,
           descriptionEn: true,

@@ -45,6 +45,7 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}));
     const slug = normalizeSlug(body?.slug);
+    const slugAz = normalizeSlug(body?.slugAz);
     const nameEn = typeof body?.nameEn === 'string' ? sanitizeInput(body.nameEn) : '';
     const nameAz = typeof body?.nameAz === 'string' ? sanitizeInput(body.nameAz) : '';
     const descriptionEn =
@@ -52,14 +53,20 @@ export async function POST(request: Request) {
     const descriptionAz =
       typeof body?.descriptionAz === 'string' ? sanitizeInput(body.descriptionAz) : '';
 
-    if (!isValidSlug(slug)) {
+    if (!isValidSlug(slug) || !isValidSlug(slugAz)) {
       return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
     }
     if (!nameEn || !nameAz) {
       return NextResponse.json({ error: 'nameEn and nameAz are required' }, { status: 400 });
     }
 
-    const existing = await prisma.subject.findFirst({ where: { slug, deletedAt: null }, select: { id: true } });
+    const existing = await prisma.subject.findFirst({
+      where: {
+        deletedAt: null,
+        OR: [{ slug }, { slugAz }, { slug: slugAz }, { slugAz: slug }],
+      },
+      select: { id: true },
+    });
     if (existing) {
       return NextResponse.json({ error: 'Subject slug already exists' }, { status: 409 });
     }
@@ -67,6 +74,7 @@ export async function POST(request: Request) {
     const created = await prisma.subject.create({
       data: {
         slug,
+        slugAz,
         nameEn,
         nameAz,
         descriptionEn: descriptionEn || null,
@@ -74,6 +82,7 @@ export async function POST(request: Request) {
       },
       select: {
         slug: true,
+        slugAz: true,
         nameEn: true,
         nameAz: true,
         descriptionEn: true,

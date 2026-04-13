@@ -24,12 +24,14 @@ import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
 
 type CurriculumTopic = {
   slug: string;
+  slugAz: string;
   nameEn: string;
   nameAz: string;
 };
 
 type CurriculumSubject = {
   slug: string;
+  slugAz: string;
   nameEn: string;
   nameAz: string;
   descriptionEn: string | null;
@@ -63,6 +65,7 @@ export function CurriculumAdminPanel() {
 
   const [newSubject, setNewSubject] = useState({
     slug: '',
+    slugAz: '',
     nameEn: '',
     nameAz: '',
     descriptionEn: '',
@@ -70,14 +73,15 @@ export function CurriculumAdminPanel() {
   });
   const [subjectEdit, setSubjectEdit] = useState({
     slug: '',
+    slugAz: '',
     nameEn: '',
     nameAz: '',
     descriptionEn: '',
     descriptionAz: '',
   });
 
-  const [newTopic, setNewTopic] = useState({ slug: '', nameEn: '', nameAz: '' });
-  const [topicEdit, setTopicEdit] = useState({ slug: '', nameEn: '', nameAz: '' });
+  const [newTopic, setNewTopic] = useState({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
+  const [topicEdit, setTopicEdit] = useState({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
 
   const filteredSubjects = useMemo(() => {
     const q = subjectsQuery.trim().toLowerCase();
@@ -124,19 +128,21 @@ export function CurriculumAdminPanel() {
     if (!selectedSubject) return;
     setSubjectEdit({
       slug: selectedSubject.slug,
+      slugAz: selectedSubject.slugAz,
       nameEn: selectedSubject.nameEn,
       nameAz: selectedSubject.nameAz,
       descriptionEn: selectedSubject.descriptionEn ?? '',
       descriptionAz: selectedSubject.descriptionAz ?? '',
     });
     setSelectedTopicSlug('');
-    setNewTopic({ slug: '', nameEn: '', nameAz: '' });
+    setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
   }, [selectedSubjectSlug]);
 
   useEffect(() => {
     if (!selectedTopic) return;
     setTopicEdit({
       slug: selectedTopic.slug,
+      slugAz: selectedTopic.slugAz,
       nameEn: selectedTopic.nameEn,
       nameAz: selectedTopic.nameAz,
     });
@@ -155,7 +161,14 @@ export function CurriculumAdminPanel() {
         return;
       }
       toast.success('Subject created.');
-      setNewSubject({ slug: '', nameEn: '', nameAz: '', descriptionEn: '', descriptionAz: '' });
+      setNewSubject({
+        slug: '',
+        slugAz: '',
+        nameEn: '',
+        nameAz: '',
+        descriptionEn: '',
+        descriptionAz: '',
+      });
       await load();
       setSelectedSubjectSlug(data.slug);
     } catch (error) {
@@ -225,7 +238,7 @@ export function CurriculumAdminPanel() {
         return;
       }
       toast.success('Topic created.');
-      setNewTopic({ slug: '', nameEn: '', nameAz: '' });
+      setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
       await load();
       setSelectedTopicSlug(data.slug);
     } catch (error) {
@@ -298,9 +311,13 @@ export function CurriculumAdminPanel() {
   }
 
   const subjectSlugPreview = newSubject.slug ? normalizeSlug(newSubject.slug) : '';
+  const subjectSlugAzPreview = newSubject.slugAz ? normalizeSlug(newSubject.slugAz) : '';
   const subjectEditSlugPreview = subjectEdit.slug ? normalizeSlug(subjectEdit.slug) : '';
+  const subjectEditSlugAzPreview = subjectEdit.slugAz ? normalizeSlug(subjectEdit.slugAz) : '';
   const topicSlugPreview = newTopic.slug ? normalizeSlug(newTopic.slug) : '';
+  const topicSlugAzPreview = newTopic.slugAz ? normalizeSlug(newTopic.slugAz) : '';
   const topicEditSlugPreview = topicEdit.slug ? normalizeSlug(topicEdit.slug) : '';
+  const topicEditSlugAzPreview = topicEdit.slugAz ? normalizeSlug(topicEdit.slugAz) : '';
 
   return (
     <Tabs defaultValue="subjects" className="space-y-4">
@@ -325,7 +342,14 @@ export function CurriculumAdminPanel() {
                 setSelectedSubjectSlug('');
                 setSelectedTopicSlug('');
                 setSubjectsQuery('');
-                setNewSubject({ slug: '', nameEn: '', nameAz: '', descriptionEn: '', descriptionAz: '' });
+                setNewSubject({
+                  slug: '',
+                  slugAz: '',
+                  nameEn: '',
+                  nameAz: '',
+                  descriptionEn: '',
+                  descriptionAz: '',
+                });
               }}
             >
               New
@@ -391,27 +415,71 @@ export function CurriculumAdminPanel() {
               </div>
 
               <div className="grid gap-3">
-                <div className="grid gap-2">
-                  <Label htmlFor="subject-slug">Slug (EN/AZ)</Label>
-                  <Input
-                    id="subject-slug"
-                    value={selectedSubject ? subjectEdit.slug : newSubject.slug}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (selectedSubject) {
-                        setSubjectEdit((p) => ({ ...p, slug: value }));
-                      } else {
-                        setNewSubject((p) => ({ ...p, slug: value }));
-                      }
-                    }}
-                    placeholder="e.g. mathematics or riyaziyyat"
-                    aria-describedby="subject-slug-help"
-                  />
-                  <div id="subject-slug-help" className="text-[11px] text-muted-foreground">
-                    Preview:{' '}
-                    <span className={cn('font-mono', (selectedSubject ? subjectEditSlugPreview : subjectSlugPreview) && !isValidSlug(selectedSubject ? subjectEditSlugPreview : subjectSlugPreview) ? 'text-destructive' : '')}>
-                      {selectedSubject ? subjectEditSlugPreview : subjectSlugPreview || '—'}
-                    </span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="subject-slug-en">Slug (EN)</Label>
+                    <Input
+                      id="subject-slug-en"
+                      value={selectedSubject ? subjectEdit.slug : newSubject.slug}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (selectedSubject) {
+                          setSubjectEdit((p) => ({ ...p, slug: value }));
+                        } else {
+                          setNewSubject((p) => ({ ...p, slug: value }));
+                        }
+                      }}
+                      placeholder="e.g. mathematics"
+                      aria-describedby="subject-slug-en-help"
+                    />
+                    <div id="subject-slug-en-help" className="text-[11px] text-muted-foreground">
+                      Preview:{' '}
+                      <span
+                        className={cn(
+                          'font-mono',
+                          (selectedSubject ? subjectEditSlugPreview : subjectSlugPreview) &&
+                            !isValidSlug(selectedSubject ? subjectEditSlugPreview : subjectSlugPreview)
+                            ? 'text-destructive'
+                            : '',
+                        )}
+                      >
+                        {selectedSubject ? subjectEditSlugPreview : subjectSlugPreview || '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="subject-slug-az">Slug (AZ)</Label>
+                    <Input
+                      id="subject-slug-az"
+                      value={selectedSubject ? subjectEdit.slugAz : newSubject.slugAz}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (selectedSubject) {
+                          setSubjectEdit((p) => ({ ...p, slugAz: value }));
+                        } else {
+                          setNewSubject((p) => ({ ...p, slugAz: value }));
+                        }
+                      }}
+                      placeholder="e.g. riyaziyyat"
+                      aria-describedby="subject-slug-az-help"
+                    />
+                    <div id="subject-slug-az-help" className="text-[11px] text-muted-foreground">
+                      Preview:{' '}
+                      <span
+                        className={cn(
+                          'font-mono',
+                          (selectedSubject ? subjectEditSlugAzPreview : subjectSlugAzPreview) &&
+                            !isValidSlug(selectedSubject ? subjectEditSlugAzPreview : subjectSlugAzPreview)
+                            ? 'text-destructive'
+                            : '',
+                        )}
+                      >
+                        {selectedSubject
+                          ? subjectEditSlugAzPreview
+                          : subjectSlugAzPreview || '—'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -448,7 +516,7 @@ export function CurriculumAdminPanel() {
                           setNewSubject((p) => ({
                             ...p,
                             nameAz: value,
-                            slug: p.slug.trim() ? p.slug : value,
+                            slugAz: p.slugAz.trim() ? p.slugAz : value,
                           }));
                         }
                       }}
@@ -525,7 +593,7 @@ export function CurriculumAdminPanel() {
               onClick={() => {
                 setSelectedTopicSlug('');
                 setTopicsQuery('');
-                setNewTopic({ slug: '', nameEn: '', nameAz: '' });
+                setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
               }}
               disabled={!selectedSubject}
             >
@@ -614,27 +682,71 @@ export function CurriculumAdminPanel() {
                 <p className="text-sm text-muted-foreground">Select a subject to manage its topics.</p>
               ) : (
                 <div className="grid gap-3">
-                  <div className="grid gap-2">
-                    <Label htmlFor="topic-slug">Slug (EN/AZ)</Label>
-                    <Input
-                      id="topic-slug"
-                      value={selectedTopic ? topicEdit.slug : newTopic.slug}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (selectedTopic) {
-                          setTopicEdit((p) => ({ ...p, slug: value }));
-                        } else {
-                          setNewTopic((p) => ({ ...p, slug: value }));
-                        }
-                      }}
-                      placeholder="e.g. algebra or cəbr"
-                      aria-describedby="topic-slug-help"
-                    />
-                    <div id="topic-slug-help" className="text-[11px] text-muted-foreground">
-                      Preview:{' '}
-                      <span className={cn('font-mono', (selectedTopic ? topicEditSlugPreview : topicSlugPreview) && !isValidSlug(selectedTopic ? topicEditSlugPreview : topicSlugPreview) ? 'text-destructive' : '')}>
-                        {selectedTopic ? topicEditSlugPreview : topicSlugPreview || '—'}
-                      </span>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="topic-slug-en">Slug (EN)</Label>
+                      <Input
+                        id="topic-slug-en"
+                        value={selectedTopic ? topicEdit.slug : newTopic.slug}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (selectedTopic) {
+                            setTopicEdit((p) => ({ ...p, slug: value }));
+                          } else {
+                            setNewTopic((p) => ({ ...p, slug: value }));
+                          }
+                        }}
+                        placeholder="e.g. algebra"
+                        aria-describedby="topic-slug-en-help"
+                      />
+                      <div id="topic-slug-en-help" className="text-[11px] text-muted-foreground">
+                        Preview:{' '}
+                        <span
+                          className={cn(
+                            'font-mono',
+                            (selectedTopic ? topicEditSlugPreview : topicSlugPreview) &&
+                              !isValidSlug(selectedTopic ? topicEditSlugPreview : topicSlugPreview)
+                              ? 'text-destructive'
+                              : '',
+                          )}
+                        >
+                          {selectedTopic ? topicEditSlugPreview : topicSlugPreview || '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="topic-slug-az">Slug (AZ)</Label>
+                      <Input
+                        id="topic-slug-az"
+                        value={selectedTopic ? topicEdit.slugAz : newTopic.slugAz}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (selectedTopic) {
+                            setTopicEdit((p) => ({ ...p, slugAz: value }));
+                          } else {
+                            setNewTopic((p) => ({ ...p, slugAz: value }));
+                          }
+                        }}
+                        placeholder="e.g. cebr"
+                        aria-describedby="topic-slug-az-help"
+                      />
+                      <div id="topic-slug-az-help" className="text-[11px] text-muted-foreground">
+                        Preview:{' '}
+                        <span
+                          className={cn(
+                            'font-mono',
+                            (selectedTopic ? topicEditSlugAzPreview : topicSlugAzPreview) &&
+                              !isValidSlug(selectedTopic ? topicEditSlugAzPreview : topicSlugAzPreview)
+                              ? 'text-destructive'
+                              : '',
+                          )}
+                        >
+                          {selectedTopic
+                            ? topicEditSlugAzPreview
+                            : topicSlugAzPreview || '—'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -671,7 +783,7 @@ export function CurriculumAdminPanel() {
                             setNewTopic((p) => ({
                               ...p,
                               nameAz: value,
-                              slug: p.slug.trim() ? p.slug : value,
+                              slugAz: p.slugAz.trim() ? p.slugAz : value,
                             }));
                           }
                         }}

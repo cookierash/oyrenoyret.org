@@ -62,7 +62,7 @@ export async function PATCH(
 
     const topic = await prisma.topic.findFirst({
       where: { subjectId: subject.id, slug: topicSlug, deletedAt: null },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, slugAz: true },
     });
     if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
 
@@ -71,13 +71,37 @@ export async function PATCH(
     if (nextSlug && !isValidSlug(nextSlug)) {
       return NextResponse.json({ error: 'Invalid topic slug' }, { status: 400 });
     }
+    const nextSlugAz = body?.slugAz ? normalizeSlug(body.slugAz) : null;
+    if (nextSlugAz && !isValidSlug(nextSlugAz)) {
+      return NextResponse.json({ error: 'Invalid topic slug' }, { status: 400 });
+    }
 
     const nameEn = typeof body?.nameEn === 'string' ? sanitizeInput(body.nameEn) : undefined;
     const nameAz = typeof body?.nameAz === 'string' ? sanitizeInput(body.nameAz) : undefined;
 
     if (nextSlug && nextSlug !== topic.slug) {
       const existing = await prisma.topic.findFirst({
-        where: { subjectId: subject.id, slug: nextSlug, deletedAt: null },
+        where: {
+          subjectId: subject.id,
+          deletedAt: null,
+          id: { not: topic.id },
+          OR: [{ slug: nextSlug }, { slugAz: nextSlug }],
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        return NextResponse.json({ error: 'Topic slug already exists' }, { status: 409 });
+      }
+    }
+
+    if (nextSlugAz && nextSlugAz !== topic.slugAz) {
+      const existing = await prisma.topic.findFirst({
+        where: {
+          subjectId: subject.id,
+          deletedAt: null,
+          id: { not: topic.id },
+          OR: [{ slug: nextSlugAz }, { slugAz: nextSlugAz }],
+        },
         select: { id: true },
       });
       if (existing) {
@@ -90,10 +114,11 @@ export async function PATCH(
         where: { id: topic.id },
         data: {
           ...(nextSlug && nextSlug !== topic.slug ? { slug: nextSlug } : {}),
+          ...(nextSlugAz && nextSlugAz !== topic.slugAz ? { slugAz: nextSlugAz } : {}),
           ...(nameEn !== undefined ? { nameEn } : {}),
           ...(nameAz !== undefined ? { nameAz } : {}),
         },
-        select: { slug: true, nameEn: true, nameAz: true },
+        select: { slug: true, slugAz: true, nameEn: true, nameAz: true },
       });
 
       if (nextSlug && nextSlug !== topic.slug) {

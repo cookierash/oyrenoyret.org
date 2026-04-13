@@ -60,10 +60,11 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}));
     const slug = normalizeSlug(body?.slug);
+    const slugAz = normalizeSlug(body?.slugAz);
     const nameEn = typeof body?.nameEn === 'string' ? sanitizeInput(body.nameEn) : '';
     const nameAz = typeof body?.nameAz === 'string' ? sanitizeInput(body.nameAz) : '';
 
-    if (!isValidSlug(slug)) {
+    if (!isValidSlug(slug) || !isValidSlug(slugAz)) {
       return NextResponse.json({ error: 'Invalid topic slug' }, { status: 400 });
     }
     if (!nameEn || !nameAz) {
@@ -71,7 +72,11 @@ export async function POST(
     }
 
     const existing = await prisma.topic.findFirst({
-      where: { subjectId: subject.id, slug, deletedAt: null },
+      where: {
+        subjectId: subject.id,
+        deletedAt: null,
+        OR: [{ slug }, { slugAz }, { slug: slugAz }, { slugAz: slug }],
+      },
       select: { id: true },
     });
     if (existing) {
@@ -82,10 +87,11 @@ export async function POST(
       data: {
         subjectId: subject.id,
         slug,
+        slugAz,
         nameEn,
         nameAz,
       },
-      select: { slug: true, nameEn: true, nameAz: true },
+      select: { slug: true, slugAz: true, nameEn: true, nameAz: true },
     });
 
     return NextResponse.json(created);

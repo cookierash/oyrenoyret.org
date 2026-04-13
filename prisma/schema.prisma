@@ -576,6 +576,7 @@ model LiveAnnouncement {
 model Subject {
   id            String   @id @default(uuid())
   slug          String   @unique
+  slugAz        String   @unique
   nameEn        String
   nameAz        String
   descriptionEn String?  @db.Text
@@ -588,6 +589,7 @@ model Subject {
   deletedAt DateTime?
 
   @@index([slug])
+  @@index([slugAz])
   @@index([deletedAt])
 }
 
@@ -595,6 +597,7 @@ model Topic {
   id        String   @id @default(uuid())
   subjectId String
   slug      String
+  slugAz    String
   nameEn    String
   nameAz    String
 
@@ -605,8 +608,10 @@ model Topic {
   deletedAt DateTime?
 
   @@unique([subjectId, slug])
+  @@unique([subjectId, slugAz])
   @@index([subjectId])
   @@index([slug])
+  @@index([slugAz])
   @@index([deletedAt])
 }
 
