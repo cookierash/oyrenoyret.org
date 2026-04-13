@@ -90,7 +90,7 @@ export function CurriculumAdminPanel() {
     const q = subjectsQuery.trim().toLowerCase();
     if (!q) return subjects;
     return subjects.filter((s) =>
-      [s.slug, s.nameEn, s.nameAz].some((field) => field.toLowerCase().includes(q)),
+      [s.slug, s.slugAz, s.nameEn, s.nameAz].some((field) => field.toLowerCase().includes(q)),
     );
   }, [subjects, subjectsQuery]);
 
@@ -99,7 +99,7 @@ export function CurriculumAdminPanel() {
     const q = topicsQuery.trim().toLowerCase();
     if (!q) return list;
     return list.filter((t) =>
-      [t.slug, t.nameEn, t.nameAz].some((field) => field.toLowerCase().includes(q)),
+      [t.slug, t.slugAz, t.nameEn, t.nameAz].some((field) => field.toLowerCase().includes(q)),
     );
   }, [selectedSubject?.topics, topicsQuery]);
 

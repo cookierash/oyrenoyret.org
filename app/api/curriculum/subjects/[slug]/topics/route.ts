@@ -20,14 +20,21 @@ import {
 import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug: rawSlug } = await params;
-    const subjectSlug = normalizeSlug(rawSlug);
-    if (!isValidSlug(subjectSlug)) {
+    const looksLikeId = isUuid(rawSlug);
+    const subjectSlug = looksLikeId ? '' : normalizeSlug(rawSlug);
+    if (!looksLikeId && !isValidSlug(subjectSlug)) {
       return NextResponse.json({ error: 'Invalid subject slug' }, { status: 400 });
     }
 
@@ -54,19 +61,17 @@ export async function POST(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: {
-        deletedAt: null,
-        OR: [
-          { id: rawSlug },
-          { id: subjectSlug },
-          { slug: rawSlug },
-          { slugAz: rawSlug },
-          { slug: subjectSlug },
-          { slugAz: subjectSlug },
-          { slug: { equals: rawSlug, mode: 'insensitive' } },
-          { slugAz: { equals: rawSlug, mode: 'insensitive' } },
-        ],
-      },
+      where: looksLikeId
+        ? { id: rawSlug, deletedAt: null }
+        : {
+            deletedAt: null,
+            OR: [
+              { slug: subjectSlug },
+              { slugAz: subjectSlug },
+              { slug: { equals: rawSlug, mode: 'insensitive' } },
+              { slugAz: { equals: rawSlug, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, slug: true },
     });
     if (!subject) {

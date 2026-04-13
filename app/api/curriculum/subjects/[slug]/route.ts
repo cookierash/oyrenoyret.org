@@ -21,14 +21,21 @@ import {
 import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
     const { slug: rawSlug } = await params;
-    const currentSlug = normalizeSlug(rawSlug);
-    if (!isValidSlug(currentSlug)) {
+    const looksLikeId = isUuid(rawSlug);
+    const currentSlug = looksLikeId ? '' : normalizeSlug(rawSlug);
+    if (!looksLikeId && !isValidSlug(currentSlug)) {
       return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
     }
 
@@ -55,19 +62,17 @@ export async function PATCH(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: {
-        deletedAt: null,
-        OR: [
-          { id: rawSlug },
-          { id: currentSlug },
-          { slug: rawSlug },
-          { slugAz: rawSlug },
-          { slug: currentSlug },
-          { slugAz: currentSlug },
-          { slug: { equals: rawSlug, mode: 'insensitive' } },
-          { slugAz: { equals: rawSlug, mode: 'insensitive' } },
-        ],
-      },
+      where: looksLikeId
+        ? { id: rawSlug, deletedAt: null }
+        : {
+            deletedAt: null,
+            OR: [
+              { slug: currentSlug },
+              { slugAz: currentSlug },
+              { slug: { equals: rawSlug, mode: 'insensitive' } },
+              { slugAz: { equals: rawSlug, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) {
@@ -188,8 +193,9 @@ export async function DELETE(
 ) {
   try {
     const { slug: rawSlug } = await params;
-    const slug = normalizeSlug(rawSlug);
-    if (!isValidSlug(slug)) {
+    const looksLikeId = isUuid(rawSlug);
+    const slug = looksLikeId ? '' : normalizeSlug(rawSlug);
+    if (!looksLikeId && !isValidSlug(slug)) {
       return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
     }
 
@@ -216,19 +222,17 @@ export async function DELETE(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: {
-        deletedAt: null,
-        OR: [
-          { id: rawSlug },
-          { id: slug },
-          { slug: rawSlug },
-          { slugAz: rawSlug },
-          { slug },
-          { slugAz: slug },
-          { slug: { equals: rawSlug, mode: 'insensitive' } },
-          { slugAz: { equals: rawSlug, mode: 'insensitive' } },
-        ],
-      },
+      where: looksLikeId
+        ? { id: rawSlug, deletedAt: null }
+        : {
+            deletedAt: null,
+            OR: [
+              { slug },
+              { slugAz: slug },
+              { slug: { equals: rawSlug, mode: 'insensitive' } },
+              { slugAz: { equals: rawSlug, mode: 'insensitive' } },
+            ],
+          },
       select: { id: true, slug: true },
     });
     if (!subject) {
