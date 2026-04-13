@@ -12,7 +12,6 @@
  */
 
 import { z } from 'zod';
-import DOMPurify from 'isomorphic-dompurify';
 import { PRACTICE_TEST_LIMITS } from '@/src/config/practice-test';
 import { maybeDecodeEscapedHtml } from '@/src/lib/html';
 
@@ -79,43 +78,122 @@ export function sanitizeHtml(input: string): string {
   return normalized.replace(/\n/g, '<br>');
 }
 
-let richTextHooksInstalled = false;
+function escapeHtml(raw: string) {
+  return raw
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-function installRichTextHooksOnce() {
-  if (richTextHooksInstalled) return;
-  richTextHooksInstalled = true;
+function sanitizeToPlainHtmlWithBreaks(input: string) {
+  const dirty = maybeDecodeEscapedHtml(String(input ?? '').trim());
+  if (!dirty) return '';
 
-  // Restrict inline styles to a tiny allow-list to preserve editor color/highlight
-  // while preventing layout-breaking or unsafe CSS from being persisted.
-  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
-    if (data.attrName !== 'style' || typeof data.attrValue !== 'string') return;
+  const withBreaks = dirty
+    .replace(/<\s*br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre)>/gi, '\n');
+  const stripped = withBreaks.replace(/<[^>]*>/g, '');
+  const normalized = stripped.replace(/\n{3,}/g, '\n\n').trim();
+  return escapeHtml(normalized).replace(/\n/g, '<br>');
+}
 
-    const raw = data.attrValue;
-    const kept: string[] = [];
-    for (const part of raw.split(';')) {
-      const [propRaw, valueRaw] = part.split(':');
-      if (!propRaw || !valueRaw) continue;
-      const prop = propRaw.trim().toLowerCase();
-      const value = valueRaw.trim();
+function filterInlineStyle(style: string) {
+  const kept: string[] = [];
+  for (const part of style.split(';')) {
+    const [propRaw, valueRaw] = part.split(':');
+    if (!propRaw || !valueRaw) continue;
+    const prop = propRaw.trim().toLowerCase();
+    const value = valueRaw.trim();
 
-      const isHex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
-      const isRgb = /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(value);
-      const isHsl =
-        /^hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(
-          value,
-        );
-      if (!isHex && !isRgb && !isHsl) continue;
+    const isHex = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value);
+    const isRgb =
+      /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(
+        value,
+      );
+    const isHsl =
+      /^hsla?\(\s*\d{1,3}\s*,\s*\d{1,3}%\s*,\s*\d{1,3}%(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(
+        value,
+      );
+    if (!isHex && !isRgb && !isHsl) continue;
 
-      if (prop === 'color' || prop === 'background-color') {
-        kept.push(`${prop}: ${value}`);
+    if (prop === 'color' || prop === 'background-color') {
+      kept.push(`${prop}: ${value}`);
+    }
+  }
+  return kept.join('; ');
+}
+
+function sanitizeWithDomParser(options: {
+  input: string;
+  allowedTags: string[];
+  allowedAttrs: string[];
+  allowImgSrc?: (src: string) => boolean;
+}) {
+  const { input, allowedTags, allowedAttrs, allowImgSrc } = options;
+  const dirty = maybeDecodeEscapedHtml(String(input ?? '').trim());
+  if (!dirty) return '';
+
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+    return sanitizeToPlainHtmlWithBreaks(dirty);
+  }
+
+  const doc = new DOMParser().parseFromString(`<div>${dirty}</div>`, 'text/html');
+  const root = doc.body.firstElementChild;
+  if (!root) return '';
+
+  const allowedTagSet = new Set(allowedTags.map((t) => t.toUpperCase()));
+  const allowedAttrSet = new Set(allowedAttrs.map((a) => a.toLowerCase()));
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      const tag = el.tagName.toUpperCase();
+
+      if (!allowedTagSet.has(tag)) {
+        // Unwrap: keep children, drop the tag itself.
+        const parent = el.parentNode;
+        if (!parent) return;
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+        return;
+      }
+
+      // Strip attributes aggressively.
+      for (const attr of Array.from(el.attributes)) {
+        const name = attr.name.toLowerCase();
+        if (!allowedAttrSet.has(name)) {
+          el.removeAttribute(attr.name);
+          continue;
+        }
+        if (name.startsWith('on')) {
+          el.removeAttribute(attr.name);
+          continue;
+        }
+        if (name === 'style') {
+          const filtered = filterInlineStyle(attr.value);
+          if (filtered) el.setAttribute('style', filtered);
+          else el.removeAttribute('style');
+          continue;
+        }
+        if (tag === 'IMG' && name === 'src' && typeof allowImgSrc === 'function') {
+          const src = attr.value.trim();
+          if (!allowImgSrc(src)) {
+            el.remove();
+            return;
+          }
+        }
       }
     }
 
-    data.attrValue = kept.join('; ');
-    if (!data.attrValue) {
-      data.keepAttr = false;
+    for (const child of Array.from(node.childNodes)) {
+      walk(child);
     }
-  });
+  };
+
+  walk(root);
+  return root.innerHTML;
 }
 
 /**
@@ -123,14 +201,9 @@ function installRichTextHooksOnce() {
  * Intended for materials and practice tests.
  */
 export function sanitizeRichTextHtml(input: string): string {
-  installRichTextHooksOnce();
-  const dirty = maybeDecodeEscapedHtml(String(input ?? '').trim());
-  if (!dirty) return '';
-
-  return DOMPurify.sanitize(dirty, {
-    KEEP_CONTENT: true,
-    FORBID_TAGS: ['a', 'img', 'svg', 'math', 'iframe', 'script', 'style'],
-    ALLOWED_TAGS: [
+  return sanitizeWithDomParser({
+    input,
+    allowedTags: [
       'p',
       'br',
       'div',
@@ -153,7 +226,7 @@ export function sanitizeRichTextHtml(input: string): string {
       'sub',
       'mark',
     ],
-    ALLOWED_ATTR: ['style', 'start'],
+    allowedAttrs: ['style', 'start'],
   });
 }
 
@@ -161,19 +234,41 @@ export function sanitizeRichTextHtml(input: string): string {
  * Sanitizes discussion rich HTML content while allowing uploaded images.
  */
 export function sanitizeDiscussionRichTextHtml(input: string): string {
-  installRichTextHooksOnce();
-  const dirty = maybeDecodeEscapedHtml(String(input ?? '').trim());
-  if (!dirty) return '';
-
   const discussionsPrefixBase = String(process.env.R2_DISCUSSIONS_PREFIX ?? 'discussions').replace(
     /^\/+|\/+$/g,
     '',
   );
 
-  const sanitized = DOMPurify.sanitize(dirty, {
-    KEEP_CONTENT: true,
-    FORBID_TAGS: ['a', 'svg', 'math', 'iframe', 'script', 'style'],
-    ALLOWED_TAGS: [
+  const isAllowedDiscussionImageSrc = (src: string) => {
+    if (!src || src.includes('..')) return false;
+
+    if (src.startsWith('/api/uploads/discussions/file?key=')) {
+      try {
+        const parsed = new URL(src, 'http://local.test');
+        const key = parsed.searchParams.get('key') ?? '';
+        const decoded = decodeURIComponent(key);
+        return decoded.startsWith(`${discussionsPrefixBase}/`) && !decoded.includes('..');
+      } catch {
+        return false;
+      }
+    }
+
+    if (src.startsWith('https://')) {
+      try {
+        const url = new URL(src);
+        const key = url.pathname.replace(/^\/+/, '');
+        return key.startsWith(`${discussionsPrefixBase}/`) && !key.includes('..');
+      } catch {
+        return false;
+      }
+    }
+
+    return false;
+  };
+
+  return sanitizeWithDomParser({
+    input,
+    allowedTags: [
       'p',
       'br',
       'div',
@@ -197,7 +292,7 @@ export function sanitizeDiscussionRichTextHtml(input: string): string {
       'mark',
       'img',
     ],
-    ALLOWED_ATTR: [
+    allowedAttrs: [
       'style',
       'start',
       'src',
@@ -208,42 +303,7 @@ export function sanitizeDiscussionRichTextHtml(input: string): string {
       'loading',
       'decoding',
     ],
-  });
-
-  const isAllowedDiscussionImageSrc = (src: string) => {
-    if (!src || src.includes('..')) return false;
-
-    // Preferred: proxy through the app (works in localhost + locked-down buckets).
-    if (src.startsWith('/api/uploads/discussions/file?key=')) {
-      try {
-        const parsed = new URL(src, 'http://local.test');
-        const key = parsed.searchParams.get('key') ?? '';
-        const decoded = decodeURIComponent(key);
-        return decoded.startsWith(`${discussionsPrefixBase}/`) && !decoded.includes('..');
-      } catch {
-        return false;
-      }
-    }
-
-    // Direct CDN/R2 URL: allow if the path looks like a discussions object key.
-    if (src.startsWith('https://')) {
-      try {
-        const url = new URL(src);
-        const key = url.pathname.replace(/^\/+/, '');
-        return key.startsWith(`${discussionsPrefixBase}/`) && !key.includes('..');
-      } catch {
-        return false;
-      }
-    }
-
-    return false;
-  };
-
-  // Remove any <img> that doesn't have an allowed src.
-  return String(sanitized).replace(/<img\b[^>]*>/gi, (tag) => {
-    const match = tag.match(/\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const src = (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').trim();
-    return isAllowedDiscussionImageSrc(src) ? tag : '';
+    allowImgSrc: isAllowedDiscussionImageSrc,
   });
 }
 
