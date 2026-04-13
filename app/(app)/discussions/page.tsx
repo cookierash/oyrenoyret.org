@@ -47,22 +47,7 @@ export default function DiscussionsPage() {
   );
 
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') return;
-    let active = true;
-    const runCleanup = async () => {
-      try {
-        await fetch('/api/cron/archive-discussions', { cache: 'no-store' });
-      } catch {
-        return;
-      }
-      if (active) {
-        setRefreshKey((prev) => prev + 1);
-      }
-    };
-    runCleanup();
-    return () => {
-      active = false;
-    };
+    return;
   }, []);
 
   useEffect(() => {

@@ -33,8 +33,6 @@ function getAppOrigin(request: Request): string {
 }
 
 export async function POST(request: Request) {
-  const isDev = process.env.NODE_ENV === 'development';
-
   try {
     const body = (await request.json().catch(() => ({}))) as { token?: unknown };
     const providedToken = typeof body.token === 'string' ? body.token.trim() : '';
@@ -100,10 +98,6 @@ export async function POST(request: Request) {
     const { token: verificationToken } = await issueEmailVerificationToken(userId);
     const origin = getAppOrigin(request);
     const verifyUrl = `${origin}/verify-email?token=${encodeURIComponent(verificationToken)}`;
-
-    if (isDev) {
-      console.log(`[AUTH] Email verification link for ${user.email}: ${verifyUrl}`);
-    }
 
     await sendAccountVerificationEmail(user.email, verifyUrl);
     return NextResponse.json({ success: true }, { headers: getPrivateNoStoreHeaders() });

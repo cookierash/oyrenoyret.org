@@ -12,8 +12,6 @@ import { hashEmailVerificationToken } from '@/src/modules/auth/utils/email-verif
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 export async function POST(request: Request) {
-  const isDev = process.env.NODE_ENV === 'development';
-
   try {
     const identifier = getRateLimitIdentifier(request);
     const rateLimit = await checkRateLimit(`auth:verify-email:${identifier}`, RATE_LIMITS.AUTH_EMAIL_VERIFICATION);
@@ -92,12 +90,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error verifying email:', error);
-    if (isDev) {
-      return NextResponse.json(
-        { success: false, error: error instanceof Error ? error.message : 'Failed to verify email' },
-        { status: 500, headers: getPrivateNoStoreHeaders() }
-      );
-    }
     return NextResponse.json({ success: false, errorKey: 'verifyEmailFailed' }, { status: 500, headers: getPrivateNoStoreHeaders() });
   }
 }

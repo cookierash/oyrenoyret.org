@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/src/lib/utils';
-import { getAvatarSrc, isAvatarVariant } from '@/src/lib/avatar';
+import { getAvatarSrc, getStableAvatarVariant, isAvatarVariant } from '@/src/lib/avatar';
 import { useOptionalCurrentUser } from '@/src/modules/auth/components/current-user-context';
 
 type PublicUser = {
@@ -71,7 +71,10 @@ export function UserHoverCard({
   const resolvedHref = href ?? (lookupId ? `/u/${lookupId}` : null);
   const resolvedName = getDisplayName(user ?? {}, fallbackName);
   const resolvedAvatarVariant = avatarVariant ?? user?.avatarVariant ?? null;
-  const avatarSrc = isAvatarVariant(resolvedAvatarVariant) ? getAvatarSrc(resolvedAvatarVariant) : null;
+  const finalVariant = isAvatarVariant(resolvedAvatarVariant)
+    ? resolvedAvatarVariant
+    : getStableAvatarVariant(lookupId ?? resolvedName);
+  const avatarSrc = getAvatarSrc(finalVariant);
 
   const maybeFetch = async () => {
     if (!lookupId) return;
@@ -108,24 +111,13 @@ export function UserHoverCard({
       <HoverCardContent sideOffset={8} className="w-72">
         <div className="flex items-start gap-3">
           <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full ring-1 ring-black/5 bg-muted">
-            {avatarSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={avatarSrc}
-                alt=""
-                className="h-full w-full object-cover"
-                decoding="async"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-xs font-medium text-foreground/70">
-                {resolvedName
-                  .split(/\s+/)
-                  .map((n) => n.charAt(0))
-                  .join('')
-                  .toUpperCase()
-                  .slice(0, 2) || '?'}
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={avatarSrc}
+              alt=""
+              className="h-full w-full object-cover"
+              decoding="async"
+            />
           </div>
 
           <div className="min-w-0 flex-1">

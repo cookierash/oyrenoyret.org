@@ -257,15 +257,6 @@ export async function sendParentVerificationCode(userId: string) {
       success: true,
     };
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      return {
-        success: false,
-        error:
-          error instanceof Error && error.message
-            ? error.message
-            : 'Failed to send verification email',
-      };
-    }
     return {
       success: false,
       errorKey: 'verificationSendFailed',

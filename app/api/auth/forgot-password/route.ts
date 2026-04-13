@@ -51,8 +51,6 @@ export async function POST(request: Request) {
     return NextResponse.json(body, { status, headers });
   }
 
-  const isDev = process.env.NODE_ENV === 'development';
-
   try {
     const body = (await request.json().catch(() => ({}))) as { email?: unknown };
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
@@ -95,26 +93,11 @@ export async function POST(request: Request) {
 
     const origin = getAppOrigin(request);
     const resetUrl = `${origin}/reset-password?token=${encodeURIComponent(token)}`;
-    if (isDev) {
-      console.log(`[AUTH] Password reset link for ${user.email}: ${resetUrl}`);
-    }
     await sendPasswordResetEmail(user.email, resetUrl);
 
     return NextResponse.json({ success: true }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error sending password reset email:', error);
-    if (isDev) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            error instanceof Error && error.message
-              ? error.message
-              : 'Failed to send password reset email',
-        },
-        { status: 500, headers: getPrivateNoStoreHeaders() }
-      );
-    }
     // In production, still return success to prevent account enumeration.
     return NextResponse.json({ success: true }, { headers: getPrivateNoStoreHeaders() });
   }

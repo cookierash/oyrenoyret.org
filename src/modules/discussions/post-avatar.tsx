@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/src/lib/utils';
-import { getAvatarSrc, isAvatarVariant } from '@/src/lib/avatar';
+import { getAvatarSrc, getStableAvatarVariant, isAvatarVariant } from '@/src/lib/avatar';
 import { useOptionalCurrentUser } from '@/src/modules/auth/components/current-user-context';
 import { UserHoverCard } from '@/src/components/users/user-hover-card';
 
@@ -58,14 +58,11 @@ export function PostAvatar({
 
   const resolvedVariant = isCurrentUser ? currentUser?.avatarVariant ?? null : avatarVariant ?? null;
 
-  const src = isAvatarVariant(resolvedVariant) ? getAvatarSrc(resolvedVariant) : null;
+  const finalVariant = isAvatarVariant(resolvedVariant)
+    ? resolvedVariant
+    : getStableAvatarVariant(userId ?? authorName);
+  const src = getAvatarSrc(finalVariant);
   const colorClass = AVATAR_COLORS[getAvatarIndex(userId ?? authorName)];
-  const initials = authorName
-    .split(/\s+/)
-    .map((n) => n.charAt(0))
-    .join('')
-    .toUpperCase()
-    .slice(0, 2) || '?';
 
   const sizeClass =
     size === 'xs'
@@ -81,7 +78,7 @@ export function PostAvatar({
     <div
       className={cn(
         'relative flex shrink-0 items-center justify-center overflow-hidden rounded-full font-medium text-white',
-        !src && colorClass,
+        colorClass,
         sizeClass,
         isInteractive
           ? 'cursor-pointer ring-1 ring-black/5 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2'
@@ -119,17 +116,13 @@ export function PostAvatar({
           : undefined
       }
     >
-      {src ? (
-        <Image
-          src={src}
-          alt="Avatar"
-          fill
-          sizes={size === 'xs' ? '20px' : size === 'sm' ? '32px' : '40px'}
-          className="object-cover"
-        />
-      ) : (
-        initials
-      )}
+      <Image
+        src={src}
+        alt="Avatar"
+        fill
+        sizes={size === 'xs' ? '20px' : size === 'sm' ? '32px' : '40px'}
+        className="object-cover"
+      />
     </div>
   );
 

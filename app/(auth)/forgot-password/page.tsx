@@ -37,12 +37,7 @@ export default function ForgotPasswordPage() {
       toast.success(copy.success);
       setEmail('');
     } catch (error) {
-      const isDev = process.env.NODE_ENV === 'development';
-      if (isDev && error instanceof Error && error.message) {
-        toast.error(error.message);
-      } else {
-        toast.error(copy.error);
-      }
+      toast.error(copy.error);
     } finally {
       setIsSubmitting(false);
     }

@@ -38,7 +38,6 @@ export async function login(data: LoginInput) {
     // Validate input
     const validated = loginSchema.parse(data);
 
-    const isDev = process.env.NODE_ENV === 'development';
     const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
 
@@ -91,36 +90,10 @@ export async function login(data: LoginInput) {
         // Validate against the configured admin password first.
         const adminPasswordValid = await verifyPassword(validated.password, adminPasswordHash);
         if (!adminPasswordValid) {
-          // Dev fallback: allow DB-managed admin passwords if env hash is stale.
-          if (isDev && existing && existing.role === 'ADMIN' && existing.passwordHash) {
-            const dbPasswordValid = await verifyPassword(validated.password, existing.passwordHash);
-            if (dbPasswordValid) {
-              user =
-                existing.status === 'ACTIVE'
-                  ? existing
-                  : await prisma.user.update({
-                      where: { id: existing.id },
-                      data: { status: 'ACTIVE', emailVerifiedAt: new Date() },
-                      select: {
-                        id: true,
-                        email: true,
-                        passwordHash: true,
-                        role: true,
-                        status: true,
-                      },
-                    });
-            } else {
-              return {
-                success: false,
-                errorKey: 'invalidCredentials',
-              };
-            }
-          } else {
-            return {
-              success: false,
-              errorKey: 'invalidCredentials',
-            };
-          }
+          return {
+            success: false,
+            errorKey: 'invalidCredentials',
+          };
         }
 
         // If we didn't take the dev fallback, ensure the DB user exists and is set as admin.
