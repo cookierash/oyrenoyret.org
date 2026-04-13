@@ -13,7 +13,7 @@ export type SessionDuration = (typeof SESSION_DURATIONS)[number];
 
 /** Participant count bounds for group sessions */
 export const SESSION_PARTICIPANT_MIN = 3;
-export const SESSION_PARTICIPANT_MAX = 6;
+export const SESSION_PARTICIPANT_MAX = 5;
 
 /** Sprint duration options (minutes) */
 export const SPRINT_DURATIONS = [10, 12, 15] as const;
@@ -30,7 +30,7 @@ export const CREDITS_GROUP_SESSION = {
   BASE_PARTICIPANT: 1.0,
   /** Base gain for facilitator (target range 2–4) */
   BASE_FACILITATOR: 1.2,
-  /** Full session bonus (6 participants) */
+  /** Full session bonus (max participants) */
   BONUS_FULL_SESSION: 0.15,
   /** Duration factors for participant cost */
   DURATION_PARTICIPANT: { 30: 1.0, 45: 1.25, 60: 1.5 } as Record<SessionDuration, number>,

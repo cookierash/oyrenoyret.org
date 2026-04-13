@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { PiCalendar as CalendarDays, PiBookOpen as BookOpen, PiWarningCircle as WarningCircle, PiChatCircle as MessageSquare } from 'react-icons/pi';
+import { PiCalendar as CalendarDays, PiBookOpen as BookOpen, PiWarningCircle as WarningCircle, PiChatCircle as MessageSquare, PiUsersThree as UsersThree } from 'react-icons/pi';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { isStaff } from '@/src/lib/permissions';
@@ -63,6 +63,21 @@ export default async function AdminPage() {
                 </Link>
               </Button>
             </div>
+          </div>
+
+          <div className="card-frame bg-card p-5 flex flex-col gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                <UsersThree className="h-4 w-4" />
+                {messages.sidebar.guidedGroupSessions}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {adminCopy.guidedGroupSessionsCardDescription ?? 'Review facilitator applications and guided sessions.'}
+              </p>
+            </div>
+            <Button size="sm" variant="secondary-primary" asChild>
+              <Link href="/admin/guided-group-sessions">{adminCopy.open}</Link>
+            </Button>
           </div>
 
           <div className="card-frame bg-card p-5 flex flex-col gap-4">

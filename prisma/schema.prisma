@@ -77,12 +77,48 @@ enum ModerationNoticeType {
   ACCOUNT_BANNED
   ACCOUNT_UNBANNED
   CONTENT_REMOVED
+  FACILITATOR_APPLICATION_CHANGES_REQUESTED
+  FACILITATOR_APPLICATION_REJECTED
+  FACILITATOR_APPLICATION_APPROVED
+  GUIDED_GROUP_SESSION_CANCELLED
+  GUIDED_GROUP_SESSION_AUTO_CANCELLED
+  GUIDED_GROUP_SESSION_NO_SHOW
+  GUIDED_GROUP_SESSION_ENROLLMENT_APPROVED
+  GUIDED_GROUP_SESSION_ENROLLMENT_REJECTED
 }
 
 enum SessionStatus {
   ACTIVE
   COMPLETED
   ABANDONED
+}
+
+enum FacilitatorApplicationStatus {
+  PENDING
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum GuidedGroupSessionStatus {
+  SCHEDULED
+  LIVE
+  COMPLETED
+  CANCELLED
+  AUTO_CANCELLED
+  NO_SHOW
+}
+
+enum GuidedGroupSessionEnrollmentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum GuidedGroupSessionLearnerSentiment {
+  GOOD
+  BAD
 }
 
 model ContactMessage {
@@ -166,6 +202,19 @@ model User {
   materialCommentsRemoved MaterialComment[] @relation("MaterialCommentRemovedBy")
   materialCommentVotes MaterialCommentVote[]
   contactMessages ContactMessage[]
+  facilitatorApplications FacilitatorApplication[]
+  facilitatorApplicationsReviewed FacilitatorApplication[] @relation("FacilitatorApplicationsReviewedBy")
+  facilitatorSubjectVerifications FacilitatorSubjectVerification[] @relation("FacilitatorVerifiedSubjects")
+  facilitatorSubjectsVerifiedBy FacilitatorSubjectVerification[] @relation("FacilitatorSubjectVerifiedBy")
+  facilitatorSubjectsRevokedBy FacilitatorSubjectVerification[] @relation("FacilitatorSubjectRevokedBy")
+  guidedGroupSessionsFacilitated GuidedGroupSession[] @relation("GuidedGroupSessionsFacilitated")
+  guidedGroupSessionsCancelled GuidedGroupSession[] @relation("GuidedGroupSessionsCancelledBy")
+  guidedGroupSessionEnrollments GuidedGroupSessionEnrollment[] @relation("GuidedGroupSessionEnrollments")
+  guidedGroupSessionEnrollmentDecisions GuidedGroupSessionEnrollment[] @relation("GuidedGroupSessionEnrollmentDecidedBy")
+  guidedGroupSessionFacilitatorRatingsGiven GuidedGroupSessionFacilitatorFeedback[] @relation("GuidedGroupSessionFacilitatorRatingsByLearner")
+  guidedGroupSessionFacilitatorRatingsReceived GuidedGroupSessionFacilitatorFeedback[] @relation("GuidedGroupSessionFacilitatorRatingsForFacilitator")
+  guidedGroupSessionLearnerFeedbackGiven GuidedGroupSessionLearnerFeedback[] @relation("GuidedGroupSessionLearnerFeedbackByFacilitator")
+  guidedGroupSessionLearnerFeedbackReceived GuidedGroupSessionLearnerFeedback[] @relation("GuidedGroupSessionLearnerFeedbackForLearner")
   reportsMade    UserReport[] @relation("UserReportsReporter")
   reportsReceived UserReport[] @relation("UserReportsReported")
   reportsResolved UserReport[] @relation("UserReportsResolvedBy")
@@ -186,6 +235,174 @@ model User {
   @@index([emailVerifiedAt])
   @@index([suspensionUntil])
   @@index([bannedAt])
+}
+
+model FacilitatorApplication {
+  id               String                       @id @default(uuid())
+  userId           String
+  phoneNumber      String
+  finCode          String
+  motivationLetter String                       @db.Text
+  status           FacilitatorApplicationStatus @default(PENDING)
+  reviewerMessage  String?                      @db.Text
+  reviewedById     String?
+  reviewedAt       DateTime?
+
+  user             User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy       User?                        @relation("FacilitatorApplicationsReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  subjects         FacilitatorApplicationSubject[]
+  verifications    FacilitatorSubjectVerification[]
+
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  deletedAt        DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([reviewedById])
+  @@index([deletedAt])
+}
+
+model FacilitatorApplicationSubject {
+  id            String                 @id @default(uuid())
+  applicationId String
+  subjectId     String
+  approvedAt    DateTime?
+
+  application   FacilitatorApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, subjectId])
+  @@index([applicationId])
+  @@index([subjectId])
+  @@index([approvedAt])
+}
+
+model FacilitatorSubjectVerification {
+  id            String                  @id @default(uuid())
+  userId        String
+  subjectId     String
+  applicationId String?
+  verifiedById  String?
+  verifiedAt    DateTime                @default(now())
+  revokedAt     DateTime?
+  revokedById   String?
+  revokedReason String?                 @db.Text
+
+  user          User                    @relation("FacilitatorVerifiedSubjects", fields: [userId], references: [id], onDelete: Cascade)
+  application   FacilitatorApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  verifiedBy    User?                   @relation("FacilitatorSubjectVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  revokedBy     User?                   @relation("FacilitatorSubjectRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, subjectId])
+  @@index([subjectId])
+  @@index([verifiedAt])
+  @@index([revokedAt])
+  @@index([applicationId])
+}
+
+model GuidedGroupSession {
+  id                    String                   @id @default(uuid())
+  facilitatorId         String
+  subjectId             String
+  topicId               String
+  title                 String
+  objectives            String?                  @db.Text
+  scheduledAt           DateTime
+  durationMinutes       Int
+  learnerCapacity       Int
+  status                GuidedGroupSessionStatus @default(SCHEDULED)
+  startedAt             DateTime?
+  endedAt               DateTime?
+  cancelledAt           DateTime?
+  cancelledById         String?
+  cancelReason          String?                  @db.Text
+  ratingAvg             Float                    @default(0)
+  ratingCount           Int                      @default(0)
+  whiteboardData        Json?
+  activeMaterialId      String?
+  settledAt             DateTime?
+  facilitatorPayoutTxId String?
+
+  facilitator           User                     @relation("GuidedGroupSessionsFacilitated", fields: [facilitatorId], references: [id], onDelete: Cascade)
+  cancelledBy           User?                    @relation("GuidedGroupSessionsCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  activeMaterial        Material?                @relation("GuidedGroupSessionActiveMaterial", fields: [activeMaterialId], references: [id], onDelete: SetNull)
+  enrollments           GuidedGroupSessionEnrollment[]
+  facilitatorFeedback   GuidedGroupSessionFacilitatorFeedback[]
+  learnerFeedback       GuidedGroupSessionLearnerFeedback[]
+
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  deletedAt             DateTime?
+
+  @@index([scheduledAt])
+  @@index([facilitatorId, scheduledAt])
+  @@index([subjectId, topicId, scheduledAt])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model GuidedGroupSessionEnrollment {
+  id                  String                         @id @default(uuid())
+  sessionId           String
+  userId              String
+  status              GuidedGroupSessionEnrollmentStatus @default(PENDING)
+  decidedAt           DateTime?
+  decidedById         String?
+  cancelledAt         DateTime?
+  chargedAt           DateTime?
+  chargeTransactionId String?
+  joinedAt            DateTime?
+  leftAt              DateTime?
+
+  session             GuidedGroupSession             @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user                User                          @relation("GuidedGroupSessionEnrollments", fields: [userId], references: [id], onDelete: Cascade)
+  decidedBy           User?                         @relation("GuidedGroupSessionEnrollmentDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+
+  @@unique([sessionId, userId])
+  @@index([userId])
+  @@index([sessionId])
+  @@index([status])
+}
+
+model GuidedGroupSessionFacilitatorFeedback {
+  id            String             @id @default(uuid())
+  sessionId     String
+  learnerId     String
+  facilitatorId String
+  rating        Int
+  comment       String?            @db.Text
+
+  session       GuidedGroupSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  learner       User               @relation("GuidedGroupSessionFacilitatorRatingsByLearner", fields: [learnerId], references: [id], onDelete: Cascade)
+  facilitator   User               @relation("GuidedGroupSessionFacilitatorRatingsForFacilitator", fields: [facilitatorId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime           @default(now())
+
+  @@unique([sessionId, learnerId])
+  @@index([facilitatorId, createdAt])
+  @@index([learnerId, createdAt])
+}
+
+model GuidedGroupSessionLearnerFeedback {
+  id            String                          @id @default(uuid())
+  sessionId     String
+  facilitatorId String
+  learnerId     String
+  sentiment     GuidedGroupSessionLearnerSentiment
+  note          String?                         @db.Text
+
+  session       GuidedGroupSession              @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  facilitator   User                           @relation("GuidedGroupSessionLearnerFeedbackByFacilitator", fields: [facilitatorId], references: [id], onDelete: Cascade)
+  learner       User                           @relation("GuidedGroupSessionLearnerFeedbackForLearner", fields: [learnerId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime                        @default(now())
+
+  @@unique([sessionId, learnerId])
+  @@index([facilitatorId, createdAt])
+  @@index([learnerId, createdAt])
 }
 
 model ModerationAction {
@@ -653,6 +870,7 @@ model Material {
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   accesses      MaterialAccess[]
   comments      MaterialComment[]
+  guidedGroupSessionsAsActiveMaterial GuidedGroupSession[] @relation("GuidedGroupSessionActiveMaterial")
   
   // Timestamps
   createdAt   DateTime       @default(now())
@@ -828,6 +1046,8 @@ enum CreditTransactionType {
   DISCUSSION_HELP
   GROUP_SESSION_PARTICIPATE
   GROUP_SESSION_FACILITATE
+  GROUP_SESSION_CANCEL_PENALTY
+  GROUP_SESSION_NO_SHOW_PENALTY
   SPRINT_ENTRY
   SPRINT_PAYOUT
   SPECIAL_EVENT

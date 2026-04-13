@@ -23,6 +23,7 @@ import { cn } from '@/src/lib/utils';
 import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
 
 type CurriculumTopic = {
+  id: string;
   slug: string;
   slugAz: string;
   nameEn: string;
@@ -30,6 +31,7 @@ type CurriculumTopic = {
 };
 
 type CurriculumSubject = {
+  id: string;
   slug: string;
   slugAz: string;
   nameEn: string;
@@ -47,20 +49,21 @@ async function parseJson(res: Response) {
 export function CurriculumAdminPanel() {
   const [subjects, setSubjects] = useState<CurriculumSubject[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSubjectSlug, setSelectedSubjectSlug] = useState<string>('');
-  const [selectedTopicSlug, setSelectedTopicSlug] = useState<string>('');
+  const [seeding, setSeeding] = useState(false);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedTopicId, setSelectedTopicId] = useState<string>('');
   const [subjectsQuery, setSubjectsQuery] = useState('');
   const [topicsQuery, setTopicsQuery] = useState('');
   const [deleteSubjectOpen, setDeleteSubjectOpen] = useState(false);
   const [deleteTopicOpen, setDeleteTopicOpen] = useState(false);
 
   const selectedSubject = useMemo(
-    () => subjects.find((s) => s.slug === selectedSubjectSlug) ?? null,
-    [subjects, selectedSubjectSlug],
+    () => subjects.find((s) => s.id === selectedSubjectId) ?? null,
+    [subjects, selectedSubjectId],
   );
   const selectedTopic = useMemo(
-    () => selectedSubject?.topics.find((t) => t.slug === selectedTopicSlug) ?? null,
-    [selectedSubject, selectedTopicSlug],
+    () => selectedSubject?.topics.find((t) => t.id === selectedTopicId) ?? null,
+    [selectedSubject, selectedTopicId],
   );
 
   const [newSubject, setNewSubject] = useState({
@@ -103,13 +106,13 @@ export function CurriculumAdminPanel() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/curriculum', { cache: 'no-store' });
+      const res = await fetch('/api/curriculum/subjects', { cache: 'no-store' });
       const data = await parseJson(res);
       if (!res.ok) throw new Error(extractErrorMessage(data) ?? 'Failed to load');
       const list = Array.isArray(data?.subjects) ? (data.subjects as CurriculumSubject[]) : [];
       setSubjects(list);
-      if (!selectedSubjectSlug && list.length > 0) {
-        setSelectedSubjectSlug(list[0].slug);
+      if (!selectedSubjectId && list.length > 0) {
+        setSelectedSubjectId(list[0].id);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to load curriculum');
@@ -134,9 +137,9 @@ export function CurriculumAdminPanel() {
       descriptionEn: selectedSubject.descriptionEn ?? '',
       descriptionAz: selectedSubject.descriptionAz ?? '',
     });
-    setSelectedTopicSlug('');
+    setSelectedTopicId('');
     setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
-  }, [selectedSubjectSlug]);
+  }, [selectedSubjectId]);
 
   useEffect(() => {
     if (!selectedTopic) return;
@@ -146,7 +149,7 @@ export function CurriculumAdminPanel() {
       nameEn: selectedTopic.nameEn,
       nameAz: selectedTopic.nameAz,
     });
-  }, [selectedTopicSlug]);
+  }, [selectedTopicId]);
 
   const createSubject = async () => {
     try {
@@ -170,7 +173,9 @@ export function CurriculumAdminPanel() {
         descriptionAz: '',
       });
       await load();
-      setSelectedSubjectSlug(data.slug);
+      if (typeof data?.id === 'string' && data.id) {
+        setSelectedSubjectId(data.id);
+      }
     } catch (error) {
       toast.error(formatErrorToast('Failed to create subject.', error instanceof Error ? error.message : null));
     }
@@ -179,7 +184,7 @@ export function CurriculumAdminPanel() {
   const saveSubject = async () => {
     if (!selectedSubject) return;
     try {
-      const res = await fetch(`/api/curriculum/subjects/${encodeURIComponent(selectedSubject.slug)}`, {
+      const res = await fetch(`/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -195,7 +200,16 @@ export function CurriculumAdminPanel() {
       }
       toast.success('Subject saved.');
       await load();
-      setSelectedSubjectSlug(data.slug);
+      if (data && typeof data === 'object') {
+        setSubjectEdit({
+          slug: typeof data.slug === 'string' ? data.slug : subjectEdit.slug,
+          slugAz: typeof data.slugAz === 'string' ? data.slugAz : subjectEdit.slugAz,
+          nameEn: typeof data.nameEn === 'string' ? data.nameEn : subjectEdit.nameEn,
+          nameAz: typeof data.nameAz === 'string' ? data.nameAz : subjectEdit.nameAz,
+          descriptionEn: typeof data.descriptionEn === 'string' ? data.descriptionEn : '',
+          descriptionAz: typeof data.descriptionAz === 'string' ? data.descriptionAz : '',
+        });
+      }
     } catch (error) {
       toast.error(formatErrorToast('Failed to save subject.', error instanceof Error ? error.message : null));
     }
@@ -204,7 +218,7 @@ export function CurriculumAdminPanel() {
   const deleteSubject = async () => {
     if (!selectedSubject) return;
     try {
-      const res = await fetch(`/api/curriculum/subjects/${encodeURIComponent(selectedSubject.slug)}`, {
+      const res = await fetch(`/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}`, {
         method: 'DELETE',
       });
       const data = await parseJson(res);
@@ -213,7 +227,7 @@ export function CurriculumAdminPanel() {
         return;
       }
       toast.success('Subject deleted.');
-      setSelectedSubjectSlug('');
+      setSelectedSubjectId('');
       setDeleteSubjectOpen(false);
       await load();
     } catch (error) {
@@ -225,7 +239,7 @@ export function CurriculumAdminPanel() {
     if (!selectedSubject) return;
     try {
       const res = await fetch(
-        `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.slug)}/topics`,
+        `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}/topics`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -234,13 +248,19 @@ export function CurriculumAdminPanel() {
       );
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to create topic.', extractErrorMessage(data)));
+        const message = extractErrorMessage(data);
+        const hint = message && /subject not found/i.test(message)
+          ? 'Subject not found in the database. Seed defaults or create the subject first.'
+          : message;
+        toast.error(formatErrorToast('Failed to create topic.', hint));
         return;
       }
       toast.success('Topic created.');
       setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
       await load();
-      setSelectedTopicSlug(data.slug);
+      if (typeof data?.id === 'string' && data.id) {
+        setSelectedTopicId(data.id);
+      }
     } catch (error) {
       toast.error(formatErrorToast('Failed to create topic.', error instanceof Error ? error.message : null));
     }
@@ -250,7 +270,7 @@ export function CurriculumAdminPanel() {
     if (!selectedSubject || !selectedTopic) return;
     try {
       const res = await fetch(
-        `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.slug)}/topics/${encodeURIComponent(selectedTopic.slug)}`,
+        `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}/topics/${encodeURIComponent(selectedTopic.id)}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -264,7 +284,14 @@ export function CurriculumAdminPanel() {
       }
       toast.success('Topic saved.');
       await load();
-      setSelectedTopicSlug(data.slug);
+      if (data && typeof data === 'object') {
+        setTopicEdit({
+          slug: typeof data.slug === 'string' ? data.slug : topicEdit.slug,
+          slugAz: typeof data.slugAz === 'string' ? data.slugAz : topicEdit.slugAz,
+          nameEn: typeof data.nameEn === 'string' ? data.nameEn : topicEdit.nameEn,
+          nameAz: typeof data.nameAz === 'string' ? data.nameAz : topicEdit.nameAz,
+        });
+      }
     } catch (error) {
       toast.error(formatErrorToast('Failed to save topic.', error instanceof Error ? error.message : null));
     }
@@ -274,7 +301,7 @@ export function CurriculumAdminPanel() {
     if (!selectedSubject || !selectedTopic) return;
     try {
       const res = await fetch(
-        `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.slug)}/topics/${encodeURIComponent(selectedTopic.slug)}`,
+        `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}/topics/${encodeURIComponent(selectedTopic.id)}`,
         { method: 'DELETE' },
       );
       const data = await parseJson(res);
@@ -283,11 +310,31 @@ export function CurriculumAdminPanel() {
         return;
       }
       toast.success('Topic deleted.');
-      setSelectedTopicSlug('');
+      setSelectedTopicId('');
       setDeleteTopicOpen(false);
       await load();
     } catch (error) {
       toast.error(formatErrorToast('Failed to delete topic.', error instanceof Error ? error.message : null));
+    }
+  };
+
+  const seedDefaults = async () => {
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/curriculum/seed', { method: 'POST' });
+      const data = await parseJson(res);
+      if (!res.ok) {
+        toast.error(formatErrorToast('Failed to initialize curriculum.', extractErrorMessage(data)));
+        return;
+      }
+      toast.success(data?.seeded ? 'Curriculum initialized.' : 'Curriculum already initialized.');
+      await load();
+    } catch (error) {
+      toast.error(
+        formatErrorToast('Failed to initialize curriculum.', error instanceof Error ? error.message : null),
+      );
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -319,6 +366,32 @@ export function CurriculumAdminPanel() {
   const topicEditSlugPreview = topicEdit.slug ? normalizeSlug(topicEdit.slug) : '';
   const topicEditSlugAzPreview = topicEdit.slugAz ? normalizeSlug(topicEdit.slugAz) : '';
 
+  const canCreateSubject =
+    isValidSlug(subjectSlugPreview) &&
+    isValidSlug(subjectSlugAzPreview) &&
+    Boolean(newSubject.nameEn.trim()) &&
+    Boolean(newSubject.nameAz.trim());
+  const canSaveSubject =
+    Boolean(selectedSubject) &&
+    isValidSlug(subjectEditSlugPreview) &&
+    isValidSlug(subjectEditSlugAzPreview) &&
+    Boolean(subjectEdit.nameEn.trim()) &&
+    Boolean(subjectEdit.nameAz.trim());
+
+  const canCreateTopic =
+    Boolean(selectedSubject) &&
+    isValidSlug(topicSlugPreview) &&
+    isValidSlug(topicSlugAzPreview) &&
+    Boolean(newTopic.nameEn.trim()) &&
+    Boolean(newTopic.nameAz.trim());
+  const canSaveTopic =
+    Boolean(selectedSubject) &&
+    Boolean(selectedTopic) &&
+    isValidSlug(topicEditSlugPreview) &&
+    isValidSlug(topicEditSlugAzPreview) &&
+    Boolean(topicEdit.nameEn.trim()) &&
+    Boolean(topicEdit.nameAz.trim());
+
   return (
     <Tabs defaultValue="subjects" className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -326,9 +399,16 @@ export function CurriculumAdminPanel() {
           <TabsTrigger value="subjects">Subjects</TabsTrigger>
           <TabsTrigger value="topics">Topics</TabsTrigger>
         </TabsList>
-        <Button size="sm" variant="outline" onClick={load}>
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {subjects.length === 0 ? (
+            <Button size="sm" variant="secondary-primary" onClick={seedDefaults} disabled={seeding}>
+              {seeding ? 'Seeding…' : 'Seed defaults'}
+            </Button>
+          ) : null}
+          <Button size="sm" variant="outline" onClick={load} disabled={seeding}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <TabsContent value="subjects" className="mt-0">
@@ -339,8 +419,8 @@ export function CurriculumAdminPanel() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setSelectedSubjectSlug('');
-                setSelectedTopicSlug('');
+                setSelectedSubjectId('');
+                setSelectedTopicId('');
                 setSubjectsQuery('');
                 setNewSubject({
                   slug: '',
@@ -377,12 +457,12 @@ export function CurriculumAdminPanel() {
                   <div className="px-3 py-2 text-sm text-muted-foreground">No subjects.</div>
                 ) : (
                   filteredSubjects.map((subject) => {
-                    const active = subject.slug === selectedSubjectSlug;
+                    const active = subject.id === selectedSubjectId;
                     return (
                       <button
-                        key={subject.slug}
+                        key={subject.id}
                         type="button"
-                        onClick={() => setSelectedSubjectSlug(subject.slug)}
+                        onClick={() => setSelectedSubjectId(subject.id)}
                         className={cn(
                           'flex w-full items-start justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
                           active ? 'bg-muted/70' : 'hover:bg-muted/40',
@@ -564,7 +644,7 @@ export function CurriculumAdminPanel() {
                 <div className="flex flex-wrap gap-2">
                   {selectedSubject ? (
                     <>
-                      <Button onClick={saveSubject} size="sm" variant="secondary-primary">
+                      <Button onClick={saveSubject} size="sm" variant="secondary-primary" disabled={!canSaveSubject}>
                         Save
                       </Button>
                       <Button onClick={() => setDeleteSubjectOpen(true)} size="sm" variant="danger">
@@ -572,7 +652,7 @@ export function CurriculumAdminPanel() {
                       </Button>
                     </>
                   ) : (
-                    <Button onClick={createSubject} size="sm">
+                    <Button onClick={createSubject} size="sm" disabled={!canCreateSubject}>
                       Create
                     </Button>
                   )}
@@ -591,7 +671,7 @@ export function CurriculumAdminPanel() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setSelectedTopicSlug('');
+                setSelectedTopicId('');
                 setTopicsQuery('');
                 setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
               }}
@@ -607,12 +687,12 @@ export function CurriculumAdminPanel() {
                 <Label htmlFor="topics-subject">Subject</Label>
                 <Select
                   id="topics-subject"
-                  value={selectedSubjectSlug}
-                  onChange={(e) => setSelectedSubjectSlug(e.target.value)}
+                  value={selectedSubjectId}
+                  onChange={(e) => setSelectedSubjectId(e.target.value)}
                   placeholder="Select a subject…"
                 >
                   {subjects.map((s) => (
-                    <SelectItem key={s.slug} value={s.slug}>
+                    <SelectItem key={s.id} value={s.id}>
                       {s.nameEn} ({s.slug})
                     </SelectItem>
                   ))}
@@ -644,12 +724,12 @@ export function CurriculumAdminPanel() {
                   <div className="px-3 py-2 text-sm text-muted-foreground">No topics.</div>
                 ) : (
                   filteredTopics.map((topic) => {
-                    const active = topic.slug === selectedTopicSlug;
+                    const active = topic.id === selectedTopicId;
                     return (
                       <button
-                        key={topic.slug}
+                        key={topic.id}
                         type="button"
-                        onClick={() => setSelectedTopicSlug(topic.slug)}
+                        onClick={() => setSelectedTopicId(topic.id)}
                         className={cn(
                           'flex w-full items-start justify-between gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
                           active ? 'bg-muted/70' : 'hover:bg-muted/40',
@@ -794,7 +874,7 @@ export function CurriculumAdminPanel() {
                   <div className="flex flex-wrap gap-2">
                     {selectedTopic ? (
                       <>
-                        <Button onClick={saveTopic} size="sm" variant="secondary-primary">
+                        <Button onClick={saveTopic} size="sm" variant="secondary-primary" disabled={!canSaveTopic}>
                           Save
                         </Button>
                         <Button onClick={() => setDeleteTopicOpen(true)} size="sm" variant="danger">
@@ -802,7 +882,7 @@ export function CurriculumAdminPanel() {
                         </Button>
                       </>
                     ) : (
-                      <Button onClick={createTopic} size="sm">
+                      <Button onClick={createTopic} size="sm" disabled={!canCreateTopic}>
                         Create
                       </Button>
                     )}

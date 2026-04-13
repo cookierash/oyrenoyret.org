@@ -24,6 +24,7 @@ export const revalidate = 0;
 export default async function CatalogPage() {
   const { locale, messages } = await getI18n();
   const copy = messages.app.catalog;
+  const emptyLabel = locale === 'az' ? 'Fənn yoxdur.' : 'No subjects.';
   let dbSubjects: Array<{
     id: string;
     slug: string;
@@ -32,6 +33,8 @@ export default async function CatalogPage() {
     descriptionEn: string | null;
     descriptionAz: string | null;
   }> = [];
+  let hasSchemaMismatch = false;
+  let subjectTotal = 0;
   let topicCounts: Array<{ subjectId: string; _count: { _all: number } }> = [];
   try {
     dbSubjects = await prisma.subject.findMany({
@@ -57,10 +60,20 @@ export default async function CatalogPage() {
     if (!isDbSchemaMismatch(error)) throw error;
     dbSubjects = [];
     topicCounts = [];
+    hasSchemaMismatch = true;
+  }
+  if (!hasSchemaMismatch && dbSubjects.length === 0) {
+    try {
+      subjectTotal = await prisma.subject.count();
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      hasSchemaMismatch = true;
+    }
   }
   const topicCountBySubjectId = new Map(topicCounts.map((row) => [row.subjectId, row._count._all]));
+  const useFallback = hasSchemaMismatch || (dbSubjects.length === 0 && subjectTotal === 0);
   const subjects =
-    dbSubjects.length > 0
+    !useFallback
       ? dbSubjects.map((subject) => ({
           id: subject.slug,
           name: locale === 'az' ? subject.nameAz : subject.nameEn,
@@ -107,50 +120,56 @@ export default async function CatalogPage() {
         <section className="relative">
           <CatalogSearch />
         </section>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {subjects.map((subject) => {
-            const subjectId = subject.id;
-            const Icon =
-              (SUBJECT_ICONS as Record<string, typeof BookOpen>)[subjectId] ?? BookOpen;
-            const topicCount = subject.topicCount ?? 0;
-            const materialCount = subjectCountMap.get(subjectId) ?? 0;
-            return (
-              <Link
-                key={subjectId}
-                href={`/catalog/${subjectId}`}
-                className="group card-frame bg-card flex min-w-0 items-center gap-3 px-3 py-2.5 transition-all duration-200 hover:bg-muted/30"
-              >
-                <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                    (SUBJECT_COLORS as Record<string, string>)[subjectId] ??
-                    'bg-muted text-foreground'
-                  }`}
+        {subjects.length === 0 ? (
+          <div className="card-frame bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+            {emptyLabel}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {subjects.map((subject) => {
+              const subjectId = subject.id;
+              const Icon =
+                (SUBJECT_ICONS as Record<string, typeof BookOpen>)[subjectId] ?? BookOpen;
+              const topicCount = subject.topicCount ?? 0;
+              const materialCount = subjectCountMap.get(subjectId) ?? 0;
+              return (
+                <Link
+                  key={subjectId}
+                  href={`/catalog/${subjectId}`}
+                  className="group card-frame bg-card flex min-w-0 items-center gap-3 px-3 py-2.5 transition-all duration-200 hover:bg-muted/30"
                 >
-                  <Icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <span className="font-medium text-foreground truncate">
-                      {subject.name}
-                    </span>
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
-                      <span className="whitespace-nowrap">
-                        {topicCount} {copy.topics}
-                      </span>
-                      <span className="whitespace-nowrap">
-                        {materialCount} {copy.materials}
-                      </span>
-                    </div>
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                      (SUBJECT_COLORS as Record<string, string>)[subjectId] ??
+                      'bg-muted text-foreground'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {subject.description}
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-              </Link>
-            );
-          })}
-        </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 flex-col gap-0.5">
+                      <span className="font-medium text-foreground truncate">
+                        {subject.name}
+                      </span>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+                        <span className="whitespace-nowrap">
+                          {topicCount} {copy.topics}
+                        </span>
+                        <span className="whitespace-nowrap">
+                          {materialCount} {copy.materials}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {subject.description}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </main>
     </DashboardShell>
   );

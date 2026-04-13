@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
@@ -57,6 +58,10 @@ export async function PATCH(
       where: {
         deletedAt: null,
         OR: [
+          { id: rawSlug },
+          { id: currentSlug },
+          { slug: rawSlug },
+          { slugAz: rawSlug },
           { slug: currentSlug },
           { slugAz: currentSlug },
           { slug: { equals: rawSlug, mode: 'insensitive' } },
@@ -65,7 +70,9 @@ export async function PATCH(
       },
       select: { id: true, slug: true, slugAz: true },
     });
-    if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject not found', subject: rawSlug }, { status: 404 });
+    }
 
     const body = await request.json().catch(() => ({}));
     const nextSlug = body?.slug ? normalizeSlug(body.slug) : null;
@@ -132,6 +139,7 @@ export async function PATCH(
           ...(descriptionAz !== undefined ? { descriptionAz } : {}),
         },
         select: {
+          id: true,
           slug: true,
           slugAz: true,
           nameEn: true,
@@ -156,6 +164,10 @@ export async function PATCH(
 
       return updatedSubject;
     });
+
+    revalidatePath('/catalog');
+    revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${updated.slug}`);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -207,20 +219,29 @@ export async function DELETE(
       where: {
         deletedAt: null,
         OR: [
+          { id: rawSlug },
+          { id: slug },
+          { slug: rawSlug },
+          { slugAz: rawSlug },
           { slug },
           { slugAz: slug },
           { slug: { equals: rawSlug, mode: 'insensitive' } },
           { slugAz: { equals: rawSlug, mode: 'insensitive' } },
         ],
       },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
-    if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject not found', subject: rawSlug }, { status: 404 });
+    }
 
     await prisma.$transaction([
       prisma.subject.update({ where: { id: subject.id }, data: { deletedAt: new Date() } }),
       prisma.topic.updateMany({ where: { subjectId: subject.id }, data: { deletedAt: new Date() } }),
     ]);
+
+    revalidatePath('/catalog');
+    revalidatePath(`/catalog/${subject.slug}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

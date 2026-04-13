@@ -48,6 +48,7 @@ export async function GET(request: Request) {
     }
 
     let subjects: any[] = [];
+    let hasSchemaMismatch = false;
     try {
       subjects = await prisma.subject.findMany({
         where: { deletedAt: null },
@@ -73,11 +74,18 @@ export async function GET(request: Request) {
       });
     } catch (error) {
       if (!isDbSchemaMismatch(error)) throw error;
-      subjects = [];
+      hasSchemaMismatch = true;
     }
 
-    if (subjects.length > 0) {
+    if (!hasSchemaMismatch && subjects.length > 0) {
       return NextResponse.json({ subjects }, { headers: getPrivateNoStoreHeaders() });
+    }
+
+    if (!hasSchemaMismatch) {
+      const total = await prisma.subject.count();
+      if (total > 0) {
+        return NextResponse.json({ subjects: [] }, { headers: getPrivateNoStoreHeaders() });
+      }
     }
 
     const fallback = SUBJECTS.map((subject) => {

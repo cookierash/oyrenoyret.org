@@ -5,6 +5,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
@@ -56,15 +57,21 @@ export async function POST(
       where: {
         deletedAt: null,
         OR: [
+          { id: rawSlug },
+          { id: subjectSlug },
+          { slug: rawSlug },
+          { slugAz: rawSlug },
           { slug: subjectSlug },
           { slugAz: subjectSlug },
           { slug: { equals: rawSlug, mode: 'insensitive' } },
           { slugAz: { equals: rawSlug, mode: 'insensitive' } },
         ],
       },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
-    if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject not found', subject: rawSlug }, { status: 404 });
+    }
 
     const body = await request.json().catch(() => ({}));
     const slug = normalizeSlug(body?.slug);
@@ -99,8 +106,12 @@ export async function POST(
         nameEn,
         nameAz,
       },
-      select: { slug: true, slugAz: true, nameEn: true, nameAz: true },
+      select: { id: true, slug: true, slugAz: true, nameEn: true, nameAz: true },
     });
+
+    revalidatePath('/catalog');
+    revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slug}/${created.slug}`);
 
     return NextResponse.json(created);
   } catch (error) {

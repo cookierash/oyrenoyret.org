@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
@@ -58,6 +59,10 @@ export async function PATCH(
       where: {
         deletedAt: null,
         OR: [
+          { id: rawSubject },
+          { id: subjectSlug },
+          { slug: rawSubject },
+          { slugAz: rawSubject },
           { slug: subjectSlug },
           { slugAz: subjectSlug },
           { slug: { equals: rawSubject, mode: 'insensitive' } },
@@ -66,13 +71,19 @@ export async function PATCH(
       },
       select: { id: true, slug: true },
     });
-    if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject not found', subject: rawSubject }, { status: 404 });
+    }
 
     const topic = await prisma.topic.findFirst({
       where: {
         subjectId: subject.id,
         deletedAt: null,
         OR: [
+          { id: rawTopic },
+          { id: topicSlug },
+          { slug: rawTopic },
+          { slugAz: rawTopic },
           { slug: topicSlug },
           { slugAz: topicSlug },
           { slug: { equals: rawTopic, mode: 'insensitive' } },
@@ -135,7 +146,7 @@ export async function PATCH(
           ...(nameEn !== undefined ? { nameEn } : {}),
           ...(nameAz !== undefined ? { nameAz } : {}),
         },
-        select: { slug: true, slugAz: true, nameEn: true, nameAz: true },
+        select: { id: true, slug: true, slugAz: true, nameEn: true, nameAz: true },
       });
 
       if (nextSlug && nextSlug !== topic.slug) {
@@ -153,6 +164,11 @@ export async function PATCH(
 
       return updatedTopic;
     });
+
+    revalidatePath('/catalog');
+    revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slug}/${topic.slug}`);
+    revalidatePath(`/catalog/${subject.slug}/${updated.slug}`);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -205,32 +221,47 @@ export async function DELETE(
       where: {
         deletedAt: null,
         OR: [
+          { id: rawSubject },
+          { id: subjectSlug },
+          { slug: rawSubject },
+          { slugAz: rawSubject },
           { slug: subjectSlug },
           { slugAz: subjectSlug },
           { slug: { equals: rawSubject, mode: 'insensitive' } },
           { slugAz: { equals: rawSubject, mode: 'insensitive' } },
         ],
       },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
-    if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
+    if (!subject) {
+      return NextResponse.json({ error: 'Subject not found', subject: rawSubject }, { status: 404 });
+    }
 
     const topic = await prisma.topic.findFirst({
       where: {
         subjectId: subject.id,
         deletedAt: null,
         OR: [
+          { id: rawTopic },
+          { id: topicSlug },
+          { slug: rawTopic },
+          { slugAz: rawTopic },
           { slug: topicSlug },
           { slugAz: topicSlug },
           { slug: { equals: rawTopic, mode: 'insensitive' } },
           { slugAz: { equals: rawTopic, mode: 'insensitive' } },
         ],
       },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
     if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
 
     await prisma.topic.update({ where: { id: topic.id }, data: { deletedAt: new Date() } });
+
+    revalidatePath('/catalog');
+    revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slug}/${topic.slug}`);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (isDbSchemaMismatch(error)) {

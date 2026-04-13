@@ -19,6 +19,9 @@ import { getI18n } from '@/src/i18n/server';
 import { getLocalizedSubject } from '@/src/i18n/subject-utils';
 import { getLocalizedTopics } from '@/src/i18n/topic-utils';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface TopicPageProps {
   params: Promise<{ subject: string; topic: string }>;
 }
@@ -36,6 +39,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
     descriptionEn: string | null;
     descriptionAz: string | null;
   } | null = null;
+  let subjectSchemaMismatch = false;
   try {
     dbSubject = await prisma.subject.findFirst({
       where: { slug: subjectId, deletedAt: null },
@@ -50,10 +54,20 @@ export default async function TopicPage({ params }: TopicPageProps) {
     });
   } catch (error) {
     if (!isDbSchemaMismatch(error)) throw error;
-    dbSubject = null;
+    subjectSchemaMismatch = true;
   }
   const fallbackSubject = SUBJECTS.find((s) => s.id === subjectId) ?? null;
   if (!dbSubject && !fallbackSubject) notFound();
+  if (!dbSubject && !subjectSchemaMismatch) {
+    let total = 0;
+    try {
+      total = await prisma.subject.count();
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      total = 0;
+    }
+    if (total > 0) notFound();
+  }
 
   const fallbackLocalizedSubject = fallbackSubject
     ? getLocalizedSubject(messages, fallbackSubject.id) ?? fallbackSubject
@@ -68,6 +82,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
     | { slug: string; nameEn: string; nameAz: string }
     | { name: string }
     | null = null;
+  let topicSchemaMismatch = false;
   if (dbSubject) {
     try {
       topic = await prisma.topic.findFirst({
@@ -77,9 +92,10 @@ export default async function TopicPage({ params }: TopicPageProps) {
     } catch (error) {
       if (!isDbSchemaMismatch(error)) throw error;
       topic = null;
+      topicSchemaMismatch = true;
     }
   }
-  if (!topic && fallbackSubject) {
+  if (!topic && fallbackSubject && (!dbSubject || subjectSchemaMismatch || topicSchemaMismatch)) {
     topic = getLocalizedTopics(messages, fallbackSubject.id).find((t) => t.id === topicId) ?? null;
   }
 

@@ -11,9 +11,12 @@ import type { CreditTransactionType, Prisma } from '@prisma/client';
 import type { CreditResult, MaterialCreditParams } from './credits.types';
 import {
   DEFAULT_CREDITS,
+  CREDITS_GROUP_SESSION,
   CREDITS_MATERIAL,
   CREDITS_DISCUSSION,
   CREDITS_SPRINT,
+  SESSION_DURATIONS,
+  type SessionDuration,
 } from '@/src/config/credits';
 
 export function roundCredits(value: number): number {
@@ -131,6 +134,31 @@ export function calcDiscussionHelpCredit(validation: 'accepted' | 'upvotes_2' | 
 export function calcSprintPayout(cost: number, rank: 1 | 2 | 3): number {
   const bonus = CREDITS_SPRINT.RANK_BONUS[rank] ?? 0;
   return roundCredits(cost + bonus);
+}
+
+function normalizeGroupSessionDuration(durationMinutes: number): SessionDuration {
+  const durations = SESSION_DURATIONS as unknown as number[];
+  if (durations.includes(durationMinutes)) return durationMinutes as SessionDuration;
+  return 45;
+}
+
+export function calcGroupSessionParticipantCost(durationMinutes: number): number {
+  const duration = normalizeGroupSessionDuration(durationMinutes);
+  const factor = CREDITS_GROUP_SESSION.DURATION_PARTICIPANT[duration];
+  return roundCredits(CREDITS_GROUP_SESSION.BASE_PARTICIPANT * factor);
+}
+
+export function calcGroupSessionFacilitatorPayout(
+  durationMinutes: number,
+  chargedLearnerCount: number,
+  learnerCapacity: number,
+): number {
+  const duration = normalizeGroupSessionDuration(durationMinutes);
+  const factor = CREDITS_GROUP_SESSION.DURATION_FACILITATOR[duration];
+  const base = CREDITS_GROUP_SESSION.BASE_FACILITATOR * chargedLearnerCount * factor;
+  const isFull = chargedLearnerCount >= learnerCapacity;
+  const multiplier = isFull ? 1 + CREDITS_GROUP_SESSION.BONUS_FULL_SESSION : 1;
+  return roundCredits(base * multiplier);
 }
 
 /** Grant credits on material publish (idempotent: only once per material via publishCreditsGrantedAt) */
@@ -527,6 +555,140 @@ export async function grantDiscussionHelp(
       success: false,
       amount: 0,
       balanceAfter: await getBalance(helperUserId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+export async function spendGroupSessionParticipation(
+  learnerUserId: string,
+  sessionId: string,
+  cost: number,
+  enrollmentId: string,
+): Promise<CreditResult> {
+  const amount = roundCredits(cost);
+  try {
+    const existing = await prisma.creditTransaction.findFirst({
+      where: {
+        userId: learnerUserId,
+        type: 'GROUP_SESSION_PARTICIPATE',
+        referenceId: enrollmentId,
+      },
+      select: { id: true, amount: true, balanceAfter: true },
+    });
+    if (existing) {
+      return {
+        success: true,
+        amount: roundCredits(existing.amount),
+        balanceAfter: roundCredits(existing.balanceAfter),
+        transactionId: existing.id,
+      };
+    }
+
+    const { balanceAfter, transactionId } = await executeTransaction(
+      learnerUserId,
+      -amount,
+      'GROUP_SESSION_PARTICIPATE',
+      { sessionId, cost: amount, enrollmentId },
+      enrollmentId,
+    );
+    return { success: true, amount: -amount, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(learnerUserId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+export async function grantGroupSessionFacilitation(
+  facilitatorUserId: string,
+  sessionId: string,
+  payout: number,
+  metadata?: Record<string, unknown>,
+): Promise<CreditResult> {
+  const amount = roundCredits(payout);
+  try {
+    const existing = await prisma.creditTransaction.findFirst({
+      where: {
+        userId: facilitatorUserId,
+        type: 'GROUP_SESSION_FACILITATE',
+        referenceId: sessionId,
+      },
+      select: { id: true, amount: true, balanceAfter: true },
+    });
+    if (existing) {
+      return {
+        success: true,
+        amount: roundCredits(existing.amount),
+        balanceAfter: roundCredits(existing.balanceAfter),
+        transactionId: existing.id,
+      };
+    }
+
+    const { balanceAfter, transactionId } = await executeTransaction(
+      facilitatorUserId,
+      amount,
+      'GROUP_SESSION_FACILITATE',
+      { sessionId, payout: amount, ...(metadata ?? {}) },
+      sessionId,
+    );
+    return { success: true, amount, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(facilitatorUserId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+export async function spendGroupSessionCancelPenalty(
+  facilitatorUserId: string,
+  sessionId: string,
+): Promise<CreditResult> {
+  const amount = 1;
+  try {
+    const { balanceAfter, transactionId } = await executeTransaction(
+      facilitatorUserId,
+      -amount,
+      'GROUP_SESSION_CANCEL_PENALTY',
+      { sessionId, penalty: amount, reason: 'cancel_with_registrations' },
+      sessionId,
+    );
+    return { success: true, amount: -amount, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(facilitatorUserId),
+      error: e instanceof Error ? e.message : 'Transaction failed',
+    };
+  }
+}
+
+export async function spendGroupSessionNoShowPenalty(
+  facilitatorUserId: string,
+  sessionId: string,
+): Promise<CreditResult> {
+  const amount = 1;
+  try {
+    const { balanceAfter, transactionId } = await executeTransaction(
+      facilitatorUserId,
+      -amount,
+      'GROUP_SESSION_NO_SHOW_PENALTY',
+      { sessionId, penalty: amount, reason: 'no_show' },
+      sessionId,
+    );
+    return { success: true, amount: -amount, balanceAfter, transactionId };
+  } catch (e) {
+    return {
+      success: false,
+      amount: 0,
+      balanceAfter: await getBalance(facilitatorUserId),
       error: e instanceof Error ? e.message : 'Transaction failed',
     };
   }

@@ -21,6 +21,86 @@ const globalForPrisma = globalThis as unknown as {
 
 let prismaSingleton: PrismaClient | undefined;
 
+function getDatabaseUrlFromEnv() {
+  return (
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_PRISMA_URL ??
+    process.env.POSTGRES_URL ??
+    process.env.POSTGRES_URL_NON_POOLING ??
+    process.env.DIRECT_URL
+  );
+}
+
+function coerceBoolean(value: string | undefined) {
+  if (!value) return undefined;
+  if (value === '1' || value.toLowerCase() === 'true') return true;
+  if (value === '0' || value.toLowerCase() === 'false') return false;
+  return undefined;
+}
+
+function safeDbTargetLabel(databaseUrl: URL) {
+  const db = databaseUrl.pathname?.replace(/^\//, '') || '(unknown-db)';
+  const port = databaseUrl.port ? `:${databaseUrl.port}` : '';
+  return `${databaseUrl.hostname}${port}/${db}`;
+}
+
+function buildPostgresConnection(databaseUrlRaw: string) {
+  let databaseUrl: URL | undefined;
+  try {
+    databaseUrl = new URL(databaseUrlRaw);
+  } catch {
+    // Some connection strings may include unescaped characters in credentials.
+    // Fall back to using the raw string and rely on explicit PG_* env vars.
+    const rejectUnauthorized =
+      coerceBoolean(process.env.PG_SSL_REJECT_UNAUTHORIZED) ?? true;
+    const sslForcedOff = coerceBoolean(process.env.PG_SSL) === false;
+    const shouldUseSsl = process.env.NODE_ENV === 'production' && !sslForcedOff;
+    return {
+      connectionString: databaseUrlRaw,
+      ssl: shouldUseSsl ? { rejectUnauthorized } : undefined,
+      targetLabel: '(unparsed DATABASE_URL)',
+      sslMode: process.env.PG_SSLMODE,
+    };
+  }
+  const sslModeFromEnv = process.env.PG_SSLMODE;
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  if (
+    isProduction &&
+    (databaseUrl.hostname === 'localhost' ||
+      databaseUrl.hostname === '127.0.0.1' ||
+      databaseUrl.hostname === '0.0.0.0')
+  ) {
+    throw new Error(
+      `DATABASE_URL points to a local host (${safeDbTargetLabel(
+        databaseUrl
+      )}); Vercel cannot reach localhost. Set a publicly reachable Postgres host.`
+    );
+  }
+
+  if (sslModeFromEnv) {
+    databaseUrl.searchParams.set('sslmode', sslModeFromEnv);
+  } else if (isProduction && !databaseUrl.searchParams.has('sslmode')) {
+    // Default to SSL in production because most managed Postgres providers require TLS.
+    databaseUrl.searchParams.set('sslmode', 'require');
+  }
+
+  const sslMode = databaseUrl.searchParams.get('sslmode')?.toLowerCase();
+  const sslDisabled = sslMode === 'disable';
+  const sslForcedOff = coerceBoolean(process.env.PG_SSL) === false;
+  const shouldUseSsl = !sslDisabled && !sslForcedOff && Boolean(sslMode && sslMode !== 'prefer');
+
+  const rejectUnauthorized =
+    coerceBoolean(process.env.PG_SSL_REJECT_UNAUTHORIZED) ?? true;
+
+  return {
+    connectionString: databaseUrl.toString(),
+    ssl: shouldUseSsl ? { rejectUnauthorized } : undefined,
+    targetLabel: safeDbTargetLabel(databaseUrl),
+    sslMode,
+  };
+}
+
 function getModelDelegateNames() {
   const modelNameEnum = (Prisma as unknown as { ModelName?: Record<string, string> }).ModelName;
   if (!modelNameEnum) return [];
@@ -40,18 +120,21 @@ function isCachedClientCompatible(client: PrismaClient) {
 }
 
 function initPrismaPool(): Pool {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    throw new Error('DATABASE_URL is not set');
-  }
+  const databaseUrl = getDatabaseUrlFromEnv();
+  if (!databaseUrl) throw new Error('DATABASE_URL is not set');
+
+  const { connectionString, ssl, targetLabel, sslMode } = buildPostgresConnection(databaseUrl);
 
   const pool =
     globalForPrisma.prismaPool ??
     new Pool({
-      connectionString: databaseUrl,
+      connectionString,
+      ssl,
       max: Number(process.env.PG_POOL_MAX ?? 10),
       idleTimeoutMillis: Number(process.env.PG_POOL_IDLE ?? 10000),
-      connectionTimeoutMillis: Number(process.env.PG_POOL_TIMEOUT ?? 10000),
+      connectionTimeoutMillis: Number(
+        process.env.PG_POOL_TIMEOUT ?? (process.env.NODE_ENV === 'production' ? 30000 : 10000)
+      ),
       allowExitOnIdle: true,
       keepAlive: true,
     });
@@ -61,6 +144,11 @@ function initPrismaPool(): Pool {
   }
 
   if (!globalForPrisma.prismaPoolInitialized) {
+    console.info(
+      `Postgres pool configured: target=${targetLabel} sslmode=${sslMode ?? '(default)'} ssl=${
+        ssl ? 'on' : 'off'
+      }`
+    );
     pool.on('error', (err) => {
       // Log and allow the pool to recover by creating a new client on next checkout.
       console.error('Postgres pool error:', err);

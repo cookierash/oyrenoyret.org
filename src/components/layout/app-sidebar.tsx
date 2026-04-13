@@ -311,6 +311,18 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                   {t('sidebar.manageLive')}
                 </Link>
                 <Link
+                  href="/admin/guided-group-sessions"
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                    pathname.startsWith('/admin/guided-group-sessions')
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  )}
+                >
+                  <UsersThree className="h-4 w-4" />
+                  {t('sidebar.guidedGroupSessions')}
+                </Link>
+                <Link
                   href="/admin/messages"
                   className={cn(
                     'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',

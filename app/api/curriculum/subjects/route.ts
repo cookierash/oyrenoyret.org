@@ -1,16 +1,19 @@
 /**
  * Curriculum Subjects Admin API
  *
+ * GET: List subjects + topics (staff only)
  * POST: Create subject (staff only)
  */
 
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { isStaff } from '@/src/lib/permissions';
 import { sanitizeInput } from '@/src/security/validation';
 import { RATE_LIMITS } from '@/src/config/constants';
+import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import {
   buildRateLimitResponse,
   checkRateLimit,
@@ -18,6 +21,59 @@ import {
 } from '@/src/security/rateLimiter';
 import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
+
+export async function GET(request: Request) {
+  try {
+    const userId = await getCurrentSession();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!user || !isStaff(user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(`curriculum:subjects:read:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
+    const subjects = await prisma.subject.findMany({
+      where: { deletedAt: null },
+      orderBy: { slug: 'asc' },
+      select: {
+        id: true,
+        slug: true,
+        slugAz: true,
+        nameEn: true,
+        nameAz: true,
+        descriptionEn: true,
+        descriptionAz: true,
+        topics: {
+          where: { deletedAt: null },
+          orderBy: { slug: 'asc' },
+          select: {
+            id: true,
+            slug: true,
+            slugAz: true,
+            nameEn: true,
+            nameAz: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({ subjects }, { headers: getPrivateNoStoreHeaders() });
+  } catch (error) {
+    if (isDbSchemaMismatch(error)) {
+      return NextResponse.json(
+        { error: 'Curriculum tables are not available. Apply database migrations first.' },
+        { status: 503 },
+      );
+    }
+    console.error('Error listing subjects:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -81,6 +137,7 @@ export async function POST(request: Request) {
         descriptionAz: descriptionAz || null,
       },
       select: {
+        id: true,
         slug: true,
         slugAz: true,
         nameEn: true,
@@ -89,6 +146,9 @@ export async function POST(request: Request) {
         descriptionAz: true,
       },
     });
+
+    revalidatePath('/catalog');
+    revalidatePath(`/catalog/${created.slug}`);
 
     return NextResponse.json(created);
   } catch (error) {

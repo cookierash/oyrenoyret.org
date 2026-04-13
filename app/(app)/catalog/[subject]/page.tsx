@@ -32,6 +32,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
   const { subject: subjectId } = await params;
   const { locale, messages } = await getI18n();
   const copy = messages.app.catalog;
+  const emptyTopicsLabel = locale === 'az' ? 'Mövzu yoxdur.' : 'No topics.';
 
   let dbSubject: {
     id: string;
@@ -41,6 +42,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     descriptionEn: string | null;
     descriptionAz: string | null;
   } | null = null;
+  let subjectSchemaMismatch = false;
   try {
     dbSubject = await prisma.subject.findFirst({
       where: { slug: subjectId, deletedAt: null },
@@ -55,11 +57,21 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     });
   } catch (error) {
     if (!isDbSchemaMismatch(error)) throw error;
-    dbSubject = null;
+    subjectSchemaMismatch = true;
   }
 
   const fallbackSubject = SUBJECTS.find((s) => s.id === subjectId) ?? null;
   if (!dbSubject && !fallbackSubject) notFound();
+  if (!dbSubject && !subjectSchemaMismatch) {
+    let total = 0;
+    try {
+      total = await prisma.subject.count();
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      total = 0;
+    }
+    if (total > 0) notFound();
+  }
   const subjectSlug = dbSubject ? dbSubject.slug : (fallbackSubject as { id: string }).id;
 
   const localizedSubject = dbSubject
@@ -72,6 +84,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
       (fallbackSubject as { id: string; name: string; description: string }));
 
   let topics: Array<{ id: string; name: string }> = [];
+  let topicsSchemaMismatch = false;
   if (dbSubject) {
     try {
       topics = (
@@ -87,16 +100,19 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     } catch (error) {
       if (!isDbSchemaMismatch(error)) throw error;
       topics = [];
+      topicsSchemaMismatch = true;
     }
   }
-  if ((!dbSubject || topics.length === 0) && fallbackSubject) {
+  if (
+    (!dbSubject || topics.length === 0) &&
+    fallbackSubject &&
+    (!dbSubject || subjectSchemaMismatch || topicsSchemaMismatch)
+  ) {
     topics = getLocalizedTopics(messages, fallbackSubject.id).map((topic) => ({
       id: topic.id,
       name: topic.name,
     }));
   }
-
-  if (!topics || topics.length === 0) notFound();
 
   let topicCounts: Array<{ topicId: string; _count: { _all: number } }> = [];
   try {
@@ -142,38 +158,44 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
           {copy.topicsIntro}
         </p>
         <section>
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {topics.map((topic) => (
-              <li key={topic.id} className="min-w-0">
-                <Link
-                  href={`/catalog/${subjectId}/${topic.id}`}
-                  className="group card-frame bg-card flex min-w-0 items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 hover:bg-muted/30"
-                >
-                  <div
-                    className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
-                      (SUBJECT_COLORS as Record<string, string>)[subjectSlug] ??
-                      'bg-muted text-foreground'
-                    }`}
+          {topics.length === 0 ? (
+            <div className="card-frame bg-card px-6 py-10 text-center text-sm text-muted-foreground">
+              {emptyTopicsLabel}
+            </div>
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {topics.map((topic) => (
+                <li key={topic.id} className="min-w-0">
+                  <Link
+                    href={`/catalog/${subjectId}/${topic.id}`}
+                    className="group card-frame bg-card flex min-w-0 items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 hover:bg-muted/30"
                   >
-                    <BookOpen className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-foreground truncate">
-                        {topic.name}
-                      </span>
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="min-w-0 text-[10px] text-muted-foreground truncate">
-                          {topicCountMap.get(topic.id) ?? 0} {copy.materials}
+                    <div
+                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${
+                        (SUBJECT_COLORS as Record<string, string>)[subjectSlug] ??
+                        'bg-muted text-foreground'
+                      }`}
+                    >
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-foreground truncate">
+                          {topic.name}
                         </span>
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="min-w-0 text-[10px] text-muted-foreground truncate">
+                            {topicCountMap.get(topic.id) ?? 0} {copy.materials}
+                          </span>
+                          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </main>
     </DashboardShell>

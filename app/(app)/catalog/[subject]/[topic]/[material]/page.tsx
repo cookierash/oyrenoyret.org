@@ -9,7 +9,6 @@ import { notFound } from 'next/navigation';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { SUBJECTS } from '@/src/config/constants';
 import { prisma } from '@/src/db/client';
 import { MaterialDetailView } from '@/src/modules/materials/material-detail-view';
 import { MaterialCommentsSection } from '@/src/modules/materials/material-comments-section';
@@ -17,11 +16,13 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { getBalance, calcMaterialUnlockCost, roundCredits } from '@/src/modules/credits';
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 import { getI18n } from '@/src/i18n/server';
-import { getLocalizedSubject } from '@/src/i18n/subject-utils';
-import { getLocalizedTopicName } from '@/src/i18n/topic-utils';
+import { resolveCurriculumNames } from '@/src/modules/curriculum/resolve-curriculum-names';
 import { ReportButton } from '@/src/modules/reports/report-user-button';
 import { AdminRemoveContentButton } from '@/src/modules/moderation/admin-remove-content-button';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 interface MaterialPageProps {
   params: Promise<{ subject: string; topic: string; material: string }>;
@@ -29,16 +30,13 @@ interface MaterialPageProps {
 
 export default async function MaterialPage({ params }: MaterialPageProps) {
   const { subject: subjectId, topic: topicId, material: materialId } = await params;
-  const subject = SUBJECTS.find((s) => s.id === subjectId);
-  const { messages } = await getI18n();
+  const { locale, messages } = await getI18n();
   const catalogCopy = messages.app.catalog;
   const libraryCopy = messages.app.library;
   const authorFallback = messages.materials.authorFallback;
-  if (!subject) notFound();
-
-  const localizedSubject = getLocalizedSubject(messages, subject.id) ?? subject;
-  const topicName = getLocalizedTopicName(messages, subject.id, topicId);
-  if (!topicName) notFound();
+  const curriculum = await resolveCurriculumNames({ messages, locale, subjectId, topicId });
+  if (!curriculum) notFound();
+  const { subjectName, topicName } = curriculum;
 
   const userId = await getCurrentSession();
   const viewer = userId
@@ -153,7 +151,7 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
     <DashboardShell>
       <PageHeader
         title={material.title}
-        description={`${topicName} · ${localizedSubject.name}`}
+        description={`${topicName} · ${subjectName}`}
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary-primary" asChild>
