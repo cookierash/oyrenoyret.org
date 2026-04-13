@@ -75,6 +75,43 @@ export async function GET(request: Request) {
     } catch (error) {
       if (!isDbSchemaMismatch(error)) throw error;
       hasSchemaMismatch = true;
+
+      // Backwards-compatible query for rollouts where localized slug columns
+      // (e.g. slugAz) haven't been migrated yet.
+      try {
+        const legacy = await prisma.subject.findMany({
+          where: { deletedAt: null },
+          orderBy: { slug: 'asc' },
+          select: {
+            slug: true,
+            nameEn: true,
+            nameAz: true,
+            descriptionEn: true,
+            descriptionAz: true,
+            topics: {
+              where: { deletedAt: null },
+              orderBy: { slug: 'asc' },
+              select: {
+                slug: true,
+                nameEn: true,
+                nameAz: true,
+              },
+            },
+          },
+        });
+
+        subjects = legacy.map((subject) => ({
+          ...subject,
+          slugAz: subject.slug,
+          topics: (subject.topics ?? []).map((topic) => ({
+            ...topic,
+            slugAz: topic.slug,
+          })),
+        }));
+        hasSchemaMismatch = false;
+      } catch (fallbackError) {
+        if (!isDbSchemaMismatch(fallbackError)) throw fallbackError;
+      }
     }
 
     if (!hasSchemaMismatch && subjects.length > 0) {
