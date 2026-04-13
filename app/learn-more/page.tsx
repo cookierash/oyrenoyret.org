@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { SiteHeader } from '@/src/components/layout/site-header';
 import { SiteFooter } from '@/src/components/layout/site-footer';
 import { LandingThemeLock } from '@/src/components/landing/landing-theme-lock';
+import { BrandText } from '@/src/components/ui/brand-text';
 import { getI18n } from '@/src/i18n/server';
 
 export const metadata = {
@@ -31,10 +32,10 @@ export default async function LearnMorePage() {
               {copy.pill}
             </span>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
-              {copy.title}
+              <BrandText>{copy.title}</BrandText>
             </h1>
             <p className="text-base text-muted-foreground sm:text-lg">
-              {copy.subtitle}
+              <BrandText>{copy.subtitle}</BrandText>
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg" variant="primary">
@@ -50,20 +51,24 @@ export default async function LearnMorePage() {
             <div className="relative space-y-6 rounded-3xl border border-border/70 bg-background/90 p-6 shadow-[0_30px_70px_-45px_rgba(15,23,42,0.6)]">
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
-                  {copy.focusLabel}
+                  <BrandText>{copy.focusLabel}</BrandText>
                 </p>
-                <h2 className="text-xl font-semibold text-foreground">
-                  {copy.focusTitle}
+                <h2 className="text-xl font-medium text-foreground">
+                  <BrandText>{copy.focusTitle}</BrandText>
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  {copy.focusBody}
+                  <BrandText>{copy.focusBody}</BrandText>
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 {values.map((value) => (
                   <div key={value.title} className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                    <h3 className="text-sm font-semibold text-foreground">{value.title}</h3>
-                    <p className="mt-2 text-xs text-muted-foreground">{value.description}</p>
+                    <h3 className="text-sm font-medium text-foreground">
+                      <BrandText>{value.title}</BrandText>
+                    </h3>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <BrandText>{value.description}</BrandText>
+                    </p>
                   </div>
                 ))}
               </div>
@@ -74,15 +79,15 @@ export default async function LearnMorePage() {
         <section className="mt-16 space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-2">
-              <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                {copy.pillarsTitle}
+              <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
+                <BrandText>{copy.pillarsTitle}</BrandText>
               </h2>
               <p className="text-sm text-muted-foreground sm:text-base">
-                {copy.pillarsSubtitle}
+                <BrandText>{copy.pillarsSubtitle}</BrandText>
               </p>
             </div>
             <div className="rounded-full border border-border/60 bg-background/70 px-4 py-2 text-xs text-muted-foreground">
-              {copy.pillarsBadge}
+              <BrandText>{copy.pillarsBadge}</BrandText>
             </div>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
@@ -93,8 +98,12 @@ export default async function LearnMorePage() {
               >
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-muted/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <div className="relative space-y-3">
-                  <h3 className="text-lg font-semibold text-foreground">{pillar.title}</h3>
-                  <p className="text-sm text-muted-foreground">{pillar.description}</p>
+                  <h3 className="text-lg font-medium text-foreground">
+                    <BrandText>{pillar.title}</BrandText>
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    <BrandText>{pillar.description}</BrandText>
+                  </p>
                 </div>
               </div>
             ))}
@@ -103,15 +112,15 @@ export default async function LearnMorePage() {
 
         <section className="mt-16 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div className="space-y-4">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              {copy.rhythmTitle}
+            <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
+              <BrandText>{copy.rhythmTitle}</BrandText>
             </h2>
             <p className="text-sm text-muted-foreground sm:text-base">
-              {copy.rhythmSubtitle}
+              <BrandText>{copy.rhythmSubtitle}</BrandText>
             </p>
             <div className="rounded-2xl border border-border/60 bg-muted/20 p-5">
               <p className="text-sm text-muted-foreground">
-                {copy.rhythmNote}
+                <BrandText>{copy.rhythmNote}</BrandText>
               </p>
             </div>
           </div>
@@ -131,8 +140,10 @@ export default async function LearnMorePage() {
               },
             ].map((step) => (
               <div key={step.title} className="rounded-2xl border border-border/70 bg-background/80 p-5">
-                <h3 className="text-base font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{step.description}</p>
+                <h3 className="text-base font-medium text-foreground">{step.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  <BrandText>{step.description}</BrandText>
+                </p>
               </div>
             ))}
           </div>
@@ -143,11 +154,11 @@ export default async function LearnMorePage() {
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-muted/40" />
             <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-center">
               <div className="space-y-3">
-                <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {copy.ctaTitle}
+                <h2 className="text-2xl font-medium tracking-tight sm:text-3xl">
+                  <BrandText>{copy.ctaTitle}</BrandText>
                 </h2>
                 <p className="text-sm text-muted-foreground sm:text-base">
-                  {copy.ctaBody}
+                  <BrandText>{copy.ctaBody}</BrandText>
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 lg:justify-end">

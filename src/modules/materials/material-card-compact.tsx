@@ -10,6 +10,7 @@ import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { StarRating } from '@/src/components/ui/star-rating';
 
 interface MaterialCardCompactProps {
   id: string;
@@ -22,6 +23,8 @@ interface MaterialCardCompactProps {
   balance?: number;
   /** Number of users who unlocked this material */
   unlockCount: number;
+  ratingAvg?: number;
+  ratingCount?: number;
   /** basic=1 green bar, intermediate=2 yellow, advanced=3 red */
   difficulty?: MaterialDifficulty | null;
   subjectId: string;
@@ -45,6 +48,8 @@ export function MaterialCardCompact({
   estimatedCost = 2,
   balance,
   unlockCount,
+  ratingAvg = 0,
+  ratingCount = 0,
   difficulty,
   subjectId,
   topicId,
@@ -138,6 +143,16 @@ export function MaterialCardCompact({
             <Users className="h-3 w-3" />
             {t('materials.card.unlockedCount', { count: unlockCount })}
           </span>
+          {ratingCount > 0 ? (
+            <span className="flex items-center gap-1">
+              <StarRating value={ratingAvg} sizeClass="h-3.5 w-3.5" ariaLabel={messages.materials.comments.ratingSummary
+                .replace('{{avg}}', Number(ratingAvg).toFixed(1))
+                .replace('{{count}}', String(ratingCount))} />
+              <span className="text-[11px]">
+                {Number(ratingAvg).toFixed(1)} ({ratingCount})
+              </span>
+            </span>
+          ) : null}
         </div>
 
         <p className="text-xs text-muted-foreground truncate">

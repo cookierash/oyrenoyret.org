@@ -62,13 +62,26 @@ export function LanguageTimeControls({
 
   return (
     <>
-      <div className="card-frame bg-card/90 p-5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Translate className="h-3.5 w-3.5" />
-          {t('settings.languageTime.languageLabel')}
+      <div className="card-frame bg-card/90 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Translate className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {t('settings.languageTime.languageLabel')}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('settings.languageTime.languageHelp')}
+            </p>
+          </div>
         </div>
-        <div className="mt-4 space-y-2">
-          <label htmlFor="settings-language" className="block text-xs font-semibold text-muted-foreground">
+
+        <div className="space-y-2">
+          <label
+            htmlFor="settings-language"
+            className="block text-xs font-medium text-muted-foreground"
+          >
             {t('settings.languageTime.defaultLanguageLabel')}
           </label>
           <Select
@@ -83,19 +96,29 @@ export function LanguageTimeControls({
               </SelectItem>
             ))}
           </Select>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.languageTime.languageHelp')}
-          </p>
         </div>
       </div>
 
-      <div className="card-frame bg-card/90 p-5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" />
-          {t('settings.languageTime.timeFormatLabel')}
+      <div className="card-frame bg-card/90 p-5 space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Clock className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">
+              {t('settings.languageTime.timeFormatLabel')}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {t('settings.languageTime.timeFormatHelp')}
+            </p>
+          </div>
         </div>
-        <div className="mt-4 space-y-2">
-          <label htmlFor="settings-time-format" className="block text-xs font-semibold text-muted-foreground">
+
+        <div className="space-y-2">
+          <label
+            htmlFor="settings-time-format"
+            className="block text-xs font-medium text-muted-foreground"
+          >
             {t('settings.languageTime.preferredDisplayLabel')}
           </label>
           <Select
@@ -108,9 +131,6 @@ export function LanguageTimeControls({
             <SelectItem value="12-hour">{t('settings.options.timeFormat.hour12')}</SelectItem>
             <SelectItem value="24-hour">{t('settings.options.timeFormat.hour24')}</SelectItem>
           </Select>
-          <p className="text-xs text-muted-foreground">
-            {t('settings.languageTime.timeFormatHelp')}
-          </p>
         </div>
       </div>
     </>

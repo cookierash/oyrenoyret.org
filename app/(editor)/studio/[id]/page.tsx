@@ -22,7 +22,6 @@ export default function EditMaterialPage() {
   const id = params.id as string;
   const { messages } = useI18n();
   const editCopy = messages.studio.edit;
-  const badge = messages.studio.headerBadge;
   const [material, setMaterial] = useState<{
     id: string;
     subjectId: string;
@@ -71,9 +70,6 @@ export default function EditMaterialPage() {
     <header className="border-b border-border bg-background flex-shrink-0">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1.5">
-          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {badge}
-          </div>
           <div className="flex items-center gap-2">
             <HeaderIcon className="h-5 w-5 text-primary" />
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -84,9 +80,9 @@ export default function EditMaterialPage() {
             {description}
           </p>
         </div>
-          <Button variant="secondary-primary" size="sm" asChild>
-            <Link href="/studio">
-              <ArrowLeft className="h-4 w-4" />
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/studio" className="inline-flex items-center gap-1">
+              <ArrowLeft className="h-3.5 w-3.5" />
               {messages.studio.newDocument.back}
             </Link>
           </Button>
@@ -100,7 +96,6 @@ export default function EditMaterialPage() {
         <header className="border-b border-border bg-background flex-shrink-0">
           <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-2">
-              <Skeleton className="h-3 w-16" />
               <Skeleton className="h-6 w-56" />
               <Skeleton className="h-4 w-72" />
             </div>
@@ -136,7 +131,7 @@ export default function EditMaterialPage() {
   return (
     <div className="flex flex-col h-full">
       {renderHeader(headerTitle, headerDescription)}
-      <main className="flex-1 overflow-auto px-4 pt-6 pb-12 max-w-4xl mx-auto w-full">
+      <main className="flex-1 overflow-auto px-4 pb-12 max-w-4xl mx-auto w-full">
         {material.materialType === 'PRACTICE_TEST' ? (
           <PracticeTestEditor
             mode="edit"

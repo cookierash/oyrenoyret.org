@@ -1,47 +1,34 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { cn } from '@/src/lib/utils';
+import { getAvatarSrc, isAvatarVariant } from '@/src/lib/avatar';
+import { UserHoverCard } from '@/src/components/users/user-hover-card';
 
 /**
  * Profile avatar for logged-in users.
- * For now: deterministic color based on userId (one of 5 preset colors).
- * Future: randomly choose one of 5 photos - use same index logic.
  */
-const AVATAR_COLORS = [
-  'bg-blue-400',      // 0
-  'bg-emerald-400',   // 1
-  'bg-violet-400',    // 2
-  'bg-amber-400',     // 3
-  'bg-rose-400',     // 4
-] as const;
-
-function getAvatarIndex(userId: string): number {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = (hash << 5) - hash + userId.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash) % AVATAR_COLORS.length;
-}
 
 interface ProfileAvatarProps {
   userId: string;
   firstName?: string | null;
   lastName?: string | null;
+  avatarVariant?: string | null;
   className?: string;
   size?: 'sm' | 'md';
+  showHoverCard?: boolean;
 }
 
 export function ProfileAvatar({
   userId,
   firstName,
   lastName,
+  avatarVariant,
   className,
   size = 'sm',
+  showHoverCard = true,
 }: ProfileAvatarProps) {
-  const index = getAvatarIndex(userId);
-  const colorClass = AVATAR_COLORS[index];
   const initials = [firstName, lastName]
     .filter(Boolean)
     .map((n) => n!.charAt(0).toUpperCase())
@@ -49,20 +36,40 @@ export function ProfileAvatar({
     .slice(0, 2) || '?';
 
   const sizeClass = size === 'sm' ? 'h-8 w-8 text-xs' : 'h-9 w-9 text-sm';
+  const src = isAvatarVariant(avatarVariant) ? getAvatarSrc(avatarVariant) : null;
 
-  return (
+  const avatar = (
     <Link
-      href="/dashboard"
+      href={`/u/${userId}`}
       className={cn(
-        'flex items-center justify-center rounded-full font-semibold text-white ring-1 ring-black/5',
-        colorClass,
+        'relative flex items-center justify-center overflow-hidden rounded-full font-medium text-white ring-1 ring-black/5',
+        !src && 'bg-muted text-foreground/80',
         sizeClass,
         'transition-opacity hover:opacity-90',
         className
       )}
-      title="Go to dashboard"
+      title="View profile"
     >
-      {initials}
+      {src ? (
+        <Image
+          src={src}
+          alt="Avatar"
+          fill
+          sizes={size === 'sm' ? '32px' : '36px'}
+          className="object-cover"
+        />
+      ) : (
+        initials
+      )}
     </Link>
+  );
+
+  if (!showHoverCard) return avatar;
+
+  const fallbackName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'User';
+  return (
+    <UserHoverCard lookupId={userId} fallbackName={fallbackName} avatarVariant={avatarVariant} href={`/u/${userId}`}>
+      {avatar}
+    </UserHoverCard>
   );
 }

@@ -8,17 +8,117 @@ import type { NextConfig } from 'next';
  */
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  images: (() => {
+    const r2PublicBaseUrl = (process.env.R2_PUBLIC_BASE_URL || '').trim();
+    const r2PrefixBase = String(process.env.R2_ANNOUNCEMENTS_PREFIX ?? 'announcements').replace(
+      /^\/+|\/+$/g,
+      '',
+    );
+
+    return {
+      formats: ['image/avif', 'image/webp'],
+      minimumCacheTTL: 60 * 60 * 24 * 7, // 7 days
+      remotePatterns: (() => {
+        const patterns: NonNullable<NextConfig['images']>['remotePatterns'] = [];
+
+        if (r2PublicBaseUrl) {
+          try {
+            const url = new URL(r2PublicBaseUrl);
+            patterns.push({
+              protocol: url.protocol.replace(':', '') as 'http' | 'https',
+              hostname: url.hostname,
+              pathname: `${url.pathname.replace(/\/$/, '')}/**`,
+            });
+          } catch {
+            // ignore invalid URL
+          }
+        }
+
+        // Fallback: allow Cloudflare's public R2 domain even if build-time env vars are missing/mismatched.
+        // This prevents Next/Image from rejecting valid `*.r2.dev` URLs returned by our upload signer.
+        patterns.push({
+          protocol: 'https',
+          hostname: '*.r2.dev',
+          pathname: `/${r2PrefixBase}/**`,
+        });
+
+        return patterns;
+      })(),
+    } satisfies NonNullable<NextConfig['images']>;
+  })(),
+  experimental: {
+    // Reduces client bundle size for icon-heavy pages.
+    optimizePackageImports: ['react-icons'],
+  },
   // Security headers
   async headers() {
     const isDev = process.env.NODE_ENV !== 'production';
+    const r2ConnectSrc = (() => {
+      const base: string[] = [];
+      const accountId = String(process.env.R2_ACCOUNT_ID ?? '').trim();
+      if (accountId) {
+        base.push(`https://${accountId}.r2.cloudflarestorage.com`);
+      } else {
+        base.push('https://*.r2.cloudflarestorage.com');
+      }
+      const endpoint = String(process.env.R2_ENDPOINT ?? '').trim();
+      if (endpoint) {
+        try {
+          const url = new URL(endpoint);
+          base.push(`${url.protocol}//${url.hostname}`);
+        } catch {
+          // ignore invalid URL
+        }
+      }
+      return base.join(' ');
+    })();
     const connectSrc = isDev
-      ? "connect-src 'self' ws: wss: http://127.0.0.1:3000 http://localhost:3000 http://127.0.0.1:7242 http://localhost:7242"
-      : "connect-src 'self'";
+      ? `connect-src 'self' ws: wss: http://127.0.0.1:3000 http://localhost:3000 http://127.0.0.1:7242 http://localhost:7242 ${r2ConnectSrc}`
+      : `connect-src 'self' ${r2ConnectSrc}`;
     const scriptSrc = isDev
       ? "script-src 'self' 'unsafe-eval' 'unsafe-inline'"
       : "script-src 'self' 'unsafe-inline'";
+    const securityDirectives = [
+      "base-uri 'self'",
+      "object-src 'none'",
+      "form-action 'self'",
+      "frame-src 'none'",
+      "script-src-attr 'none'",
+      "manifest-src 'self'",
+      "worker-src 'self' blob:",
+    ];
+    const prodOnlyDirectives = ["upgrade-insecure-requests", 'block-all-mixed-content'];
 
     return [
+      // Immutable static image assets.
+      {
+        source: '/avatar-:rest',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/partner:rest',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/landing-page-screen.gif',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
       {
         source: '/:path*',
         headers: [
@@ -60,6 +160,8 @@ const nextConfig: NextConfig = {
               "font-src 'self' data:",
               connectSrc,
               "frame-ancestors 'none'",
+              ...securityDirectives,
+              ...(isDev ? [] : prodOnlyDirectives),
             ].join('; '),
           },
         ],

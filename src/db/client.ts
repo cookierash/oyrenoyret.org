@@ -14,7 +14,28 @@ import { Pool } from 'pg';
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   prismaMiddlewareApplied?: boolean;
+  prismaPool?: Pool;
+  prismaPoolInitialized?: boolean;
+  prismaAdapter?: PrismaPg;
 };
+
+function getModelDelegateNames() {
+  const modelNameEnum = (Prisma as unknown as { ModelName?: Record<string, string> }).ModelName;
+  if (!modelNameEnum) return [];
+  const modelNames = Object.values(modelNameEnum).filter((name) => typeof name === 'string');
+  return modelNames.map((name) => `${name.charAt(0).toLowerCase()}${name.slice(1)}`);
+}
+
+function hasFindManyDelegate(client: PrismaClient, delegateName: string) {
+  const delegate = (client as unknown as Record<string, unknown>)[delegateName] as { findMany?: unknown } | undefined;
+  return Boolean(delegate && typeof delegate.findMany === 'function');
+}
+
+function isCachedClientCompatible(client: PrismaClient) {
+  const delegates = getModelDelegateNames();
+  if (delegates.length === 0) return true;
+  return delegates.every((delegateName) => hasFindManyDelegate(client, delegateName));
+}
 
 /**
  * Prisma Client Singleton
@@ -22,24 +43,47 @@ const globalForPrisma = globalThis as unknown as {
  * Creates a single Prisma client instance to prevent connection pool exhaustion.
  * In development, the client is stored globally to prevent multiple instances during hot reloads.
  */
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: Number(process.env.PG_POOL_MAX ?? 10),
-  idleTimeoutMillis: Number(process.env.PG_POOL_IDLE ?? 10000),
-  connectionTimeoutMillis: Number(process.env.PG_POOL_TIMEOUT ?? 10000),
-  allowExitOnIdle: true,
-  keepAlive: true,
-});
+const pool =
+  globalForPrisma.prismaPool ??
+  new Pool({
+    connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.PG_POOL_MAX ?? 10),
+    idleTimeoutMillis: Number(process.env.PG_POOL_IDLE ?? 10000),
+    connectionTimeoutMillis: Number(process.env.PG_POOL_TIMEOUT ?? 10000),
+    allowExitOnIdle: true,
+    keepAlive: true,
+  });
 
-pool.on('error', (err) => {
-  // Log and allow the pool to recover by creating a new client on next checkout.
-  console.error('Postgres pool error:', err);
-});
+if (!globalForPrisma.prismaPool) {
+  globalForPrisma.prismaPool = pool;
+}
 
-const adapter = new PrismaPg(pool);
+if (!globalForPrisma.prismaPoolInitialized) {
+  pool.on('error', (err) => {
+    // Log and allow the pool to recover by creating a new client on next checkout.
+    console.error('Postgres pool error:', err);
+  });
+  globalForPrisma.prismaPoolInitialized = true;
+}
+
+const adapter = globalForPrisma.prismaAdapter ?? new PrismaPg(pool);
+if (!globalForPrisma.prismaAdapter) {
+  globalForPrisma.prismaAdapter = adapter;
+}
+
+const cachedClient = globalForPrisma.prisma;
+const shouldUseCachedClient =
+  Boolean(cachedClient) &&
+  (process.env.NODE_ENV === 'production' || isCachedClientCompatible(cachedClient as PrismaClient));
+
+if (cachedClient && !shouldUseCachedClient && process.env.NODE_ENV !== 'production') {
+  console.warn('Stale Prisma client detected in global cache; reinitializing to match current schema.');
+  globalForPrisma.prismaMiddlewareApplied = false;
+  void cachedClient.$disconnect().catch(() => {});
+}
 
 let prismaClient =
-  globalForPrisma.prisma ??
+  (shouldUseCachedClient ? cachedClient : undefined) ??
   new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
@@ -77,7 +121,22 @@ if (!globalForPrisma.prismaMiddlewareApplied) {
   )?.$extends;
 
   if (typeof maybeUse === 'function') {
-    maybeUse(async (params, next) => reconnectOnce(() => next(params)));
+    maybeUse(async (params, next) => {
+      const p = params as {
+        model?: string;
+        action?: string;
+        args?: { data?: Record<string, unknown> };
+      };
+
+      if (p?.model === 'User' && (p.action === 'update' || p.action === 'upsert' || p.action === 'updateMany')) {
+        const data = p.args?.data;
+        if (data && typeof data.email === 'string' && !Object.prototype.hasOwnProperty.call(data, 'emailVerifiedAt')) {
+          data.emailVerifiedAt = null;
+        }
+      }
+
+      return reconnectOnce(() => next(params));
+    });
   } else if (typeof maybeExtends === 'function') {
     prismaClient = prismaClient.$extends({
       query: {

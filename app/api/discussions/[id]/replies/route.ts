@@ -6,10 +6,14 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
+import { MAX_DISCUSSION_IMAGES } from '@/src/config/uploads';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
-import { sanitizeHtml } from '@/src/security/validation';
+import { sanitizeDiscussionRichTextHtml } from '@/src/security/validation';
+import { richTextHtmlToPlainText } from '@/src/lib/rich-text';
+import { countDiscussionImages, discussionRichTextHasContent } from '@/src/lib/discussion-rich-text';
 import { grantDiscussionReply } from '@/src/modules/credits';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 
 export async function GET(
   request: Request,
@@ -30,24 +34,42 @@ export async function GET(
       return NextResponse.json({ error: 'parentReplyId is required' }, { status: 400 });
     }
 
+    const currentUserId = await getCurrentSession();
+    const currentUser = currentUserId
+      ? await prisma.user.findUnique({ where: { id: currentUserId }, select: { role: true } })
+      : null;
+    const isAdminUser = currentUser?.role === 'ADMIN';
+
     const discussion = await prisma.discussion.findFirst({
       where: { id: discussionId, archivedAt: null },
-      select: { id: true },
+      select: { id: true, userId: true, removedAt: true },
     });
 
     if (!discussion) {
       return NextResponse.json({ error: 'Discussion not found or archived' }, { status: 404 });
     }
-
-    const currentUserId = await getCurrentSession();
+    if (discussion.removedAt && !(isAdminUser || (currentUserId && discussion.userId === currentUserId))) {
+      return NextResponse.json({ error: 'Discussion not found or archived' }, { status: 404 });
+    }
 
     const replies = await prisma.discussionReply.findMany({
-      where: { discussionId, parentReplyId },
+      where: isAdminUser
+        ? { discussionId, parentReplyId }
+        : {
+            discussionId,
+            parentReplyId,
+            OR: [
+              { removedAt: null },
+              ...(currentUserId ? [{ userId: currentUserId }] : []),
+            ],
+          },
       orderBy: { createdAt: 'asc' },
       select: {
         id: true,
         content: true,
         createdAt: true,
+        removedAt: true,
+        removedReason: true,
         user: {
           select: {
             id: true,
@@ -88,6 +110,8 @@ export async function GET(
       id: reply.id,
       content: reply.content,
       createdAt: reply.createdAt,
+      removedAt: (reply as any).removedAt ?? null,
+      removedReason: (reply as any).removedReason ?? null,
       authorId: reply.user.id,
       authorName:
         [reply.user.firstName, reply.user.lastName].filter(Boolean).join(' ') ||
@@ -117,6 +141,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
+    }
+
     const identifier = getRateLimitIdentifier(request, userId);
     const rateLimit = await checkRateLimit(
       `discussions:reply:${identifier}`,
@@ -138,8 +171,26 @@ export async function POST(
       );
     }
 
+    const safeContent = sanitizeDiscussionRichTextHtml(String(content));
+    const plainText = richTextHtmlToPlainText(safeContent);
+    if (!discussionRichTextHasContent(safeContent)) {
+      return NextResponse.json(
+        { error: 'content is required' },
+        { status: 400 }
+      );
+    }
+    if (countDiscussionImages(safeContent) > MAX_DISCUSSION_IMAGES) {
+      return NextResponse.json({ error: 'Too many images', max: MAX_DISCUSSION_IMAGES }, { status: 400 });
+    }
+    if (plainText.length > CONTENT_LIMITS.REPLY_CONTENT_MAX) {
+      return NextResponse.json(
+        { error: 'content is too long', max: CONTENT_LIMITS.REPLY_CONTENT_MAX },
+        { status: 400 }
+      );
+    }
+
     const discussion = await prisma.discussion.findFirst({
-      where: { id: discussionId, archivedAt: null },
+      where: { id: discussionId, archivedAt: null, removedAt: null },
     });
 
     if (!discussion) {
@@ -148,7 +199,7 @@ export async function POST(
 
     if (parentReplyId) {
       const parent = await prisma.discussionReply.findFirst({
-        where: { id: parentReplyId, discussionId },
+        where: { id: parentReplyId, discussionId, removedAt: null },
       });
       if (!parent) {
         return NextResponse.json({ error: 'Parent reply not found' }, { status: 404 });
@@ -160,7 +211,7 @@ export async function POST(
         discussionId,
         parentReplyId: parentReplyId || null,
         userId,
-        content: sanitizeHtml(String(content)).slice(0, CONTENT_LIMITS.REPLY_CONTENT_MAX),
+        content: safeContent,
       },
     });
 

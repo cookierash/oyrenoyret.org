@@ -4,6 +4,7 @@ import { prisma } from '@/src/db/client';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export async function GET(request: Request) {
   try {
@@ -19,23 +20,51 @@ export async function GET(request: Request) {
       return NextResponse.json(body, { status, headers });
     }
 
-    const accesses = await prisma.materialAccess.findMany({
-      where: { userId, material: { deletedAt: null } },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        createdAt: true,
-        material: {
-          select: {
-            id: true,
-            title: true,
-            subjectId: true,
-            topicId: true,
-            materialType: true,
-            difficulty: true,
+    let accesses: any[] = [];
+    try {
+      accesses = await prisma.materialAccess.findMany({
+        // Keep purchased materials in the user's library even if the author removes them from the catalog.
+        where: { userId, material: { removedAt: null } },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          createdAt: true,
+          material: {
+            select: {
+              id: true,
+              title: true,
+              subjectId: true,
+              topicId: true,
+              materialType: true,
+              difficulty: true,
+              ratingAvg: true,
+              ratingCount: true,
+            },
           },
         },
-      },
-    });
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      // Safe rollout fallback: DB may not have moderation columns yet.
+      accesses = await prisma.materialAccess.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          createdAt: true,
+          material: {
+            select: {
+              id: true,
+              title: true,
+              subjectId: true,
+              topicId: true,
+              materialType: true,
+              difficulty: true,
+              ratingAvg: true,
+              ratingCount: true,
+            },
+          },
+        },
+      });
+    }
 
     const result = accesses.map((a) => ({
       purchasedAt: a.createdAt,
@@ -46,6 +75,8 @@ export async function GET(request: Request) {
         topicId: a.material.topicId,
         materialType: a.material.materialType,
         difficulty: a.material.difficulty,
+        ratingAvg: a.material.ratingAvg,
+        ratingCount: a.material.ratingCount,
       },
     }));
 

@@ -53,7 +53,8 @@ export function LoginForm() {
 
       if (result.success) {
         toast.success(copy.success);
-        const destination = result.role && isStaff(result.role) ? '/admin/dashboard' : '/dashboard';
+        const destination =
+          result.role && isStaff(result.role) ? '/admin/interactive-sessions' : '/dashboard';
         router.push(destination);
         router.refresh();
       } else {
@@ -126,7 +127,7 @@ export function LoginForm() {
             type="submit"
             variant="primary"
             size="lg"
-          className="h-10 w-full text-sm font-semibold"
+          className="h-10 w-full text-sm font-medium"
           disabled={isSubmitting}
         >
           {isSubmitting ? copy.loggingIn : copy.login}

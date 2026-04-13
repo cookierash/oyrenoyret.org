@@ -7,10 +7,13 @@ import { PiLock as Lock, PiCircleNotch as Loader2 } from 'react-icons/pi';
 import { DifficultyBars, type MaterialDifficulty } from './difficulty-bars';
 import { PracticeTestView } from './practice-test-view';
 import { toast } from 'sonner';
-import { sanitizeHtml } from '@/src/security/validation';
+import { sanitizeRichTextHtml } from '@/src/security/validation';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocaleCode } from '@/src/i18n';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { StarRating } from '@/src/components/ui/star-rating';
+import { htmlToPlainTextWithNewlines } from '@/src/lib/html';
+import { splitObjectives } from '@/src/modules/materials/utils';
 
 interface MaterialDetailViewProps {
   id: string;
@@ -27,17 +30,8 @@ interface MaterialDetailViewProps {
   estimatedCost?: number;
   balance?: number;
   unlockCount?: number;
-}
-
-function stripHtmlWithLineBreaks(html: string): string {
-  const withBreaks = html
-    .replace(/<\s*br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6)>/gi, '\n');
-  return withBreaks
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/[ \t\r\f\v]+/g, ' ')
-    .replace(/\s*\n\s*/g, '\n')
-    .trim();
+  ratingAvg?: number;
+  ratingCount?: number;
 }
 
 function practiceTestPreview(
@@ -53,12 +47,12 @@ function practiceTestPreview(
       questions: qs.slice(0, 3).map((q: { question?: string; options?: { text?: string }[] }) => {
         const options = Array.isArray(q.options) ? q.options : [];
         return {
-          questionHtml: sanitizeHtml(
+          questionHtml: sanitizeRichTextHtml(
             q.question || `<p>${fallback.missingQuestion}</p>`,
           ),
           options: options.map((opt, idx) => ({
             label: String.fromCharCode(65 + idx),
-            textHtml: sanitizeHtml(opt?.text || `<p>${fallback.emptyOption}</p>`),
+            textHtml: sanitizeRichTextHtml(opt?.text || `<p>${fallback.emptyOption}</p>`),
           })),
         };
       }),
@@ -69,7 +63,7 @@ function practiceTestPreview(
 }
 
 function getTextStats(html: string) {
-  const text = stripHtmlWithLineBreaks(html);
+  const text = htmlToPlainTextWithNewlines(html);
   const wordCount = text ? text.trim().split(/\s+/).filter(Boolean).length : 0;
   const charCount = text.replace(/\s+/g, '').length;
   const lines = text
@@ -77,21 +71,6 @@ function getTextStats(html: string) {
     .map((line) => line.trim())
     .filter(Boolean);
   return { text, wordCount, charCount, lines };
-}
-
-function getPracticeStats(content: string) {
-  try {
-    const parsed = JSON.parse(content);
-    const questions = Array.isArray(parsed?.questions) ? parsed.questions : [];
-    const questionCount = questions.length;
-    const optionCount = questions.reduce((total: number, q: { options?: unknown[] }) => {
-      const opts = Array.isArray(q.options) ? q.options.length : 0;
-      return total + opts;
-    }, 0);
-    return { questionCount, optionCount };
-  } catch {
-    return { questionCount: 0, optionCount: 0 };
-  }
 }
 
 export function MaterialDetailView({
@@ -108,9 +87,12 @@ export function MaterialDetailView({
   estimatedCost = 3,
   balance,
   unlockCount = 0,
+  ratingAvg = 0,
+  ratingCount = 0,
 }: MaterialDetailViewProps) {
   const { locale, t, messages } = useI18n();
   const copy = messages.materials.detail;
+  const commentsCopy = messages.materials.comments;
   const practiceCopy = messages.materials.practiceTest;
   const router = useRouter();
   const [unlocking, setUnlocking] = useState(false);
@@ -133,6 +115,7 @@ export function MaterialDetailView({
     () => textStats?.lines.slice(0, 5) ?? [],
     [textStats],
   );
+  const objectiveLines = useMemo(() => splitObjectives(objectives), [objectives]);
   const practicePreview = useMemo(
     () =>
       materialType === 'PRACTICE_TEST'
@@ -142,10 +125,6 @@ export function MaterialDetailView({
           })
         : null,
     [content, materialType, practiceCopy],
-  );
-  const practiceStats = useMemo(
-    () => (materialType === 'PRACTICE_TEST' ? getPracticeStats(content) : null),
-    [content, materialType],
   );
 
   const handleUnlock = async () => {
@@ -217,6 +196,25 @@ export function MaterialDetailView({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-2">
         <DifficultyBars difficulty={difficulty ?? 'BASIC'} />
+        <div className="flex items-center gap-2">
+          <StarRating
+            value={ratingCount > 0 ? ratingAvg : 0}
+            ariaLabel={
+              ratingCount > 0
+                ? commentsCopy.ratingSummary
+                    .replace('{{avg}}', Number(ratingAvg).toFixed(1))
+                    .replace('{{count}}', String(ratingCount))
+                : commentsCopy.noRatings
+            }
+          />
+          <span className="text-xs text-muted-foreground">
+            {ratingCount > 0
+              ? commentsCopy.ratingSummary
+                  .replace('{{avg}}', Number(ratingAvg).toFixed(1))
+                  .replace('{{count}}', String(ratingCount))
+              : commentsCopy.noRatings}
+          </span>
+        </div>
         <p className="text-xs text-muted-foreground">
           {t('materials.detail.by', { name: authorName })}
           {publishedAt && <> · {dateFormatter.format(new Date(publishedAt))}</>}
@@ -226,19 +224,15 @@ export function MaterialDetailView({
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] lg:items-start">
         <div className="space-y-4">
-          {objectives && objectives.trim() && (
+          {objectiveLines.length > 0 && (
             <section className="card-frame bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">{copy.objectivesTitle}</h2>
+                <h2 className="text-sm font-medium">{copy.objectivesTitle}</h2>
               </div>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                {objectives
-                  .split('\n')
-                  .map((line) => line.trim())
-                  .filter(Boolean)
-                  .map((line, idx) => (
+                {objectiveLines.map((line, idx) => (
                     <li key={idx} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary/70" />
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/70" />
                       <span className="leading-relaxed">{line}</span>
                     </li>
                   ))}
@@ -248,55 +242,45 @@ export function MaterialDetailView({
 
           {!unlocked && (materialType === 'TEXTUAL' || materialType === 'PRACTICE_TEST') && (
             <section className="card-frame bg-card p-4 space-y-3">
-              <div className="text-sm font-semibold text-foreground">{copy.statsTitle}</div>
+              <div className="text-sm font-medium text-foreground">{copy.statsTitle}</div>
               <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
                 <div className="rounded-md border border-border/70 bg-background px-3 py-2">
                   <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                     {copy.statsUnlocked}
                   </div>
-                  <div className="text-sm font-semibold text-foreground">
+                  <div className="text-sm font-medium text-foreground">
                     {unlockCount}
                   </div>
                 </div>
-                {materialType === 'TEXTUAL' ? (
-                  <>
-                    <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {copy.statsWords}
-                      </div>
-                      <div className="text-sm font-semibold text-foreground">
-                        {textStats?.wordCount ?? 0}
-                      </div>
-                    </div>
-                    <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {copy.statsCharacters}
-                      </div>
-                      <div className="text-sm font-semibold text-foreground">
-                        {textStats?.charCount ?? 0}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {copy.statsQuestions}
-                      </div>
-                      <div className="text-sm font-semibold text-foreground">
-                        {practiceStats?.questionCount ?? 0}
-                      </div>
-                    </div>
-                    <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {copy.statsOptions}
-                      </div>
-                      <div className="text-sm font-semibold text-foreground">
-                        {practiceStats?.optionCount ?? 0}
-                      </div>
-                    </div>
-                  </>
-                )}
+                <div className="rounded-md border border-border/70 bg-background px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {copy.statsRatingAvg}
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <StarRating
+                      value={ratingCount > 0 ? ratingAvg : 0}
+                      sizeClass="h-4 w-4"
+                      ariaLabel={
+                        ratingCount > 0
+                          ? commentsCopy.ratingSummary
+                              .replace('{{avg}}', Number(ratingAvg).toFixed(1))
+                              .replace('{{count}}', String(ratingCount))
+                          : commentsCopy.noRatings
+                      }
+                    />
+                    <span className="text-sm font-medium text-foreground">
+                      {ratingCount > 0 ? Number(ratingAvg).toFixed(1) : '—'}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-md border border-border/70 bg-background px-3 py-2">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {copy.statsRatingCount}
+                  </div>
+                  <div className="text-sm font-medium text-foreground">
+                    {ratingCount}
+                  </div>
+                </div>
               </div>
             </section>
           )}
@@ -338,8 +322,8 @@ export function MaterialDetailView({
           {unlocked ? (
             materialType === 'TEXTUAL' ? (
               <div
-                className="document-editor-content text-sm"
-                dangerouslySetInnerHTML={{ __html: content }}
+                className="document-editor-content"
+                dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(content) }}
               />
             ) : (
               <div className="space-y-4">
@@ -351,7 +335,7 @@ export function MaterialDetailView({
             <section className="card-frame bg-card p-4 space-y-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold">{copy.previewTextTitle}</h2>
+                  <h2 className="text-sm font-medium">{copy.previewTextTitle}</h2>
                   <p className="text-xs text-muted-foreground">
                     {copy.previewTextSubtitle}
                   </p>
@@ -372,7 +356,7 @@ export function MaterialDetailView({
           ) : (
             <section className="card-frame bg-card p-4 space-y-4">
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold">{copy.previewQuestionsTitle}</h2>
+                <h2 className="text-sm font-medium">{copy.previewQuestionsTitle}</h2>
                 <p className="text-xs text-muted-foreground">
                   {copy.previewQuestionsSubtitle}
                 </p>
@@ -404,7 +388,7 @@ export function MaterialDetailView({
                               >
                                 <div className="flex items-center gap-2 pt-1">
                                   <span className="h-4 w-4 rounded-full border border-border bg-background" />
-                                  <span className="text-xs font-semibold text-muted-foreground w-6">
+                                  <span className="text-xs font-medium text-muted-foreground w-6">
                                     {opt.label}
                                   </span>
                                 </div>

@@ -3,18 +3,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiTrophy as Trophy, PiBookOpen as BookOpen, PiBooks as Library, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiPalette as Palette, PiTranslate as Translate } from 'react-icons/pi';
+import { PiSquaresFour as LayoutDashboard, PiSparkle as Sparkles, PiTrophy as Trophy, PiBookOpen as BookOpen, PiBooks as Library, PiUsersThree as UsersThree, PiCalendar as CalendarDays, PiChatCircle as MessageSquare, PiGraduationCap as GraduationCap, PiSignOut as LogOut, PiGear as Settings, PiReceipt as Receipt, PiX as X, PiShieldCheck as ShieldCheck, PiUserCircle as UserCircle, PiBell as Bell, PiPalette as Palette, PiTranslate as Translate, PiArrowLeft as ArrowLeft, PiWarningCircle as WarningCircle } from 'react-icons/pi';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
 import { Logo } from '@/src/components/ui/logo';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { Button } from '@/components/ui/button';
 
 interface AppSidebarProps {
   user: {
     id: string;
     firstName: string | null;
     lastName: string | null;
+    avatarVariant?: string | null;
     email: string;
     credits?: number;
     role?: string;
@@ -30,7 +31,6 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const router = useRouter();
   const { t } = useI18n();
   const [credits, setCredits] = useState<number | null>(user.credits ?? null);
-  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [logoutPending, setLogoutPending] = useState(false);
   const lastBalanceFetchRef = useRef(0);
   const fetchInFlightRef = useRef(false);
@@ -38,6 +38,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const isSettingsRoute = pathname === '/settings' || pathname.startsWith('/settings/');
   const settingsNavSections = [
     {
+      id: 'user-settings',
       title: t('settings.nav.userSettings'),
       items: [
         {
@@ -45,9 +46,15 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
           label: t('settings.nav.myAccount'),
           icon: UserCircle,
         },
+        {
+          href: '/settings/notifications',
+          label: t('settings.nav.notifications'),
+          icon: Bell,
+        },
       ],
     },
     {
+      id: 'app-settings',
       title: t('settings.nav.appSettings'),
       items: [
         {
@@ -69,7 +76,8 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     { href: '/leaderboard', label: t('sidebar.leaderboard'), icon: Trophy },
     { href: '/catalog', label: t('sidebar.catalog'), icon: BookOpen },
     { href: '/library', label: t('sidebar.library'), icon: Library },
-    { href: '/live-activities', label: t('sidebar.liveActivities'), icon: CalendarDays },
+    { href: '/library/guided-group-sessions', label: t('sidebar.guidedGroupSessions'), icon: UsersThree },
+    { href: '/interactive-sessions', label: t('sidebar.liveActivities'), icon: CalendarDays },
     { href: '/discussions', label: t('sidebar.discussions'), icon: MessageSquare },
     { href: '/recent-activities', label: t('sidebar.recentActivities'), icon: Receipt },
     { href: '/academic-record', label: t('sidebar.academicRecord'), icon: GraduationCap },
@@ -81,7 +89,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     if (!force && now - lastBalanceFetchRef.current < 60_000) return;
     fetchInFlightRef.current = true;
     try {
-      const res = await fetch(`/api/credits/balance?_=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch('/api/credits/balance', { cache: 'no-store' });
       if (res.ok) {
         const { balance } = await res.json();
         setCredits(balance);
@@ -139,10 +147,12 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const handleLogout = useCallback(async () => {
     if (logoutPending) return;
     setLogoutPending(true);
-    setProfileMenuOpen(false);
     onClose?.();
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch (error) {
+      // Avoid crashing the client if the request fails (offline, dev env, transient network).
+      console.warn('[LOGOUT] Request failed; redirecting anyway.', error);
     } finally {
       router.replace('/');
       router.refresh();
@@ -159,12 +169,17 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       <div className="flex h-14 items-center border-b border-border px-4">
         {isSettingsRoute ? (
           <div className="relative flex w-full items-center justify-start">
-            <div className="flex items-center gap-2">
-              <Logo size="sm" showText textSize="sm" />
-              <span className="text-[11px] font-semibold text-foreground tracking-tight whitespace-nowrap">
-                {t('settings.nav.settings')}
-              </span>
-            </div>
+            <Button size="sm" variant="ghost" asChild>
+              <Link
+                href="/dashboard"
+                onClick={() => onClose?.()}
+                className="inline-flex items-center gap-1"
+                aria-label={t('settings.nav.backHome')}
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span className="whitespace-nowrap">{t('settings.nav.backHome')}</span>
+              </Link>
+            </Button>
             {onClose ? (
               <button
                 type="button"
@@ -178,7 +193,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
           </div>
         ) : (
           <>
-            <Logo size="sm" showText />
+            <Logo size="sm" showText priority />
             <div className="ml-auto flex items-center gap-2">
               {onClose ? (
                 <button
@@ -199,8 +214,8 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
         {isSettingsRoute ? (
           <div className="space-y-6">
             {settingsNavSections.map((section) => (
-              <div key={section.title} className="space-y-2">
-                <p className="px-3 text-xs font-semibold text-muted-foreground">
+              <div key={section.id} className="space-y-2">
+                <p className="px-3 text-xs font-medium text-muted-foreground">
                   {section.title}
                 </p>
                 <div className="space-y-1">
@@ -221,6 +236,21 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                 </div>
               </div>
             ))}
+
+            <div className="space-y-2">
+              <p className="px-3 text-xs font-medium text-muted-foreground">
+                {t('settings.nav.logOut')}
+              </p>
+              <button
+                type="button"
+                onClick={handleLogout}
+                disabled={logoutPending}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-destructive/90 transition-colors hover:bg-destructive/10 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <LogOut className="h-4 w-4" />
+                {logoutPending ? t('settings.nav.loggingOut') : t('settings.nav.logOut')}
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -242,7 +272,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                     <Icon className="h-4 w-4" />
                     {item.isBrand ? (
                       <span className="lowercase">
-                        <span className="font-comfortaa">oyrenoyret</span> studio
+                        <span className="brand-font">oyrenoyret</span> studio
                       </span>
                     ) : (
                       item.label
@@ -254,22 +284,22 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
             {isStaff ? (
               <div className="space-y-0.5">
                 <Link
-                  href="/admin/dashboard"
+                  href="/admin"
                   className={cn(
                     'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                    pathname === '/admin/dashboard'
+                    pathname === '/admin'
                       ? 'bg-muted text-foreground font-medium'
                       : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                   )}
                 >
-                  <ShieldCheck className="h-4 w-4" />
-                  {t('sidebar.adminDashboard')}
+                  <LayoutDashboard className="h-4 w-4" />
+                  {t('sidebar.adminHome')}
                 </Link>
                 <Link
-                  href="/admin/live-activities"
+                  href="/admin/interactive-sessions"
                   className={cn(
                     'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                    pathname.startsWith('/admin/live-activities')
+                    pathname.startsWith('/admin/interactive-sessions')
                       ? 'bg-muted text-foreground font-medium'
                       : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                   )}
@@ -277,44 +307,42 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                   <ShieldCheck className="h-4 w-4" />
                   {t('sidebar.manageLive')}
                 </Link>
-                <div className="ml-6 space-y-0.5">
-                  <Link
-                    href="/admin/live-activities/problem-sprints"
-                    className={cn(
-                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                      pathname === '/admin/live-activities/problem-sprints'
-                        ? 'bg-muted text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                    )}
-                  >
-                    <CalendarDays className="h-4 w-4" />
-                    {t('sidebar.problemSprint')}
-                  </Link>
-                  <Link
-                    href="/admin/live-activities/announcements"
-                    className={cn(
-                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                      pathname === '/admin/live-activities/announcements'
-                        ? 'bg-muted text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                    )}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    {t('sidebar.announcements')}
-                  </Link>
-                  <Link
-                    href="/admin/live-activities/events"
-                    className={cn(
-                      'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                      pathname === '/admin/live-activities/events'
-                        ? 'bg-muted text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                    )}
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    {t('sidebar.events')}
-                  </Link>
-                </div>
+                <Link
+                  href="/admin/messages"
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                    pathname.startsWith('/admin/messages')
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  )}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {t('sidebar.contactMessages')}
+                </Link>
+                <Link
+                  href="/admin/curriculum"
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                    pathname.startsWith('/admin/curriculum')
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  )}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  {t('sidebar.curriculum')}
+                </Link>
+                <Link
+                  href="/admin/reports"
+                  className={cn(
+                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                    pathname.startsWith('/admin/reports')
+                      ? 'bg-muted text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                  )}
+                >
+                  <WarningCircle className="h-4 w-4" />
+                  {t('sidebar.reports')}
+                </Link>
               </div>
             ) : null}
           </>
@@ -324,10 +352,10 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       {!isStaff && !isSettingsRoute ? (
         <div className="px-2 pb-3">
           <div className="w-full rounded-md border border-primary/20 bg-primary/10 px-3 py-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary/80">
+            <p className="text-[10px] font-medium uppercase tracking-wider text-primary/80">
               {t('sidebar.creditsLabel')}
             </p>
-            <p className="mt-1 text-sm font-semibold text-primary">
+            <p className="mt-1 text-sm font-medium text-primary">
               {t('sidebar.creditsValue', { count: Math.round(Number(displayCredits)) })}
             </p>
           </div>
@@ -335,80 +363,33 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       ) : null}
 
       <div className="border-t border-border px-2 py-3">
-        {isSettingsRoute ? (
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={logoutPending}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            <LogOut className="h-4 w-4" />
-            {logoutPending ? t('settings.nav.loggingOut') : t('settings.nav.logOut')}
-          </button>
-        ) : (
-          <HoverCard
-            openDelay={10}
-            closeDelay={100}
-            open={profileMenuOpen}
-            onOpenChange={setProfileMenuOpen}
-          >
-            <HoverCardTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition-colors hover:bg-muted/70"
-                onMouseEnter={() => setProfileMenuOpen(true)}
-                onMouseLeave={() => setProfileMenuOpen(false)}
-                onClick={() => setProfileMenuOpen((open) => !open)}
-              >
-                <ProfileAvatar
-                  userId={user.id}
-                  firstName={user.firstName}
-                  lastName={user.lastName}
-                  size="sm"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-medium text-foreground">
-                    {user.firstName || user.email.split('@')[0]}
-                  </p>
-                  <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>
-                </div>
-              </button>
-            </HoverCardTrigger>
-            <HoverCardContent
-              side="top"
-              align="start"
-              forceMount
-              sideOffset={4}
-              className={cn(
-                'relative origin-bottom-left w-[var(--radix-hover-card-trigger-width)] bg-background p-1.5 shadow-sm transition-all duration-240 ease-in-out will-change-[opacity,transform] after:absolute after:left-0 after:top-full after:h-2 after:w-full after:content-[\"\"]',
-                profileMenuOpen
-                  ? 'opacity-100 translate-y-0 scale-100'
-                  : 'pointer-events-none opacity-0 -translate-y-2 scale-[0.97]',
-              )}
-              onMouseEnter={() => setProfileMenuOpen(true)}
-              onMouseLeave={() => setProfileMenuOpen(false)}
+        <div className="flex w-full items-center gap-2 rounded-md px-3 py-2">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <ProfileAvatar
+              userId={user.id}
+              firstName={user.firstName}
+              lastName={user.lastName}
+              avatarVariant={user.avatarVariant}
+              size="sm"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {user.firstName || user.email.split('@')[0]}
+              </p>
+              <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>
+            </div>
+          </div>
+          {!isSettingsRoute ? (
+            <Link
+              href="/settings/my-account"
+              onClick={() => onClose?.()}
+              aria-label={t('settings.nav.settings')}
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
             >
-              <div className="flex flex-col gap-1">
-              <Link
-                href="/settings"
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/70"
-              >
-                <Settings className="h-4 w-4" />
-                {t('settings.nav.settings')}
-              </Link>
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={logoutPending}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-red-500/90 transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                <LogOut className="h-4 w-4" />
-                {logoutPending ? t('settings.nav.loggingOut') : t('settings.nav.logOut')}
-              </button>
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-        )}
+              <Settings className="h-4 w-4" />
+            </Link>
+          ) : null}
+        </div>
       </div>
     </aside>
   );

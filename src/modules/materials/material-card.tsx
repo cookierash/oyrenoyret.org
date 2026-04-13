@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocaleCode } from '@/src/i18n';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { sanitizeRichTextHtml } from '@/src/security/validation';
 
 interface MaterialCardProps {
   id: string;
@@ -165,7 +166,7 @@ export function MaterialCard({
         ) : (
           <div
             className="document-editor-content text-sm"
-            dangerouslySetInnerHTML={{ __html: content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichTextHtml(content) }}
           />
         )}
       </CardContent>

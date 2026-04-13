@@ -1,16 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { useSettings } from '@/src/components/settings/settings-provider';
 import { getLocaleCode } from '@/src/i18n';
+import { getAnnouncementImageSrc } from '@/src/lib/announcement-images';
 
 interface LiveAnnouncement {
   id: string;
   title: string;
   body: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -73,20 +76,33 @@ export function LiveAnnouncementsList({ limit = 6, className }: LiveAnnouncement
     <div className={cn('space-y-4', className)}>
       {announcements.map((announcement) => {
         const createdAt = new Date(announcement.createdAt);
+        const imageSrc = getAnnouncementImageSrc(announcement.imageUrl);
         return (
-          <div key={announcement.id} className="space-y-1">
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
+          <Link
+            key={announcement.id}
+            href={`/a/${announcement.id}`}
+            className="block space-y-2 rounded-lg outline-none ring-offset-background transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border border-border/50 bg-muted/30">
+              {imageSrc ? (
+                // Use a plain <img> to avoid Next/Image remote host allowlist issues in some deployments.
+                <img
+                  src={imageSrc}
+                  alt=""
+                  loading="lazy"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : null}
+            </div>
+            <div className="flex items-start justify-between gap-2 px-1 pb-1">
+              <h3 className="text-sm font-medium text-foreground">
                 {announcement.title}
               </h3>
               <span className="shrink-0 text-[10px] text-muted-foreground">
                 {dateFormatter.format(createdAt)}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {announcement.body}
-            </p>
-          </div>
+          </Link>
         );
       })}
     </div>

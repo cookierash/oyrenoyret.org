@@ -12,9 +12,12 @@ import { calcMaterialUnlockCost, getBalance, roundCredits } from '@/src/modules/
 import { SUBJECTS, CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { getPrivateNoStoreHeaders, getPublicCacheHeaders } from '@/src/lib/http-cache';
-import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
+import { sanitizeInput, sanitizePracticeTestContent, sanitizeRichTextHtml } from '@/src/security/validation';
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { Prisma } from '@prisma/client';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export async function GET(request: Request) {
   try {
@@ -51,7 +54,119 @@ export async function GET(request: Request) {
     }
 
     if (!includeAccess) {
-      const materials = await prisma.material.findMany({
+      let materials: any[] = [];
+      try {
+        materials = await prisma.material.findMany({
+          where: {
+            subjectId,
+            topicId,
+            status: 'PUBLISHED',
+            deletedAt: null,
+            removedAt: null,
+          },
+          orderBy: { publishedAt: 'desc' },
+          ...(take ? { take } : {}),
+          ...(skip ? { skip } : {}),
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            materialType: true,
+            publishedAt: true,
+            ratingAvg: true,
+            ratingCount: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+      } catch (error) {
+        if (!isDbSchemaMismatch(error)) throw error;
+        // Safe rollout fallback: DB may not have moderation columns yet.
+        materials = await prisma.material.findMany({
+          where: {
+            subjectId,
+            topicId,
+            status: 'PUBLISHED',
+            deletedAt: null,
+          },
+          orderBy: { publishedAt: 'desc' },
+          ...(take ? { take } : {}),
+          ...(skip ? { skip } : {}),
+          select: {
+            id: true,
+            title: true,
+            content: true,
+            materialType: true,
+            publishedAt: true,
+            ratingAvg: true,
+            ratingCount: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+      }
+
+      return NextResponse.json(
+        materials.map((m) => ({
+          id: m.id,
+          title: m.title,
+          content: m.content,
+          materialType: m.materialType,
+          publishedAt: m.publishedAt,
+          ratingAvg: m.ratingAvg,
+          ratingCount: m.ratingCount,
+          authorName: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student',
+        })),
+        { headers: getPublicCacheHeaders() }
+      );
+    }
+
+    let materials: any[] = [];
+    try {
+      materials = await prisma.material.findMany({
+        where: {
+          subjectId,
+          topicId,
+          status: 'PUBLISHED',
+          deletedAt: null,
+          removedAt: null,
+        },
+        orderBy: { publishedAt: 'desc' },
+        ...(take ? { take } : {}),
+        ...(skip ? { skip } : {}),
+        select: {
+          id: true,
+          userId: true,
+          title: true,
+          content: true,
+          materialType: true,
+          difficulty: true,
+          questionCount: true,
+          publishedAt: true,
+          ratingAvg: true,
+          ratingCount: true,
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+            },
+          },
+          _count: {
+            select: { accesses: true },
+          },
+        },
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      materials = await prisma.material.findMany({
         where: {
           subjectId,
           topicId,
@@ -63,62 +178,27 @@ export async function GET(request: Request) {
         ...(skip ? { skip } : {}),
         select: {
           id: true,
+          userId: true,
           title: true,
           content: true,
           materialType: true,
+          difficulty: true,
+          questionCount: true,
           publishedAt: true,
+          ratingAvg: true,
+          ratingCount: true,
           user: {
             select: {
               firstName: true,
               lastName: true,
             },
           },
-        },
-      });
-
-      return NextResponse.json(
-        materials.map((m) => ({
-          id: m.id,
-          title: m.title,
-          content: m.content,
-          materialType: m.materialType,
-          publishedAt: m.publishedAt,
-          authorName: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student',
-        })),
-        { headers: getPublicCacheHeaders() }
-      );
-    }
-
-    const materials = await prisma.material.findMany({
-      where: {
-        subjectId,
-        topicId,
-        status: 'PUBLISHED',
-        deletedAt: null,
-      },
-      orderBy: { publishedAt: 'desc' },
-      ...(take ? { take } : {}),
-      ...(skip ? { skip } : {}),
-      select: {
-        id: true,
-        userId: true,
-        title: true,
-        content: true,
-        materialType: true,
-        difficulty: true,
-        questionCount: true,
-        publishedAt: true,
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
+          _count: {
+            select: { accesses: true },
           },
         },
-        _count: {
-          select: { accesses: true },
-        },
-      },
-    });
+      });
+    }
 
     const userId = await getCurrentSession();
     const materialIds = materials.map((m) => m.id);
@@ -146,6 +226,8 @@ export async function GET(request: Request) {
         materialType: m.materialType,
         difficulty: m.difficulty,
         publishedAt: m.publishedAt,
+        ratingAvg: m.ratingAvg,
+        ratingCount: m.ratingCount,
         user: m.user,
         _count: m._count,
         estimatedCost: roundCredits(
@@ -169,6 +251,16 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error('Error fetching materials:', error);
+    const message = error instanceof Error ? error.message : '';
+    const looksLikeMissingMigration =
+      (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') ||
+      /column .* does not exist/i.test(message);
+    if (looksLikeMissingMigration) {
+      return NextResponse.json(
+        { error: 'Database schema out of date', code: 'DB_MIGRATION_REQUIRED' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -181,6 +273,15 @@ export async function POST(request: Request) {
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
     }
 
     const identifier = getRateLimitIdentifier(request, userId);
@@ -205,15 +306,51 @@ export async function POST(request: Request) {
 
     const type = materialType === 'PRACTICE_TEST' ? 'PRACTICE_TEST' : 'TEXTUAL';
 
-    const subject = SUBJECTS.find((s) => s.id === subjectId);
-    const topics = subject ? CURRICULUM_TOPICS[subject.id as keyof typeof CURRICULUM_TOPICS] : null;
-    const topic = topics?.find((t) => t.id === topicId);
-
-    if (!subject || !topic) {
-      return NextResponse.json({ error: 'Invalid subject or topic' }, { status: 400 });
+    let dbSubject: { id: string } | null = null;
+    try {
+      dbSubject = await prisma.subject.findFirst({
+        where: { slug: subjectId, deletedAt: null },
+        select: { id: true },
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      dbSubject = null;
+    }
+    if (dbSubject) {
+      let dbTopic: { id: string } | null = null;
+      try {
+        dbTopic = await prisma.topic.findFirst({
+          where: { subjectId: dbSubject.id, slug: topicId, deletedAt: null },
+          select: { id: true },
+        });
+      } catch (error) {
+        if (!isDbSchemaMismatch(error)) throw error;
+        dbTopic = null;
+      }
+      if (!dbTopic) {
+        return NextResponse.json({ error: 'Invalid subject or topic' }, { status: 400 });
+      }
+    } else {
+      const subject = SUBJECTS.find((s) => s.id === subjectId);
+      const topics = subject
+        ? CURRICULUM_TOPICS[subject.id as keyof typeof CURRICULUM_TOPICS]
+        : null;
+      const topic = topics?.find((t) => t.id === topicId);
+      if (!subject || !topic) {
+        return NextResponse.json({ error: 'Invalid subject or topic' }, { status: 400 });
+      }
     }
 
-    const sanitizedContent = sanitizeHtml(content).slice(0, CONTENT_LIMITS.MATERIAL_CONTENT_MAX);
+    let sanitizedContent: string;
+    try {
+      sanitizedContent =
+        type === 'PRACTICE_TEST'
+          ? sanitizePracticeTestContent(content)
+          : sanitizeRichTextHtml(content);
+    } catch {
+      return NextResponse.json({ error: 'Invalid material content' }, { status: 400 });
+    }
+    sanitizedContent = sanitizedContent.slice(0, CONTENT_LIMITS.MATERIAL_CONTENT_MAX);
     const questionCount =
       type === 'PRACTICE_TEST' ? getPracticeTestQuestionCount(sanitizedContent) : 0;
 

@@ -101,7 +101,7 @@ export function Step2ParentInfo({
                 <FormItem>
                   <FormLabel className={FIELD_LABEL_CLASS}>{copy.firstName}</FormLabel>
                   <FormControl>
-                    <Input placeholder={placeholders.parentFirstName} className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.parentFirstName} className={INPUT_CLASS} maxLength={50} required {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -115,7 +115,7 @@ export function Step2ParentInfo({
                 <FormItem>
                   <FormLabel className={FIELD_LABEL_CLASS}>{copy.lastName}</FormLabel>
                   <FormControl>
-                    <Input placeholder={placeholders.parentLastName} className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.parentLastName} className={INPUT_CLASS} maxLength={50} required {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -130,7 +130,7 @@ export function Step2ParentInfo({
               <FormItem>
               <FormLabel className={FIELD_LABEL_CLASS}>{copy.email}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder={placeholders.parentEmail} className={INPUT_CLASS} {...field} />
+                <Input type="email" placeholder={placeholders.parentEmail} className={INPUT_CLASS} maxLength={254} required {...field} />
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
@@ -147,7 +147,7 @@ export function Step2ParentInfo({
             variant="outline"
             size="lg"
             onClick={onPrevious}
-            className="h-10 flex-1 text-sm font-semibold"
+            className="h-10 flex-1 text-sm font-medium"
           >
             {copy.previous}
           </Button>
@@ -155,7 +155,7 @@ export function Step2ParentInfo({
             type="submit"
             variant="primary"
             size="lg"
-            className="h-10 flex-1 text-sm font-semibold"
+            className="h-10 flex-1 text-sm font-medium"
             disabled={isSubmitting || !form.formState.isValid}
           >
             {isSubmitting ? copy.saving : copy.next}

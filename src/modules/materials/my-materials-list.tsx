@@ -18,10 +18,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
-import { getLocalizedTopicNameMap } from '@/src/i18n/topic-utils';
 import { getLocaleCode } from '@/src/i18n';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
+import { splitObjectives } from '@/src/modules/materials/utils';
 
 interface Material {
   id: string;
@@ -45,13 +47,13 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   const router = useRouter();
   const { locale, messages, t } = useI18n();
   const copy = messages.studio.list;
-  const localeCode = getLocaleCode(locale);
-  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
-  const subjectNameMap = useMemo(
-    () => new Map(subjects.map((subject) => [subject.id, subject.name])),
-    [subjects],
+  const { canWrite, writeRestriction } = useCurrentUser();
+  const writeBlockedMessage = useMemo(
+    () => getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified),
+    [writeRestriction, messages.auth.errors.emailNotVerified],
   );
-  const topicNameMap = useMemo(() => getLocalizedTopicNameMap(messages), [messages]);
+  const localeCode = getLocaleCode(locale);
+  const { subjectNameMap, topicNameMap } = useCurriculum();
   const dateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat(localeCode, {
@@ -140,10 +142,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
       const res = await fetch(`/api/materials/${id}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to load objectives');
       const data = await res.json();
-      const existing = (data.objectives ?? '')
-        .split('\n')
-        .map((s: string) => s.trim())
-        .filter(Boolean);
+      const existing = splitObjectives(data.objectives ?? '');
       const nextSlots = existing.slice(0, 5);
       while (nextSlots.length < 5) nextSlots.push('');
       setObjectiveSlots(nextSlots);
@@ -167,6 +166,10 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   }, []);
 
   const openPublishDialog = async (id: string, title: string) => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     setObjectiveTarget({ id, title });
     setObjectiveError(null);
     await loadObjectives(id);
@@ -174,6 +177,10 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   };
 
   const publishWithObjectives = async () => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!objectiveTarget) return;
     const cleaned = objectiveSlots.map((s) => s.trim()).filter(Boolean);
     if (cleaned.length < 2) {
@@ -220,6 +227,10 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   };
 
   const unpublish = async (id: string) => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     setPublishing(id);
     try {
       const res = await fetch(`/api/materials/${id}`, {
@@ -249,6 +260,10 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   };
 
   const deleteMaterial = async (id: string) => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     setDeleting(id);
     try {
       const res = await fetch(`/api/materials/${id}`, { method: 'DELETE' });
@@ -273,6 +288,10 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
   };
 
   const openDeleteDialog = (id: string, title: string) => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     setDeleteTarget({ id, title });
     setDeleteDialogOpen(true);
   };
@@ -408,7 +427,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                           variant="danger"
                           size="sm"
                           onClick={() => openDeleteDialog(m.id, m.title)}
-                          disabled={deleting === m.id}
+                          disabled={!canWrite || deleting === m.id}
                         >
                           {deleting === m.id ? copy.actions.deleting : copy.actions.delete}
                         </Button>
@@ -417,7 +436,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                           variant="secondary-primary"
                           size="sm"
                           onClick={() => unpublish(m.id)}
-                          disabled={publishing === m.id}
+                          disabled={!canWrite || publishing === m.id}
                         >
                           {publishing === m.id ? copy.actions.unpublishing : copy.actions.unpublish}
                         </Button>
@@ -426,14 +445,20 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                           variant="primary"
                           size="sm"
                           onClick={() => openPublishDialog(m.id, m.title)}
-                          disabled={publishing === m.id}
+                          disabled={!canWrite || publishing === m.id}
                         >
                           {publishing === m.id ? copy.actions.publishing : copy.actions.publish}
                         </Button>
                       )}
-                        <Button variant="secondary-primary" size="sm" asChild>
-                          <Link href={`/studio/${m.id}`}>{copy.actions.edit}</Link>
-                        </Button>
+                        {canWrite ? (
+                          <Button variant="secondary-primary" size="sm" asChild>
+                            <Link href={`/studio/${m.id}`}>{copy.actions.edit}</Link>
+                          </Button>
+                        ) : (
+                          <Button variant="secondary-primary" size="sm" disabled>
+                            {copy.actions.edit}
+                          </Button>
+                        )}
                         {m.status === 'PUBLISHED' && (
                           <Button variant="ghost" size="sm" asChild>
                             <Link href={`/catalog/${m.subjectId}/${m.topicId}`}>
@@ -503,7 +528,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                 variant="primary"
                 size="sm"
                 onClick={publishWithObjectives}
-                disabled={publishing === objectiveTarget?.id}
+                disabled={!canWrite || publishing === objectiveTarget?.id}
               >
                 {publishing === objectiveTarget?.id ? copy.objectives.publishing : copy.objectives.publish}
               </Button>

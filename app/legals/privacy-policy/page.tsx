@@ -1,5 +1,6 @@
 import { SiteHeader } from '@/src/components/layout/site-header';
 import { SiteFooter } from '@/src/components/layout/site-footer';
+import { BrandText } from '@/src/components/ui/brand-text';
 import { getI18n } from '@/src/i18n/server';
 
 export const metadata = {
@@ -15,52 +16,84 @@ export default async function PrivacyPolicyPage() {
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-4 pb-20 pt-20 sm:px-6 lg:px-8">
         <div className="space-y-4">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {copy.title}
+            <BrandText>{copy.title}</BrandText>
           </h1>
-          <p className="text-sm text-muted-foreground">{copy.updated}</p>
-          <p className="text-base text-muted-foreground">{copy.intro}</p>
+          <p className="text-sm text-muted-foreground">
+            <BrandText>{copy.updated}</BrandText>
+          </p>
+          <p className="text-base text-muted-foreground">
+            <BrandText>{copy.intro}</BrandText>
+          </p>
         </div>
 
         <section className="mt-10 space-y-8">
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.collect}</h2>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.collect}</BrandText>
+            </h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               {copy.collectItems.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item}>
+                  <BrandText>{item}</BrandText>
+                </li>
               ))}
             </ul>
           </div>
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.use}</h2>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.use}</BrandText>
+            </h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               {copy.useItems.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item}>
+                  <BrandText>{item}</BrandText>
+                </li>
               ))}
             </ul>
           </div>
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.cookies}</h2>
-            <p className="text-sm text-muted-foreground">{copy.cookiesBody}</p>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.cookies}</BrandText>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              <BrandText>{copy.cookiesBody}</BrandText>
+            </p>
           </div>
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.share}</h2>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.share}</BrandText>
+            </h2>
             <ul className="space-y-2 text-sm text-muted-foreground">
               {copy.shareItems.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item}>
+                  <BrandText>{item}</BrandText>
+                </li>
               ))}
             </ul>
           </div>
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.retention}</h2>
-            <p className="text-sm text-muted-foreground">{copy.retentionBody}</p>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.retention}</BrandText>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              <BrandText>{copy.retentionBody}</BrandText>
+            </p>
           </div>
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.rights}</h2>
-            <p className="text-sm text-muted-foreground">{copy.rightsBody}</p>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.rights}</BrandText>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              <BrandText>{copy.rightsBody}</BrandText>
+            </p>
           </div>
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground">{copy.sections.contact}</h2>
-            <p className="text-sm text-muted-foreground">{copy.contactBody}</p>
+            <h2 className="text-lg font-medium text-foreground">
+              <BrandText>{copy.sections.contact}</BrandText>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              <BrandText>{copy.contactBody}</BrandText>
+            </p>
           </div>
         </section>
       </main>

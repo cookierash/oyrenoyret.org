@@ -15,6 +15,8 @@ export async function GET(request: Request) {
     const { getPrivateNoStoreHeaders } = await import('@/src/lib/http-cache');
     const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
     const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
+    const { sanitizeInput } = await import('@/src/security/validation');
+    const { Prisma } = await import('@prisma/client');
 
     const identifier = getRateLimitIdentifier(request);
     const rateLimit = await checkRateLimit(`discussions:list:${identifier}`, RATE_LIMITS.GENERAL);
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
     const subjectsParam = searchParams.get('subjects');
-    const query = searchParams.get('q');
+    const queryRaw = searchParams.get('q');
     const includeVotes = searchParams.get('includeVotes') === '1';
     const takeParam = Number(searchParams.get('take') ?? 50);
     const skipParam = Number(searchParams.get('skip') ?? 0);
@@ -38,44 +40,126 @@ export async function GET(request: Request) {
       ? subjectsParam.split(',').map((s) => s.trim()).filter(Boolean)
       : [];
 
-    const discussions = await prisma.discussion.findMany({
-      where: {
-        archivedAt: null,
-        ...(subjectIds.length > 0
-          ? { subjectId: { in: subjectIds } }
-          : subjectId
-            ? { subjectId }
-            : {}),
-        ...(topicId && { topicId }),
-        ...(query ? { title: { contains: query, mode: 'insensitive' } } : {}),
-      },
-      orderBy: { lastActivityAt: 'desc' },
-      take,
-      skip,
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        subjectId: true,
-        topicId: true,
-        lastActivityAt: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+    const query = sanitizeInput(queryRaw ?? '').trim();
+    const combinedSubjectIds = Array.from(
+      new Set([
+        ...subjectIds,
+        ...(subjectId ? [subjectId] : []),
+      ]),
+    );
+
+    type DiscussionBase = {
+      id: string;
+      title: string;
+      content: string;
+      subjectId: string | null;
+      topicId: string | null;
+      lastActivityAt: Date;
+      createdAt: Date;
+      authorId: string;
+      authorFirstName: string | null;
+      authorLastName: string | null;
+      authorEmail: string;
+      authorAvatarVariant: string | null;
+    };
+
+    const discussions: DiscussionBase[] = await (async () => {
+      if (query) {
+        type Row = DiscussionBase & { rank: number };
+        const vectorExpr = Prisma.sql`to_tsvector('simple', concat_ws(' ', d.title, d.content))`;
+        const baseWhere = Prisma.sql`d."archivedAt" IS NULL AND d."removedAt" IS NULL`;
+        const subjectFilter =
+          combinedSubjectIds.length > 0
+            ? Prisma.sql` AND d."subjectId" IN (${Prisma.join(combinedSubjectIds)})`
+            : Prisma.empty;
+        const topicFilter = topicId ? Prisma.sql` AND d."topicId" = ${topicId}` : Prisma.empty;
+
+        const runQuery = async (tsQueryFn: 'websearch_to_tsquery' | 'plainto_tsquery') => {
+          const tsQuery =
+            tsQueryFn === 'websearch_to_tsquery'
+              ? Prisma.sql`websearch_to_tsquery('simple', ${query})`
+              : Prisma.sql`plainto_tsquery('simple', ${query})`;
+          return prisma.$queryRaw<Row[]>(Prisma.sql`
+            SELECT
+              d.id,
+              d.title,
+              d.content,
+              d."subjectId" as "subjectId",
+              d."topicId" as "topicId",
+              d."lastActivityAt" as "lastActivityAt",
+              d."createdAt" as "createdAt",
+              u.id as "authorId",
+              u."firstName" as "authorFirstName",
+              u."lastName" as "authorLastName",
+              u.email as "authorEmail",
+              u."avatarVariant" as "authorAvatarVariant",
+              ts_rank_cd(${vectorExpr}, ${tsQuery}) as rank
+            FROM "Discussion" d
+            JOIN "User" u ON u.id = d."userId"
+            WHERE ${baseWhere}
+              AND ${vectorExpr} @@ ${tsQuery}
+              ${subjectFilter}
+              ${topicFilter}
+            ORDER BY rank DESC, d."lastActivityAt" DESC
+            LIMIT ${take}
+            OFFSET ${skip}
+          `);
+        };
+
+        try {
+          const rows = await runQuery('websearch_to_tsquery');
+          return rows;
+        } catch {
+          const rows = await runQuery('plainto_tsquery');
+          return rows;
+        }
+      }
+
+      const rows = await prisma.discussion.findMany({
+        where: {
+          archivedAt: null,
+          removedAt: null,
+          ...(combinedSubjectIds.length > 0 ? { subjectId: { in: combinedSubjectIds } } : {}),
+          ...(topicId && { topicId }),
+        },
+        orderBy: { lastActivityAt: 'desc' },
+        take,
+        skip,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          subjectId: true,
+          topicId: true,
+          lastActivityAt: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              avatarVariant: true,
+            },
           },
         },
-        _count: {
-          select: {
-            replies: true,
-            votes: true,
-          },
-        },
-      },
-    });
+      });
+
+      return rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        content: row.content,
+        subjectId: row.subjectId,
+        topicId: row.topicId,
+        lastActivityAt: row.lastActivityAt,
+        createdAt: row.createdAt,
+        authorId: row.user.id,
+        authorFirstName: row.user.firstName,
+        authorLastName: row.user.lastName,
+        authorEmail: row.user.email,
+        authorAvatarVariant: row.user.avatarVariant,
+      }));
+    })();
 
     const discussionIds = discussions.map((d) => d.id);
     const voteScores = discussionIds.length
@@ -95,6 +179,10 @@ export async function GET(request: Request) {
         select: { id: true, discussionId: true },
       })
       : [];
+    const replyCountMap = replyRows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.discussionId] = (acc[row.discussionId] ?? 0) + 1;
+      return acc;
+    }, {});
     const replyIds = replyRows.map((r) => r.id);
     const replyVoteScores = replyIds.length
       ? await prisma.replyVote.groupBy({
@@ -136,11 +224,12 @@ export async function GET(request: Request) {
       topicId: d.topicId,
       lastActivityAt: d.lastActivityAt,
       createdAt: d.createdAt,
-      authorId: d.user.id,
+      authorId: d.authorId,
+      authorAvatarVariant: d.authorAvatarVariant,
       authorName:
-        [d.user.firstName, d.user.lastName].filter(Boolean).join(' ') ||
-        d.user.email.split('@')[0],
-      replyCount: d._count.replies,
+        [d.authorFirstName, d.authorLastName].filter(Boolean).join(' ') ||
+        d.authorEmail.split('@')[0],
+      replyCount: replyCountMap[d.id] ?? 0,
       voteScore: scoreMap[d.id] ?? 0,
       replyVoteScore: replyTotalsByDiscussion[d.id] ?? 0,
       totalPopularity: (scoreMap[d.id] ?? 0) + (replyTotalsByDiscussion[d.id] ?? 0),
@@ -164,12 +253,25 @@ export async function POST(request: Request) {
     const { getCurrentSession } = await import('@/src/modules/auth/utils/session');
     const { spendDiscussionCreate, getBalance, calcDiscussionCreateCost, roundCredits } = await import('@/src/modules/credits');
     const { CONTENT_LIMITS, RATE_LIMITS } = await import('@/src/config/constants');
-    const { sanitizeInput, sanitizeHtml } = await import('@/src/security/validation');
+    const { MAX_DISCUSSION_IMAGES } = await import('@/src/config/uploads');
+    const { sanitizeDiscussionRichTextHtml, sanitizeInput } = await import('@/src/security/validation');
+    const { richTextHtmlToPlainText } = await import('@/src/lib/rich-text');
+    const { countDiscussionImages, discussionRichTextHasContent } = await import('@/src/lib/discussion-rich-text');
     const { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } = await import('@/src/security/rateLimiter');
+    const { requireVerifiedEmailForWrite } = await import('@/src/modules/auth/utils/write-access');
 
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
     }
 
     const identifier = getRateLimitIdentifier(request, userId);
@@ -196,6 +298,24 @@ export async function POST(request: Request) {
     if (!title || typeof title !== 'string' || !content || typeof content !== 'string') {
       return NextResponse.json(
         { error: 'title and content are required' },
+        { status: 400 }
+      );
+    }
+
+    const safeContent = sanitizeDiscussionRichTextHtml(String(content));
+    const plainText = richTextHtmlToPlainText(safeContent);
+    if (!discussionRichTextHasContent(safeContent)) {
+      return NextResponse.json(
+        { error: 'content is required' },
+        { status: 400 }
+      );
+    }
+    if (countDiscussionImages(safeContent) > MAX_DISCUSSION_IMAGES) {
+      return NextResponse.json({ error: 'Too many images', max: MAX_DISCUSSION_IMAGES }, { status: 400 });
+    }
+    if (plainText.length > CONTENT_LIMITS.DISCUSSION_CONTENT_MAX) {
+      return NextResponse.json(
+        { error: 'content is too long', max: CONTENT_LIMITS.DISCUSSION_CONTENT_MAX },
         { status: 400 }
       );
     }
@@ -231,7 +351,7 @@ export async function POST(request: Request) {
       data: {
         userId,
         title: sanitizeInput(String(title)).slice(0, CONTENT_LIMITS.DISCUSSION_TITLE_MAX),
-        content: sanitizeHtml(String(content)).slice(0, CONTENT_LIMITS.DISCUSSION_CONTENT_MAX),
+        content: safeContent,
         subjectId: safeSubjectId,
         topicId: safeTopicId,
       },

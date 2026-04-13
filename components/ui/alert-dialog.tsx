@@ -156,7 +156,7 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h2
     ref={ref}
-    className={cn('text-xl font-semibold tracking-tight', className)}
+    className={cn('text-xl font-medium tracking-tight', className)}
     {...props}
   />
 ));
@@ -176,7 +176,7 @@ AlertDialogDescription.displayName = 'AlertDialogDescription';
 
 const AlertDialogAction = React.forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
+  React.ComponentPropsWithoutRef<typeof Button>
 >(({ className, ...props }, ref) => (
   <Button ref={ref} className={className} {...props} />
 ));
@@ -184,10 +184,22 @@ AlertDialogAction.displayName = 'AlertDialogAction';
 
 const AlertDialogCancel = React.forwardRef<
   HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->(({ className, ...props }, ref) => (
-  <Button ref={ref} variant="outline" className={className} {...props} />
-));
+  React.ComponentPropsWithoutRef<typeof Button>
+>(({ className, onClick, variant: _variant, ...props }, ref) => {
+  const { onOpenChange } = useAlertDialog();
+  return (
+    <Button
+      ref={ref}
+      variant="outline"
+      className={className}
+      onClick={(e) => {
+        onClick?.(e);
+        if (!e.defaultPrevented) onOpenChange(false);
+      }}
+      {...props}
+    />
+  );
+});
 AlertDialogCancel.displayName = 'AlertDialogCancel';
 
 export {

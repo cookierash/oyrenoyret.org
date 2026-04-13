@@ -12,13 +12,15 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
     '/leaderboard': 'pages.leaderboard',
     '/catalog': 'pages.catalog',
     '/library': 'pages.library',
-    '/live-activities': 'pages.liveActivities',
+    '/interactive-sessions': 'pages.liveActivities',
     '/admin': 'pages.admin',
-    '/admin/dashboard': 'pages.adminDashboard',
-    '/admin/live-activities': 'pages.manageLiveActivities',
-    '/admin/live-activities/problem-sprints': 'pages.problemSprints',
-    '/admin/live-activities/announcements': 'pages.announcements',
-    '/admin/live-activities/events': 'pages.events',
+    '/admin/interactive-sessions': 'pages.manageLiveActivities',
+    '/admin/messages': 'pages.contactMessages',
+    '/admin/curriculum': 'pages.curriculum',
+    '/admin/reports': 'pages.reports',
+    '/admin/interactive-sessions/problem-sprints': 'pages.problemSprints',
+    '/admin/interactive-sessions/announcements': 'pages.announcements',
+    '/admin/interactive-sessions/events': 'pages.events',
     '/discussions': 'pages.discussions',
     '/recent-activities': 'pages.recentActivities',
     '/academic-record': 'pages.academicRecord',
@@ -32,6 +34,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
   if (pathname.startsWith('/library/')) return t('pages.library');
   if (pathname.startsWith('/discussions/')) return t('pages.discussion');
   if (pathname.startsWith('/recent-activities')) return t('pages.recentActivities');
+  if (pathname.startsWith('/cms/sprint/')) return t('pages.problemSprint');
   if (pathname.startsWith('/sprints/')) return t('pages.problemSprint');
   if (pathname.startsWith('/admin/')) return t('pages.admin');
   if (pathname.startsWith('/studio/')) return t('pages.editor');

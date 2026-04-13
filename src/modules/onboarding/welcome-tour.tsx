@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { BrandText } from '@/src/components/ui/brand-text';
 
 interface WelcomeTourProps {
   open: boolean;
@@ -155,9 +156,9 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
       }}
     >
       <AlertDialogContent className="max-w-2xl px-6 pb-6 pt-7">
-        <div className="space-y-6">
+        <div className="space-y-5">
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground tracking-normal">
+            <div className="flex items-center justify-between text-xs font-medium text-muted-foreground tracking-normal">
               <span>{copy.headerLabel}</span>
               <span>
                 {t('welcomeTour.stepLabel', {
@@ -169,12 +170,12 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
             <Progress value={progressValue} max={totalSteps} />
           </div>
 
-          <AlertDialogHeader className="space-y-2 mb-4">
+          <AlertDialogHeader className="space-y-1">
             <AlertDialogTitle className="text-2xl tracking-normal">
-              {step.title}
+              <BrandText>{step.title}</BrandText>
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm leading-relaxed">
-              {step.description}
+              <BrandText>{step.description}</BrandText>
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -190,9 +191,13 @@ export function WelcomeTour({ open, onComplete }: WelcomeTourProps) {
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-background text-foreground">
                       <Icon className="h-4 w-4" />
                     </span>
-                    <span className="font-semibold">{item.title}</span>
+                    <span className="font-medium">
+                      <BrandText>{item.title}</BrandText>
+                    </span>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">{item.description}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    <BrandText>{item.description}</BrandText>
+                  </p>
                 </div>
               );
             })}

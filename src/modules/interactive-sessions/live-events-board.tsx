@@ -11,6 +11,8 @@ import { useI18n } from '@/src/i18n/i18n-provider';
 import { useSettings } from '@/src/components/settings/settings-provider';
 import { getLocaleCode } from '@/src/i18n';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
 
 interface LiveEvent {
   id: string;
@@ -48,6 +50,7 @@ function EventCardSkeleton() {
 export function LiveEventsBoard() {
   const { messages } = useI18n();
   const copy = messages.liveActivities.board;
+  const { canWrite, writeRestriction } = useCurrentUser();
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
@@ -55,8 +58,7 @@ export function LiveEventsBoard() {
   const fetchEvents = () => {
     setLoading(true);
     const params = new URLSearchParams();
-    params.set('take', '100');
-    params.set('type', 'PROBLEM_SPRINT');
+    params.set('take', '200');
     fetch(`/api/live-events?${params.toString()}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setEvents(Array.isArray(data) ? data : []))
@@ -79,6 +81,10 @@ export function LiveEventsBoard() {
   const hasNoEvents = events.length === 0;
 
   const handleEnroll = async (eventId: string) => {
+    if (!canWrite) {
+      toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
+      return;
+    }
     setActionId(eventId);
     try {
       const res = await fetch(`/api/live-events/${eventId}/enroll`, {
@@ -133,7 +139,7 @@ export function LiveEventsBoard() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">{copy.myEventsTitle}</h2>
+            <h2 className="text-sm font-medium text-foreground">{copy.myEventsTitle}</h2>
             <p className="text-xs text-muted-foreground">
               {copy.myEventsSubtitle}
             </p>
@@ -178,7 +184,7 @@ export function LiveEventsBoard() {
 
       <section className="space-y-4">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">{copy.allEventsTitle}</h2>
+          <h2 className="text-sm font-medium text-foreground">{copy.allEventsTitle}</h2>
           <p className="text-xs text-muted-foreground">
             {copy.allEventsSubtitle}
           </p>
@@ -226,6 +232,7 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
   const { locale, messages } = useI18n();
   const { timeFormat } = useSettings();
   const copy = messages.liveActivities.board;
+  const { canWrite } = useCurrentUser();
   const eventDate = new Date(event.date);
   const isPending = event.enrollmentStatus === 'PENDING';
   const isConfirmed = event.enrollmentStatus === 'CONFIRMED';
@@ -258,22 +265,24 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-foreground">{event.topic}</h3>
+            <h3 className="text-sm font-medium text-foreground">{event.topic}</h3>
             {isConfirmed ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600">
                 {copy.statusEnrolled}
               </span>
             ) : isPending ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600">
                 {copy.statusVerification}
               </span>
             ) : isCancelled ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-600">
                 {copy.statusCancelled}
               </span>
             ) : null}
           </div>
-          <p className="text-xs text-muted-foreground">{copy.eventType}</p>
+          <p className="text-xs text-muted-foreground">
+            {event.type === 'EVENT' ? copy.eventTypeLiveEvent : copy.eventTypeProblemSprint}
+          </p>
         </div>
         <DifficultyBars difficulty={event.difficulty} />
       </div>
@@ -313,16 +322,20 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
         )}
 
         <div className="flex items-center gap-2">
-          {isConfirmed ? (
+          {isConfirmed && event.type === 'PROBLEM_SPRINT' ? (
             <Button asChild size="sm" variant="secondary-primary">
-              <Link href={`/sprints/${event.id}`}>{copy.enterSprint}</Link>
+              <Link href={`/cms/sprint/${event.id}`}>{copy.enterSprint}</Link>
+            </Button>
+          ) : isConfirmed ? (
+            <Button size="sm" variant="secondary" disabled>
+              {copy.enrolledLabel}
             </Button>
           ) : isPending ? (
             <Button asChild size="sm" variant="secondary" disabled={isBusy}>
               <Link href="/recent-activities">{copy.completeRegistration}</Link>
             </Button>
           ) : (
-            <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy}>
+            <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy || !canWrite}>
               {isCancelled ? copy.registerAgain : copy.register}
             </Button>
           )}

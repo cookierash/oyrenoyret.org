@@ -32,9 +32,21 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 let lastCleanupAt = 0;
 const CLEANUP_INTERVAL_MS = 60_000;
 
-const hasUpstashConfig =
-  Boolean(process.env.UPSTASH_REDIS_REST_URL) &&
-  Boolean(process.env.UPSTASH_REDIS_REST_TOKEN);
+const hasUpstashUrl = Boolean(process.env.UPSTASH_REDIS_REST_URL);
+const hasUpstashToken = Boolean(process.env.UPSTASH_REDIS_REST_TOKEN);
+const hasUpstashConfig = hasUpstashUrl && hasUpstashToken;
+
+if (process.env.NODE_ENV === 'production') {
+  if (hasUpstashUrl !== hasUpstashToken) {
+    console.warn(
+      'Upstash rate limiter misconfigured: set both UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to enable distributed rate limiting.'
+    );
+  } else if (!hasUpstashConfig) {
+    console.warn(
+      'Upstash rate limiter not configured: falling back to in-memory rate limiting (per-instance). Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN to enable distributed limits.'
+    );
+  }
+}
 
 const ratelimitCache = new Map<string, Ratelimit>();
 
@@ -79,6 +91,8 @@ export function getRateLimitIdentifierFromHeaders(
   const forwarded =
     headers.get('x-forwarded-for') ||
     headers.get('x-vercel-forwarded-for') ||
+    headers.get('cf-connecting-ip') ||
+    headers.get('true-client-ip') ||
     headers.get('x-real-ip');
   const ip = forwarded ? forwarded.split(',')[0]?.trim() : null;
   return `ip:${ip || 'unknown'}`;

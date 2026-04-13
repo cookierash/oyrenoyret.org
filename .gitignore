@@ -13,6 +13,9 @@
 /.next/
 /out/
 
+# user uploads
+/public/uploads/
+
 # production
 /build
 

@@ -22,7 +22,7 @@ export default async function NotFound() {
       />
 
       <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center text-center">
-        <div className="inline-flex items-center justify-center rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-semibold uppercase text-muted-foreground">
+        <div className="inline-flex items-center justify-center rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] font-medium uppercase text-muted-foreground">
           {copy.badge}
         </div>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">

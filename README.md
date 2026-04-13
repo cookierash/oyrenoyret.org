@@ -136,6 +136,13 @@ The platform uses a professional blue color palette:
 6. **Store parental consent with version tracking**
 7. **Never store sensitive documents directly**
 
+### Rate Limiting (Upstash Redis)
+
+Rate limiting is implemented server-side. In production, configure Upstash Redis to enforce limits consistently across multiple server instances:
+
+- `UPSTASH_REDIS_REST_URL`
+- `UPSTASH_REDIS_REST_TOKEN`
+
 ## 📝 Development Guidelines
 
 - **TypeScript strict mode**: All code must pass strict type checking
@@ -150,6 +157,35 @@ The platform uses a professional blue color palette:
 2. Run database migrations
 3. Build the application: `npm run build`
 4. Start the server: `npm start`
+
+## 🖼️ User Uploads (Cloudflare R2)
+
+This project uploads user images directly to Cloudflare R2 using short-lived presigned `PUT` URLs (no server filesystem writes).
+
+**Required env vars**
+
+- `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
+- `R2_PUBLIC_BASE_URL` (recommended: a custom domain on your Cloudflare account; dev fallback: `https://<bucket>.<accountId>.r2.dev`)
+
+**Bucket CORS (required for browser uploads)**
+
+In R2 bucket settings, add a CORS rule that allows `PUT` from your app origin(s). Example:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://your-domain.com", "https://www.your-domain.com"],
+    "AllowedMethods": ["PUT", "GET", "HEAD"],
+    "AllowedHeaders": ["content-type", "cache-control"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Optional:
+- `R2_PRESIGN_TTL_SECONDS` (default `300`, min `30`, max `900`)
+- `R2_DISCUSSIONS_PREFIX`, `R2_ANNOUNCEMENTS_PREFIX`
 
 ## 📄 License
 

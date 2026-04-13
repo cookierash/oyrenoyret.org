@@ -8,11 +8,13 @@
 
 import { redirect } from 'next/navigation';
 import { prisma } from '@/src/db/client';
+import type { UserRole, UserStatus } from '@prisma/client';
 import { verifyPassword } from '../utils/password';
 import { loginSchema, type LoginInput } from '../schemas/registration';
 import { createSession } from '../utils/session';
 import { headers } from 'next/headers';
 import { recordDailyVisit } from '@/src/modules/visits';
+import { getRandomAvatarVariant } from '@/src/lib/avatar';
 
 /**
  * Authenticates a user and creates a session
@@ -36,70 +38,140 @@ export async function login(data: LoginInput) {
     // Validate input
     const validated = loginSchema.parse(data);
 
+    const isDev = process.env.NODE_ENV === 'development';
     const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH?.trim();
-    const isAdminLoginAttempt =
-      Boolean(adminEmail) && validated.email.toLowerCase() === adminEmail;
 
-    let user = await prisma.user.findUnique({
-      where: { email: validated.email },
-    });
+    let user = null as null | {
+      id: string;
+      email: string;
+      passwordHash: string | null;
+      role: UserRole;
+      status: UserStatus;
+    };
 
-    let isAdminCredentials = false;
+    // Admin bootstrap (env-configured account).
+    // Ensures an admin record exists and the configured password works even if DB seeding wasn't run.
+    if (adminEmail && validated.email === adminEmail) {
+      const existing = await prisma.user.findUnique({
+        where: { email: validated.email },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          status: true,
+        },
+      });
 
-    if (isAdminLoginAttempt && adminEmail) {
       if (!adminPasswordHash) {
-        return {
-          success: false,
-          errorKey: 'invalidCredentials',
-        };
-      }
+        // If env is missing, fall back to DB admin account (if present) so dev/prod doesn't hard-fail.
+        if (!existing || existing.role !== 'ADMIN' || !existing.passwordHash) {
+          return {
+            success: false,
+            errorKey: 'adminMisconfigured',
+          };
+        }
 
-      let adminPasswordValid = false;
-      try {
-        adminPasswordValid = await verifyPassword(validated.password, adminPasswordHash);
-      } catch {
-        adminPasswordValid = false;
-      }
+        user =
+          existing.status === 'ACTIVE'
+            ? existing
+            : await prisma.user.update({
+                where: { id: existing.id },
+                data: { status: 'ACTIVE', emailVerifiedAt: new Date() },
+                select: {
+                  id: true,
+                  email: true,
+                  passwordHash: true,
+                  role: true,
+                  status: true,
+                },
+              });
+      } else {
+        // Validate against the configured admin password first.
+        const adminPasswordValid = await verifyPassword(validated.password, adminPasswordHash);
+        if (!adminPasswordValid) {
+          // Dev fallback: allow DB-managed admin passwords if env hash is stale.
+          if (isDev && existing && existing.role === 'ADMIN' && existing.passwordHash) {
+            const dbPasswordValid = await verifyPassword(validated.password, existing.passwordHash);
+            if (dbPasswordValid) {
+              user =
+                existing.status === 'ACTIVE'
+                  ? existing
+                  : await prisma.user.update({
+                      where: { id: existing.id },
+                      data: { status: 'ACTIVE', emailVerifiedAt: new Date() },
+                      select: {
+                        id: true,
+                        email: true,
+                        passwordHash: true,
+                        role: true,
+                        status: true,
+                      },
+                    });
+            } else {
+              return {
+                success: false,
+                errorKey: 'invalidCredentials',
+              };
+            }
+          } else {
+            return {
+              success: false,
+              errorKey: 'invalidCredentials',
+            };
+          }
+        }
 
-      if (!adminPasswordValid) {
-        return {
-          success: false,
-          errorKey: 'invalidCredentials',
-        };
+        // If we didn't take the dev fallback, ensure the DB user exists and is set as admin.
+        if (!user) {
+          user = existing
+            ? await prisma.user.update({
+                where: { id: existing.id },
+                data: {
+                  passwordHash: adminPasswordHash,
+                  role: 'ADMIN',
+                  status: 'ACTIVE',
+                  emailVerifiedAt: new Date(),
+                },
+                select: {
+                  id: true,
+                  email: true,
+                  passwordHash: true,
+                  role: true,
+                  status: true,
+                },
+              })
+            : await prisma.user.create({
+                data: {
+                  email: validated.email,
+                  passwordHash: adminPasswordHash,
+                  role: 'ADMIN',
+                  status: 'ACTIVE',
+                  emailVerifiedAt: new Date(),
+                  avatarVariant: getRandomAvatarVariant(),
+                },
+                select: {
+                  id: true,
+                  email: true,
+                  passwordHash: true,
+                  role: true,
+                  status: true,
+                },
+              });
+        }
       }
-
-      isAdminCredentials = true;
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email: adminEmail,
-            passwordHash: adminPasswordHash,
-            role: 'ADMIN',
-            status: 'ACTIVE',
-            registrationStep: 5,
-          },
-        });
-      } else if (user.role !== 'ADMIN') {
-        return {
-          success: false,
-          errorKey: 'adminMisconfigured',
-        };
-      } else if (
-        user.passwordHash !== adminPasswordHash ||
-        user.status !== 'ACTIVE' ||
-        user.registrationStep !== 5
-      ) {
-        user = await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            passwordHash: adminPasswordHash,
-            status: 'ACTIVE',
-            registrationStep: 5,
-          },
-        });
-      }
+    } else {
+      user = await prisma.user.findUnique({
+        where: { email: validated.email },
+        select: {
+          id: true,
+          email: true,
+          passwordHash: true,
+          role: true,
+          status: true,
+        },
+      });
     }
 
     if (!user) {
@@ -118,9 +190,7 @@ export async function login(data: LoginInput) {
     }
 
     // Verify password
-    const passwordValid = isAdminCredentials
-      ? true
-      : await verifyPassword(validated.password, user.passwordHash);
+    const passwordValid = await verifyPassword(validated.password, user.passwordHash);
 
     if (!passwordValid) {
       return {
@@ -129,15 +199,16 @@ export async function login(data: LoginInput) {
       };
     }
 
-    // Check if registration is complete
-    if (!isAdminCredentials && user.status !== 'ACTIVE') {
+    // Check if registration is complete.
+    // SUSPENDED/BANNED users can still sign in (visitor/restricted access).
+    if (user.status === 'INACTIVE') {
       return {
         success: false,
         errorKey: 'registrationIncomplete',
       };
     }
 
-    const requiresGuardianChecks = !isAdminCredentials && user.role === 'STUDENT';
+    const requiresGuardianChecks = user.role === 'STUDENT';
 
     // Check if consent is granted (students only)
     if (requiresGuardianChecks) {

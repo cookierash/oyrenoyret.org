@@ -10,14 +10,15 @@
 import { useEffect, useState } from 'react';
 import { Step1StudentInfo } from '../steps/step-1-student-info';
 import { Step2ParentInfo } from '../steps/step-2-parent-info';
+import { Step3Verification } from '../steps/step-3-verification';
 import { Step4Consent } from '../steps/step-4-consent';
 import { Step5Complete } from '../steps/step-5-complete';
 import { cn } from '@/src/lib/utils';
 import type { ConsentInput, ParentInfoInput, StudentInfoInput } from '../schemas/registration';
 import { useI18n } from '@/src/i18n/i18n-provider';
 
-const TOTAL_STEPS = 4;
-const REGISTRATION_STORAGE_KEY = 'oyrenoyret_registration_progress_v1';
+const TOTAL_STEPS = 5;
+const REGISTRATION_STORAGE_KEY = 'oyrenoyret_registration_progress_v2';
 
 export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: number) => void }) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -105,6 +106,10 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
     setCurrentStep(4);
   };
 
+  const handleStep4Success = () => {
+    setCurrentStep(5);
+  };
+
   const handlePrevious = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
@@ -121,6 +126,8 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
         return copy.titles.step3;
       case 4:
         return copy.titles.step4;
+      case 5:
+        return copy.titles.step5;
       default:
         return copy.titles.fallback;
     }
@@ -136,6 +143,8 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
         return copy.descriptions.step3;
       case 4:
         return copy.descriptions.step4;
+      case 5:
+        return copy.descriptions.step5;
       default:
         return '';
     }
@@ -146,7 +155,7 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
       <header
         className={cn(
           'space-y-2',
-          currentStep === 4 && 'lg:pt-10'
+          currentStep === 5 && 'lg:pt-10'
         )}
       >
         <div className="space-y-2">
@@ -194,16 +203,24 @@ export function RegistrationWizard({ onStepChange }: { onStepChange?: (step: num
             onValuesChange={setStep2Values}
           />
         )}
-        {currentStep === 3 && userId && (
+        {currentStep === 3 && userId && parentEmail && (
+          <Step3Verification
+            userId={userId}
+            parentEmail={parentEmail}
+            onSuccess={handleStep3Success}
+            onPrevious={handlePrevious}
+          />
+        )}
+        {currentStep === 4 && userId && (
           <Step4Consent
             userId={userId}
-            onSuccess={handleStep3Success}
+            onSuccess={handleStep4Success}
             onPrevious={handlePrevious}
             initialValues={step4Values}
             onValuesChange={setStep4Values}
           />
         )}
-        {currentStep === 4 && (
+        {currentStep === 5 && (
           <Step5Complete studentName={studentName || undefined} />
         )}
       </section>

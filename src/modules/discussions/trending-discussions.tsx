@@ -49,7 +49,7 @@ export function TrendingDiscussions({
   const content = (
     <>
       {showTitle && (
-        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+        <h2 className="text-sm font-medium text-foreground flex items-center gap-2 mb-3">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
           {t('discussions.trendingTitle')}
         </h2>
@@ -78,7 +78,7 @@ export function TrendingDiscussions({
               className="flex items-start justify-between gap-3 group"
             >
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                   {d.title}
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -88,7 +88,7 @@ export function TrendingDiscussions({
               {showScore ? (
                 <span
                   className={cn(
-                    'text-xs font-semibold px-2 py-1 rounded-md border',
+                    'text-xs font-medium px-2 py-1 rounded-md border',
                     d.totalPopularity > 0
                       ? 'text-primary border-primary/30 bg-primary/10'
                       : d.totalPopularity < 0

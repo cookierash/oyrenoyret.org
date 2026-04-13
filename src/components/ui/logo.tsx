@@ -10,6 +10,8 @@ interface LogoProps {
   showText?: boolean;
   /** Font size for text: 'sm' (sidebar), 'lg' (header) */
   textSize?: 'sm' | 'lg';
+  /** Preload logo for above-the-fold usage (header/sidebar). */
+  priority?: boolean;
 }
 
 const sizeMap = {
@@ -17,7 +19,7 @@ const sizeMap = {
   md: { w: 40, h: 40 },
 };
 
-export function Logo({ className, size = 'sm', showText = false, textSize = 'sm' }: LogoProps) {
+export function Logo({ className, size = 'sm', showText = false, textSize = 'sm', priority = false }: LogoProps) {
   const { w, h } = sizeMap[size];
 
   if (showText) {
@@ -38,8 +40,9 @@ export function Logo({ className, size = 'sm', showText = false, textSize = 'sm'
           width={w}
           height={h}
           className="logo-mark h-[1.5em] w-[1.5em] shrink-0"
+          priority={priority}
         />
-        <span className="font-semibold font-comfortaa">oyrenoyret</span>
+        <span className="brand-font">oyrenoyret</span>
       </Link>
     );
   }
@@ -56,6 +59,7 @@ export function Logo({ className, size = 'sm', showText = false, textSize = 'sm'
         width={w}
         height={h}
         className="logo-mark shrink-0"
+        priority={priority}
       />
     </Link>
   );

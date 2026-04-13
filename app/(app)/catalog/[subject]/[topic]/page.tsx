@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { SUBJECTS } from '@/src/config/constants';
 import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { TopicMaterialsClient } from '@/src/modules/materials/topic-materials-client';
+import { prisma } from '@/src/db/client';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { getI18n } from '@/src/i18n/server';
 import { getLocalizedSubject } from '@/src/i18n/subject-utils';
 import { getLocalizedTopics } from '@/src/i18n/topic-utils';
@@ -23,24 +25,77 @@ interface TopicPageProps {
 
 export default async function TopicPage({ params }: TopicPageProps) {
   const { subject: subjectId, topic: topicId } = await params;
-  const subject = SUBJECTS.find((s) => s.id === subjectId);
-  const { messages, t } = await getI18n();
+  const { locale, messages, t } = await getI18n();
   const copy = messages.app.catalog;
 
-  if (!subject) notFound();
+  let dbSubject: {
+    id: string;
+    slug: string;
+    nameEn: string;
+    nameAz: string;
+    descriptionEn: string | null;
+    descriptionAz: string | null;
+  } | null = null;
+  try {
+    dbSubject = await prisma.subject.findFirst({
+      where: { slug: subjectId, deletedAt: null },
+      select: {
+        id: true,
+        slug: true,
+        nameEn: true,
+        nameAz: true,
+        descriptionEn: true,
+        descriptionAz: true,
+      },
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+    dbSubject = null;
+  }
+  const fallbackSubject = SUBJECTS.find((s) => s.id === subjectId) ?? null;
+  if (!dbSubject && !fallbackSubject) notFound();
 
-  const localizedSubject = getLocalizedSubject(messages, subject.id) ?? subject;
+  const fallbackLocalizedSubject = fallbackSubject
+    ? getLocalizedSubject(messages, fallbackSubject.id) ?? fallbackSubject
+    : null;
+  const subjectName = dbSubject
+    ? locale === 'az'
+      ? dbSubject.nameAz
+      : dbSubject.nameEn
+    : (fallbackLocalizedSubject?.name ?? subjectId);
 
-  const topics = getLocalizedTopics(messages, subject.id);
-  const topic = topics.find((t) => t.id === topicId);
+  let topic:
+    | { slug: string; nameEn: string; nameAz: string }
+    | { name: string }
+    | null = null;
+  if (dbSubject) {
+    try {
+      topic = await prisma.topic.findFirst({
+        where: { subjectId: dbSubject.id, slug: topicId, deletedAt: null },
+        select: { slug: true, nameEn: true, nameAz: true },
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      topic = null;
+    }
+  }
+  if (!topic && fallbackSubject) {
+    topic = getLocalizedTopics(messages, fallbackSubject.id).find((t) => t.id === topicId) ?? null;
+  }
 
   if (!topic) notFound();
+  const topicName =
+    dbSubject && 'nameEn' in topic
+      ? locale === 'az'
+        ? topic.nameAz
+        : topic.nameEn
+      : (topic as { name: string }).name;
 
   return (
     <DashboardShell>
       <PageHeader
-        title={topic.name}
-        description={`${topic.name} · ${localizedSubject.name}`}
+        title={topicName}
+        description={`${topicName} · ${subjectName}`}
         actions={
           <>
             <Button size="sm" variant="primary" asChild>
@@ -48,7 +103,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
             </Button>
             <Button size="sm" variant="secondary-primary" asChild>
               <Link href={`/catalog/${subjectId}`}>
-                {t('app.catalog.backToSubject', { subject: localizedSubject.name })}
+                {t('app.catalog.backToSubject', { subject: subjectName })}
               </Link>
             </Button>
           </>

@@ -10,8 +10,6 @@ import { DocumentEditor } from './document-editor';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
-import { getLocalizedTopics } from '@/src/i18n/topic-utils';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -19,6 +17,10 @@ import {
   AlertDialogTitle,
   AlertDialogHeader,
 } from '@/components/ui/alert-dialog';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
+import { splitObjectives } from '@/src/modules/materials/utils';
+import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
 
 interface StudioEditorProps {
   mode: 'create' | 'edit';
@@ -47,15 +49,20 @@ export function StudioEditor({
 }: StudioEditorProps) {
   const { messages, t } = useI18n();
   const editorCopy = messages.studio.editor;
-  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const { subjects } = useCurriculum();
   const difficultyCopy = messages.materials.difficulty;
+  const { canWrite, writeRestriction } = useCurrentUser();
+  const writeBlockedMessage = useMemo(
+    () => getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified),
+    [writeRestriction, messages.auth.errors.emailNotVerified],
+  );
   const router = useRouter();
   const [subjectId, setSubjectId] = useState(initialSubjectId);
   const [topicId, setTopicId] = useState(initialTopicId);
   const [title, setTitle] = useState(initialTitle);
   const [savedTitle, setSavedTitle] = useState(initialTitle);
   const [objectiveSlots, setObjectiveSlots] = useState<string[]>(() => {
-    const slots = (initialObjectives || '').split('\n').filter(Boolean);
+    const slots = splitObjectives(initialObjectives);
     while (slots.length < 5) slots.push('');
     return slots.slice(0, 5);
   });
@@ -81,9 +88,16 @@ export function StudioEditor({
 
   const isPublished = currentStatus === 'PUBLISHED';
 
-  const topics = subjectId ? getLocalizedTopics(messages, subjectId) : [];
+  const topics = useMemo(() => {
+    if (!subjectId) return [];
+    return subjects.find((subject) => subject.id === subjectId)?.topics ?? [];
+  }, [subjectId, subjects]);
 
   const save = useCallback(async (andPublish = false, skipRedirect = false): Promise<string | undefined> => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!subjectId || !topicId || !title.trim()) {
       toast.error(editorCopy.toast.requiredFields);
       return;
@@ -166,9 +180,13 @@ export function StudioEditor({
     } finally {
       setSaving(false);
     }
-  }, [mode, materialId, draftId, subjectId, topicId, title, objectiveSlots, content, difficulty, router, onSaved]);
+  }, [canWrite, writeBlockedMessage, mode, materialId, draftId, subjectId, topicId, title, objectiveSlots, content, difficulty, router, onSaved, editorCopy.toast.requiredFields, editorCopy.toast.contentRequired]);
 
   const publish = useCallback(async (confirmed = false) => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!subjectId || !topicId || !title.trim()) {
       toast.error(editorCopy.toast.requiredFields);
       return;
@@ -180,10 +198,7 @@ export function StudioEditor({
           const res = await fetch(`/api/materials/${materialId}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
-            const existing = (data.objectives ?? '')
-              .split('\n')
-              .map((s: string) => s.trim())
-              .filter(Boolean);
+            const existing = splitObjectives(data.objectives ?? '');
             const nextSlots = existing.slice(0, 5);
             while (nextSlots.length < 5) nextSlots.push('');
             setObjectiveSlots(nextSlots);
@@ -245,9 +260,13 @@ export function StudioEditor({
     } finally {
       setPublishing(false);
     }
-  }, [subjectId, topicId, title, objectiveSlots, mode, materialId, difficulty, save, router, onSaved]);
+  }, [canWrite, writeBlockedMessage, subjectId, topicId, title, objectiveSlots, mode, materialId, difficulty, save, router, onSaved, editorCopy.toast.requiredFields, editorCopy.toast.objectivesRequired, editorCopy.toast.publishFailed, t]);
 
   const unpublish = useCallback(async () => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!materialId) return;
     setUnpublishing(true);
     try {
@@ -277,9 +296,13 @@ export function StudioEditor({
     } finally {
       setUnpublishing(false);
     }
-  }, [materialId, router, onSaved]);
+  }, [canWrite, writeBlockedMessage, materialId, router, onSaved, editorCopy.toast.unpublishFailed, editorCopy.toast.unpublishSuccess]);
 
   const deleteMaterial = useCallback(async () => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!materialId) return;
     setDeleting(true);
     try {
@@ -303,10 +326,10 @@ export function StudioEditor({
     } finally {
       setDeleting(false);
     }
-  }, [materialId, router]);
+  }, [canWrite, writeBlockedMessage, materialId, router, editorCopy.toast.deleteFailed, editorCopy.toast.deleteSuccess]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pt-6">
       <div className="card-frame bg-card p-6 space-y-4 mb-4 flex-shrink-0">
         <div className="flex items-end justify-between gap-4">
           <div className="space-y-2 flex-1 max-w-xl">
@@ -315,6 +338,7 @@ export function StudioEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={editorCopy.labels.titlePlaceholder}
+              disabled={!canWrite}
             />
           </div>
           <div className="flex flex-wrap gap-2 mb-0.5">
@@ -323,7 +347,7 @@ export function StudioEditor({
                 <Button
                   variant="danger"
                   onClick={() => setShowDeleteDialog(true)}
-                  disabled={deleting || publishing || unpublishing || saving}
+                  disabled={!canWrite || deleting || publishing || unpublishing || saving}
                 >
                   {deleting ? editorCopy.actions.deleting : editorCopy.actions.delete}
                 </Button>
@@ -331,20 +355,20 @@ export function StudioEditor({
                   <Button
                     variant="secondary-primary"
                     onClick={unpublish}
-                    disabled={deleting || publishing || unpublishing || saving}
+                    disabled={!canWrite || deleting || publishing || unpublishing || saving}
                   >
                     {unpublishing ? editorCopy.actions.unpublishing : editorCopy.actions.unpublish}
                   </Button>
                 ) : null}
               </>
             ) : null}
-            <Button variant="secondary-primary" onClick={() => save(false)} disabled={saving || publishing || unpublishing || deleting}>
+            <Button variant="secondary-primary" onClick={() => save(false)} disabled={!canWrite || saving || publishing || unpublishing || deleting}>
               {saving ? editorCopy.actions.saving : editorCopy.actions.saveDraft}
             </Button>
             <Button
               variant="primary"
               onClick={() => publish(false)}
-              disabled={publishing || saving || unpublishing || deleting || (isPublished && !isModified)}
+              disabled={!canWrite || publishing || saving || unpublishing || deleting || (isPublished && !isModified)}
             >
               {publishing
                 ? editorCopy.actions.publishing
@@ -369,7 +393,7 @@ export function StudioEditor({
                 setTopicId('');
               }}
               placeholder={editorCopy.labels.subjectPlaceholder}
-              disabled={mode === 'edit' || Boolean(draftId)}
+              disabled={!canWrite || mode === 'edit' || Boolean(draftId)}
             >
               {subjects.map((subject) => (
                 <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
@@ -381,7 +405,7 @@ export function StudioEditor({
             <Select
               value={topicId}
               onChange={(e) => setTopicId(e.target.value)}
-              disabled={!subjectId || mode === 'edit' || Boolean(draftId)}
+              disabled={!canWrite || !subjectId || mode === 'edit' || Boolean(draftId)}
               placeholder={editorCopy.labels.topicPlaceholder}
             >
               {topics.map((t) => (
@@ -395,6 +419,7 @@ export function StudioEditor({
               value={difficulty}
               onChange={(e) => setDifficulty(e.target.value as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')}
               placeholder={editorCopy.labels.difficultyPlaceholder}
+              disabled={!canWrite}
             >
               <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
               <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
@@ -408,7 +433,7 @@ export function StudioEditor({
           content={content}
           onChange={setContent}
           placeholder={editorCopy.placeholders.document}
-          editable
+          editable={canWrite}
         />
       </div>
 
@@ -438,6 +463,7 @@ export function StudioEditor({
                       className={cn(
                         "h-10 text-sm transition-all duration-200 flex-1 focus:border-primary/50"
                       )}
+                      disabled={!canWrite}
                       autoFocus={idx === 0}
                     />
                   </div>

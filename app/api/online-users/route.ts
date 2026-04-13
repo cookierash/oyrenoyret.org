@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json(body, { status, headers });
   }
 
-  const count = getOnlineCount();
+  const count = await getOnlineCount();
   return NextResponse.json({ count }, { headers: getPrivateNoStoreHeaders() });
 }
 
@@ -30,6 +30,6 @@ export async function POST(request: Request) {
     return NextResponse.json(body, { status, headers });
   }
 
-  const count = touchOnlineUser(userId);
+  const count = await touchOnlineUser(userId);
   return NextResponse.json({ count }, { headers: getPrivateNoStoreHeaders() });
 }

@@ -10,6 +10,7 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { grantDiscussionHelp, hasGrantedHelpForReply } from '@/src/modules/credits';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 
 export async function POST(
   request: Request,
@@ -19,6 +20,15 @@ export async function POST(
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
     }
 
     const identifier = getRateLimitIdentifier(request, userId);
@@ -41,17 +51,19 @@ export async function POST(
         id: true,
         userId: true,
         discussionId: true,
+        removedAt: true,
         discussion: {
           select: {
             id: true,
             archivedAt: true,
             userId: true,
+            removedAt: true,
           },
         },
       },
     });
 
-    if (!reply || reply.discussion.archivedAt) {
+    if (!reply || reply.removedAt || reply.discussion.archivedAt || reply.discussion.removedAt) {
       return NextResponse.json({ error: 'Reply not found or discussion archived' }, { status: 404 });
     }
 
@@ -69,8 +81,8 @@ export async function POST(
       });
     }
 
-    await prisma.discussion.update({
-      where: { id: reply.discussionId },
+    await prisma.discussion.updateMany({
+      where: { id: reply.discussionId, removedAt: null },
       data: { lastActivityAt: new Date() },
     });
 

@@ -13,9 +13,11 @@ import { CREDITS_MATERIAL } from '@/src/config/credits';
 import { recordUserActivity } from '@/src/modules/activity-stats';
 import { CONTENT_LIMITS, RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
-import { sanitizeInput, sanitizeHtml } from '@/src/security/validation';
+import { sanitizeInput, sanitizePracticeTestContent, sanitizeRichTextHtml } from '@/src/security/validation';
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export async function GET(
   request: Request,
@@ -36,27 +38,61 @@ export async function GET(
 
     const { materialId } = await params;
 
-    const material = await prisma.material.findFirst({
-      where: { id: materialId, userId, deletedAt: null },
-      select: {
-        id: true,
-        subjectId: true,
-        topicId: true,
-        title: true,
-        objectives: true,
-        content: true,
-        status: true,
-        materialType: true,
-        questionCount: true,
-        publishedAt: true,
-        difficulty: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    let material: any = null;
+    try {
+      material = await prisma.material.findFirst({
+        where: { id: materialId, userId, deletedAt: null },
+        select: {
+          id: true,
+          subjectId: true,
+          topicId: true,
+          title: true,
+          objectives: true,
+          content: true,
+          status: true,
+          materialType: true,
+          questionCount: true,
+          publishedAt: true,
+          difficulty: true,
+          removedAt: true,
+          removedReason: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      material = await prisma.material.findFirst({
+        where: { id: materialId, userId, deletedAt: null },
+        select: {
+          id: true,
+          subjectId: true,
+          topicId: true,
+          title: true,
+          objectives: true,
+          content: true,
+          status: true,
+          materialType: true,
+          questionCount: true,
+          publishedAt: true,
+          difficulty: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      if (material) {
+        material = { ...material, removedAt: null, removedReason: null };
+      }
+    }
 
     if (!material) {
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });
+    }
+    if (material.removedAt) {
+      return NextResponse.json(
+        { error: 'This material was removed by moderators and is read-only.', errorKey: 'contentRemoved' },
+        { status: 403 },
+      );
     }
 
     return NextResponse.json(material, { headers: getPrivateNoStoreHeaders() });
@@ -79,6 +115,15 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
+    }
+
     const identifier = getRateLimitIdentifier(request, userId);
     const rateLimit = await checkRateLimit(
       `materials:update:${identifier}`,
@@ -92,12 +137,50 @@ export async function PATCH(
     const { materialId } = await params;
     const body = await request.json();
 
-    const material = await prisma.material.findFirst({
-      where: { id: materialId, userId, deletedAt: null },
-    });
+    let material: any = null;
+    try {
+      material = await prisma.material.findFirst({
+        where: { id: materialId, userId, deletedAt: null },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          materialType: true,
+          content: true,
+          objectives: true,
+          questionCount: true,
+          publishedAt: true,
+          removedAt: true,
+        },
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      material = await prisma.material.findFirst({
+        where: { id: materialId, userId, deletedAt: null },
+        select: {
+          id: true,
+          userId: true,
+          status: true,
+          materialType: true,
+          content: true,
+          objectives: true,
+          questionCount: true,
+          publishedAt: true,
+        },
+      });
+      if (material) {
+        material = { ...material, removedAt: null };
+      }
+    }
 
     if (!material) {
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });
+    }
+    if ((material as any).removedAt) {
+      return NextResponse.json(
+        { error: 'This material was removed by moderators and cannot be edited.', errorKey: 'contentRemoved' },
+        { status: 403 },
+      );
     }
 
     const updates: {
@@ -117,7 +200,16 @@ export async function PATCH(
       updates.objectives = body.objectives == null ? null : sanitizeInput(String(body.objectives)).slice(0, 2000);
     }
     if (body.content !== undefined) {
-      const sanitized = sanitizeHtml(String(body.content)).slice(0, CONTENT_LIMITS.MATERIAL_CONTENT_MAX);
+      let sanitized: string;
+      try {
+        sanitized =
+          material.materialType === 'PRACTICE_TEST'
+            ? sanitizePracticeTestContent(String(body.content))
+            : sanitizeRichTextHtml(String(body.content));
+      } catch {
+        return NextResponse.json({ error: 'Invalid material content' }, { status: 400 });
+      }
+      sanitized = sanitized.slice(0, CONTENT_LIMITS.MATERIAL_CONTENT_MAX);
       updates.content = sanitized;
       updates.questionCount =
         material.materialType === 'PRACTICE_TEST'
@@ -248,6 +340,15 @@ export async function DELETE(
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
     }
 
     const identifier = getRateLimitIdentifier(request, userId);

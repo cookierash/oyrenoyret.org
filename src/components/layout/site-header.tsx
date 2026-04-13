@@ -15,6 +15,7 @@ interface CurrentUser {
   firstName: string | null;
   lastName: string | null;
   email: string;
+  avatarVariant?: string | null;
 }
 
 interface HoverDropdownProps {
@@ -176,7 +177,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
         <div className="hidden w-full grid-cols-[1fr_auto_1fr] items-center gap-6 px-4 py-2 sm:px-6 md:grid">
           {/* 1. Logo Section */}
           <div className="flex min-w-0 items-center justify-self-start">
-            <Logo size="sm" showText textSize="lg" />
+            <Logo size="sm" showText textSize="lg" priority />
           </div>
 
           {/* 2. Directives Section - Core Navigation (centered) */}
@@ -247,6 +248,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                   userId={user.id}
                   firstName={user.firstName}
                   lastName={user.lastName}
+                  avatarVariant={user.avatarVariant}
                   size="sm"
                 />
               ) : (
@@ -317,7 +319,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
           </div>
           <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
             <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t('header.resources')}
               </span>
               <Link
@@ -350,7 +352,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
               </Link>
             </div>
             <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 {t('header.legals')}
               </span>
               <Link
@@ -397,6 +399,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
                   userId={user.id}
                   firstName={user.firstName}
                   lastName={user.lastName}
+                  avatarVariant={user.avatarVariant}
                   size="sm"
                 />
                 <span className="text-xs text-muted-foreground">

@@ -14,7 +14,9 @@ export interface AuthValidationMessages {
   lastNameMax: string;
   emailRequired: string;
   emailInvalid: string;
+  emailMax: string;
   passwordMin: string;
+  passwordMax: string;
   passwordUpper: string;
   passwordLower: string;
   passwordNumber: string;
@@ -38,7 +40,9 @@ export const DEFAULT_VALIDATION_MESSAGES: AuthValidationMessages = {
   lastNameMax: 'Last name must be less than 50 characters',
   emailRequired: 'Email is required',
   emailInvalid: 'Invalid email address',
+  emailMax: 'Email must be less than 254 characters',
   passwordMin: 'Password must be at least 8 characters',
+  passwordMax: 'Password must be at most 72 characters',
   passwordUpper: 'Password must contain at least one uppercase letter',
   passwordLower: 'Password must contain at least one lowercase letter',
   passwordNumber: 'Password must contain at least one number',
@@ -77,17 +81,22 @@ export function createStudentInfoSchema(messages: AuthValidationMessages) {
         .string()
         .min(1, messages.emailRequired)
         .email(messages.emailInvalid)
+        .max(254, messages.emailMax)
         .toLowerCase()
         .trim(),
       password: z
         .string()
         .min(8, messages.passwordMin)
+        .max(72, messages.passwordMax)
         .regex(/[A-Z]/, messages.passwordUpper)
         .regex(/[a-z]/, messages.passwordLower)
         .regex(/[0-9]/, messages.passwordNumber)
         .regex(/[^A-Za-z0-9]/, messages.passwordSpecial),
-      confirmPassword: z.string().min(1, messages.confirmPasswordRequired),
-      grade: z.enum(['5', '6', '7', '8', '9', '10', '11'], {
+      confirmPassword: z
+        .string()
+        .min(1, messages.confirmPasswordRequired)
+        .max(72, messages.passwordMax),
+      grade: z.enum(['5', '6', '7', '8', '9', '10', '11', '12'], {
         message: messages.gradeRequired,
       }),
     })
@@ -120,6 +129,7 @@ export function createParentInfoSchema(messages: AuthValidationMessages) {
       .string()
       .min(1, messages.parentEmailRequired)
       .email(messages.emailInvalid)
+      .max(254, messages.emailMax)
       .toLowerCase()
       .trim(),
   });
@@ -169,9 +179,13 @@ export function createLoginSchema(messages: AuthValidationMessages) {
       .string()
       .min(1, messages.emailRequired)
       .email(messages.emailInvalid)
+      .max(254, messages.emailMax)
       .toLowerCase()
       .trim(),
-    password: z.string().min(1, messages.loginPasswordRequired),
+    password: z
+      .string()
+      .min(1, messages.loginPasswordRequired)
+      .max(72, messages.passwordMax),
   });
 }
 

@@ -17,7 +17,7 @@ export function DiscussionsRightSidebar() {
         <TrendingDiscussions variant={isIndex ? 'card' : 'plain'} />
         {showRules && (
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-foreground">{rulesCopy.title}</h2>
+            <h2 className="text-sm font-medium text-foreground">{rulesCopy.title}</h2>
             <p className="text-xs text-muted-foreground">{rulesCopy.rule1}</p>
             <p className="text-xs text-muted-foreground">{rulesCopy.rule2}</p>
             <p className="text-xs text-muted-foreground">{rulesCopy.rule3}</p>

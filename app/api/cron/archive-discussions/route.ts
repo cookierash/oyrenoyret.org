@@ -64,7 +64,12 @@ export async function GET(request: Request) {
         archivedAt: null,
         lastActivityAt: { lt: candidateCutoff },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        userId: true,
+        lastActivityAt: true,
+        _count: { select: { replies: true } },
+      },
     });
 
     let archivedCount = 0;
@@ -72,65 +77,85 @@ export async function GET(request: Request) {
     let refundedCount = 0;
     let skippedCount = 0;
 
-    for (const candidate of candidates) {
+    if (candidates.length === 0) {
+      return NextResponse.json({
+        archived: 0,
+        removed: 0,
+        refunded: 0,
+        skipped: 0,
+        message: 'Archived 0, removed 0 (refunded 0).',
+      });
+    }
+
+    const removeCandidates = candidates.filter(
+      (c) => c._count.replies === 0 && c.lastActivityAt < removeCutoff,
+    );
+
+    const removedIds: string[] = [];
+
+    for (const candidate of removeCandidates) {
       try {
         const outcome = await prisma.$transaction(async (tx) => {
           const discussion = await tx.discussion.findUnique({
             where: { id: candidate.id },
-            select: {
-              id: true,
-              userId: true,
-              archivedAt: true,
-              lastActivityAt: true,
-            },
+            select: { id: true, userId: true, archivedAt: true, lastActivityAt: true },
           });
 
           if (!discussion || discussion.archivedAt) {
             return { status: 'skipped' as const };
           }
+          if (discussion.lastActivityAt >= removeCutoff) {
+            return { status: 'skipped' as const };
+          }
 
-          const replyCount = await tx.discussionReply.count({
+          const hasReply = await tx.discussionReply.findFirst({
             where: { discussionId: discussion.id },
+            select: { id: true },
           });
-
-          if (replyCount === 0 && discussion.lastActivityAt < removeCutoff) {
-            const refund = await refundDiscussionCreate(discussion.userId, discussion.id, tx);
-            if (!refund.success) {
-              throw new Error(refund.error ?? 'Refund failed');
-            }
-            await tx.discussion.delete({ where: { id: discussion.id } });
-            return {
-              status: 'removed' as const,
-              refunded: refund.success && refund.amount > 0,
-            };
+          if (hasReply) {
+            return { status: 'skipped' as const };
           }
 
-          if (discussion.lastActivityAt < archiveCutoff) {
-            await tx.discussion.update({
-              where: { id: discussion.id },
-              data: { archivedAt: now },
-            });
-            return { status: 'archived' as const };
+          const refund = await refundDiscussionCreate(discussion.userId, discussion.id, tx);
+          if (!refund.success) {
+            throw new Error(refund.error ?? 'Refund failed');
           }
-
-          return { status: 'skipped' as const };
+          await tx.discussion.delete({ where: { id: discussion.id } });
+          return { status: 'removed' as const, refunded: refund.amount > 0 };
         });
 
-        if (outcome.status === 'archived') {
-          archivedCount += 1;
-        } else if (outcome.status === 'removed') {
+        if (outcome.status === 'removed') {
           removedCount += 1;
-          if (outcome.refunded) {
-            refundedCount += 1;
-          }
+          removedIds.push(candidate.id);
+          if (outcome.refunded) refundedCount += 1;
         } else {
           skippedCount += 1;
         }
       } catch (error) {
         skippedCount += 1;
-        console.error('Error archiving/removing discussion:', error);
+        console.error('Error removing discussion:', error);
       }
     }
+
+    try {
+      const where = {
+        archivedAt: null,
+        lastActivityAt: { lt: archiveCutoff },
+        ...(removedIds.length > 0 ? { id: { notIn: removedIds } } : {}),
+      };
+      const result = await prisma.discussion.updateMany({
+        where,
+        data: { archivedAt: now },
+      });
+      archivedCount = result.count;
+    } catch (error) {
+      console.error('Error archiving discussions:', error);
+      skippedCount += Math.max(candidates.length - removedCount - skippedCount, 0);
+    }
+
+    const totalProcessed = archivedCount + removedCount;
+    const impliedSkipped = Math.max(candidates.length - totalProcessed, 0);
+    if (skippedCount < impliedSkipped) skippedCount = impliedSkipped;
 
     return NextResponse.json({
       archived: archivedCount,

@@ -21,7 +21,7 @@ export function DiscussionsRightSidebar({ className }: DiscussionsRightSidebarPr
       <div className="flex-1 overflow-y-auto">
         <section className="flex h-14 items-center gap-2 px-4">
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-sm font-medium text-foreground">
             {t('discussions.trendingTitle')}
           </h2>
         </section>

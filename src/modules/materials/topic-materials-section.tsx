@@ -15,6 +15,8 @@ export type TopicMaterialWithCost = {
   materialType: 'TEXTUAL' | 'PRACTICE_TEST';
   difficulty: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED' | null;
   publishedAt: Date | null;
+  ratingAvg: number;
+  ratingCount: number;
   user: { firstName: string | null; lastName: string | null };
   _count: { accesses: number };
   estimatedCost: number;

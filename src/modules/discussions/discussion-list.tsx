@@ -7,14 +7,15 @@ import { PostAvatar } from './post-avatar';
 import { formatRelativeTime } from './relative-time';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/src/i18n/i18n-provider';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 import { buildTagIndex, createTagMap, parseTaggedQuery } from '@/src/lib/tagging';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
 
 interface Discussion {
   id: string;
   title: string;
   contentPreview: string;
   authorId?: string;
+  authorAvatarVariant?: string | null;
   authorName: string;
   replyCount: number;
   voteScore: number;
@@ -42,7 +43,7 @@ export function DiscussionList({
   const [loading, setLoading] = useState(true);
   const { locale, messages } = useI18n();
   const copy = messages.discussions.list;
-  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const { subjects } = useCurriculum();
   const subjectTagIndex = useMemo(
     () =>
       buildTagIndex(
@@ -136,17 +137,22 @@ export function DiscussionList({
             {/* Vote score pill */}
             <div className="flex flex-col items-center shrink-0 w-10 text-center">
               <ChevronUp className="h-3.5 w-3.5 text-muted-foreground/50" />
-              <span className={`text-xs font-bold leading-none ${popularity > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
+              <span className={`text-xs font-medium leading-none ${popularity > 0 ? 'text-primary' : 'text-muted-foreground'}`}>
                 {popularity}
               </span>
             </div>
 
             {/* Avatar */}
-            <PostAvatar userId={d.authorId ?? d.id} authorName={d.authorName} size="sm" />
+            <PostAvatar
+              userId={d.authorId ?? d.id}
+              authorName={d.authorName}
+              avatarVariant={d.authorAvatarVariant}
+              size="sm"
+            />
 
             {/* Content */}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+              <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                 {d.title}
               </p>
               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">

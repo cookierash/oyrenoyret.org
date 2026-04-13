@@ -71,7 +71,7 @@ export function SiteFooter() {
 
   return (
     <footer className="border-t border-border/60 bg-background">
-      <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 sm:py-12 lg:px-8 lg:py-14">
         <div className="grid gap-12 lg:grid-cols-[1.1fr_2.4fr]">
           <div className="flex flex-col gap-6">
             <Logo size="sm" showText textSize="lg" className="text-xl" />
@@ -83,7 +83,9 @@ export function SiteFooter() {
               >
                 {t('footer.cookieSettings')}
               </button>
-              <p>© {year} oyrenoyret.org</p>
+              <p>
+                © {year} <span className="brand-font">oyrenoyret.org</span>
+              </p>
             </div>
             {user === null ? (
               <div className="max-w-[200px]">
@@ -104,12 +106,12 @@ export function SiteFooter() {
             ) : null}
           </div>
 
-          <div className="grid grid-cols-2 gap-x-8 gap-y-10 lg:grid-cols-5">
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
+          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:gap-x-8 sm:gap-y-8 lg:grid-cols-5 lg:gap-x-8 lg:gap-y-10">
+            <div className="min-w-0 space-y-2 md:space-y-3">
+              <h3 className="text-sm font-medium text-foreground">
                 {t('footer.platform')}
               </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="break-words space-y-1.5 text-sm text-muted-foreground md:space-y-2">
                 <li>
                   <Link href="/dashboard" className="transition-colors hover:text-foreground">
                     {t('footer.dashboard')}
@@ -126,7 +128,10 @@ export function SiteFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/live-activities" className="transition-colors hover:text-foreground">
+                  <Link
+                    href="/interactive-sessions"
+                    className="transition-colors hover:text-foreground"
+                  >
                     {t('footer.liveActivities')}
                   </Link>
                 </li>
@@ -137,11 +142,11 @@ export function SiteFooter() {
                 </li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
+            <div className="min-w-0 space-y-2 md:space-y-3">
+              <h3 className="text-sm font-medium text-foreground">
                 {t('footer.learning')}
               </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="break-words space-y-1.5 text-sm text-muted-foreground md:space-y-2">
                 <li>
                   <Link href="/studio" className="transition-colors hover:text-foreground">
                     {t('footer.studio')}
@@ -163,17 +168,20 @@ export function SiteFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/settings" className="transition-colors hover:text-foreground">
+                  <Link
+                    href="/settings/my-account"
+                    className="transition-colors hover:text-foreground"
+                  >
                     {t('footer.settings')}
                   </Link>
                 </li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
+            <div className="min-w-0 space-y-2 md:space-y-3">
+              <h3 className="text-sm font-medium text-foreground">
                 {t('footer.account')}
               </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="break-words space-y-1.5 text-sm text-muted-foreground md:space-y-2">
                 <li>
                   <Link href="/login" className="transition-colors hover:text-foreground">
                     {t('footer.logIn')}
@@ -199,11 +207,11 @@ export function SiteFooter() {
                 </li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
+            <div className="min-w-0 space-y-2 md:space-y-3">
+              <h3 className="text-sm font-medium text-foreground">
                 {t('footer.resources')}
               </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="break-words space-y-1.5 text-sm text-muted-foreground md:space-y-2">
                 <li>
                   <Link href="/resources/help" className="transition-colors hover:text-foreground">
                     {t('footer.helpCenter')}
@@ -226,11 +234,11 @@ export function SiteFooter() {
                 </li>
               </ul>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">
+            <div className="min-w-0 space-y-2 md:space-y-3">
+              <h3 className="text-sm font-medium text-foreground">
                 {t('footer.social')}
               </h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
+              <ul className="break-words space-y-1.5 text-sm text-muted-foreground md:space-y-2">
                 <li>
                   <Link
                     href="https://www.instagram.com/oyrenoyret.hzt/"

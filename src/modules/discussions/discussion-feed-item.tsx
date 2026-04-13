@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { ReportButton } from '@/src/modules/reports/report-user-button';
 
 interface DiscussionFeedItemProps {
     id: string;
@@ -16,6 +17,7 @@ interface DiscussionFeedItemProps {
     contentPreview: string;
     authorId?: string;
     authorName: string;
+    authorAvatarVariant?: string | null;
     replyCount: number;
     voteScore: number;
     userVote?: 1 | -1 | null;
@@ -29,6 +31,7 @@ export function DiscussionFeedItem({
     contentPreview,
     authorId,
     authorName,
+    authorAvatarVariant,
     replyCount,
     voteScore: initialScore,
     userVote: initialUserVote = null,
@@ -74,19 +77,24 @@ export function DiscussionFeedItem({
             'group flex gap-3 px-4 py-3 transition-colors hover:bg-muted/30 border-b border-border last:border-0',
             className
         )}>
-            <PostAvatar userId={authorId} authorName={authorName} size="sm" />
+            <PostAvatar
+              userId={authorId}
+              authorName={authorName}
+              avatarVariant={authorAvatarVariant}
+              size="sm"
+            />
 
             <div className="flex-1 min-w-0">
                 {/* Author + time */}
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground text-sm">{authorName}</span>
+                    <span className="font-medium text-foreground text-sm">{authorName}</span>
                     <span className="opacity-40">·</span>
                     <span>{formatRelativeTime(createdAt, locale)}</span>
                 </div>
 
                 {/* Title + preview */}
                 <Link href={`/discussions/${id}`} className="block mt-0.5 group/link">
-                    <h3 className="font-semibold text-[14px] leading-snug text-foreground group-hover/link:text-primary transition-colors">
+                    <h3 className="font-medium text-[14px] leading-snug text-foreground group-hover/link:text-primary transition-colors">
                         {title}
                     </h3>
                     <p className="text-[13px] text-muted-foreground line-clamp-1 mt-0.5">
@@ -113,7 +121,7 @@ export function DiscussionFeedItem({
 
                         {/* Score */}
                         <span className={cn(
-                            "px-1 text-[13px] font-bold min-w-[1.5rem] text-center",
+                            "px-1 text-[13px] font-medium min-w-[1.5rem] text-center",
                             score > 0 ? "text-orange-500" : score < 0 ? "text-blue-500" : "text-muted-foreground"
                         )}>
                             {score}
@@ -142,6 +150,21 @@ export function DiscussionFeedItem({
                         <MessageSquare className="h-3.5 w-3.5" />
                         <span>{replyCount}</span>
                     </Link>
+
+                    {authorId ? (
+                      <div className="ml-auto">
+                        <ReportButton
+                          reportedUserId={authorId}
+                          reportedUserPublicId={null}
+                          reportedUserName={authorName}
+                          targetType="DISCUSSION"
+                          targetId={id}
+                          contextUrl={`/discussions/${id}`}
+                          buttonVariant="danger"
+                          buttonClassName="h-7 px-2 text-[11px]"
+                        />
+                      </div>
+                    ) : null}
                 </div>
             </div>
         </div>

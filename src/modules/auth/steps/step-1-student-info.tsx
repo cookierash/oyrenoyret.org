@@ -33,7 +33,7 @@ interface Step1Props {
   onValuesChange?: (values: StudentInfoInput) => void;
 }
 
-const GRADES = ['5', '6', '7', '8', '9', '10', '11'] as const;
+const GRADES = ['5', '6', '7', '8', '9', '10', '11', '12'] as const;
 const FIELD_LABEL_CLASS = 'text-xs font-medium text-muted-foreground';
 const INPUT_CLASS = 'h-10 rounded-lg bg-background/70';
 
@@ -96,7 +96,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
                 <FormItem>
                   <FormLabel className={FIELD_LABEL_CLASS}>{copy.firstName}</FormLabel>
                   <FormControl>
-                    <Input placeholder={placeholders.firstName} className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.firstName} className={INPUT_CLASS} maxLength={50} required {...field} />
                   </FormControl>
                 </FormItem>
               )}
@@ -109,7 +109,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
                 <FormItem>
                   <FormLabel className={FIELD_LABEL_CLASS}>{copy.lastName}</FormLabel>
                   <FormControl>
-                    <Input placeholder={placeholders.lastName} className={INPUT_CLASS} {...field} />
+                    <Input placeholder={placeholders.lastName} className={INPUT_CLASS} maxLength={50} required {...field} />
                   </FormControl>
                 </FormItem>
               )}
@@ -123,7 +123,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
               <FormItem>
               <FormLabel className={FIELD_LABEL_CLASS}>{copy.email}</FormLabel>
               <FormControl>
-                <Input type="email" placeholder={placeholders.email} className={INPUT_CLASS} {...field} />
+                <Input type="email" placeholder={placeholders.email} className={INPUT_CLASS} maxLength={254} required {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -185,7 +185,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
               <FormItem>
               <FormLabel className={FIELD_LABEL_CLASS}>{copy.password}</FormLabel>
               <FormControl>
-                <PasswordInput placeholder={placeholders.password} className={INPUT_CLASS} {...field} />
+                <PasswordInput placeholder={placeholders.password} className={INPUT_CLASS} maxLength={72} required {...field} />
               </FormControl>
               <FormMessage />
               <p className="text-xs text-muted-foreground mt-1">
@@ -202,7 +202,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
               <FormItem>
               <FormLabel className={FIELD_LABEL_CLASS}>{copy.confirmPassword}</FormLabel>
               <FormControl>
-                <PasswordInput placeholder={placeholders.password} className={INPUT_CLASS} {...field} />
+                <PasswordInput placeholder={placeholders.password} className={INPUT_CLASS} maxLength={72} required {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -214,7 +214,7 @@ export function Step1StudentInfo({ onSuccess, initialValues, onValuesChange }: S
           type="submit"
           variant="primary"
           size="lg"
-          className="h-10 w-full text-sm font-semibold"
+          className="h-10 w-full text-sm font-medium"
           disabled={isSubmitting || !form.formState.isValid}
         >
           {isSubmitting ? copy.saving : copy.next}

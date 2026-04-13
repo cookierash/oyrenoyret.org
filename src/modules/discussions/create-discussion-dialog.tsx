@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AlertDialog,
@@ -14,8 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { CompactRichText, type CompactRichTextImage, type CompactRichTextStats } from '@/src/components/rich-text/compact-rich-text';
+import { discussionRichTextHasContent } from '@/src/lib/discussion-rich-text';
+import { appendDiscussionAttachmentsToHtml } from '@/src/lib/discussion-attachments';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
+import { CONTENT_LIMITS } from '@/src/config/constants';
+import { MAX_DISCUSSION_IMAGES } from '@/src/config/uploads';
 
 interface CreateDiscussionDialogProps {
   open: boolean;
@@ -28,22 +33,28 @@ export function CreateDiscussionDialog({
   onOpenChange,
   onCreated,
 }: CreateDiscussionDialogProps) {
-  const MAX_CONTENT_LENGTH = 2000;
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [contentStats, setContentStats] = useState<CompactRichTextStats>({ words: 0, characters: 0 });
+  const [attachments, setAttachments] = useState<CompactRichTextImage[]>([]);
   const [subjectId, setSubjectId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { t, messages } = useI18n();
   const copy = messages.discussions.createDialog;
-  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
-
-  const remainingContent = MAX_CONTENT_LENGTH - content.length;
+  const { subjects } = useCurriculum();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) {
+    const composed = appendDiscussionAttachmentsToHtml(content, attachments);
+    if (!title.trim() || !discussionRichTextHasContent(composed)) {
       toast.error(copy.titleRequired);
+      return;
+    }
+    if (contentStats.characters > CONTENT_LIMITS.DISCUSSION_CONTENT_MAX) {
+      toast.error(
+        t('discussions.createDialog.contentTooLong', { count: CONTENT_LIMITS.DISCUSSION_CONTENT_MAX })
+      );
       return;
     }
     setSubmitting(true);
@@ -53,7 +64,7 @@ export function CreateDiscussionDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: title.trim(),
-          content: content.trim(),
+          content: composed,
           subjectId: subjectId || undefined,
         }),
       });
@@ -69,6 +80,8 @@ export function CreateDiscussionDialog({
       onOpenChange(false);
       setTitle('');
       setContent('');
+      setContentStats({ words: 0, characters: 0 });
+      setAttachments([]);
       setSubjectId('');
       router.refresh();
       onCreated?.();
@@ -99,23 +112,28 @@ export function CreateDiscussionDialog({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={copy.titlePlaceholder}
               className="mt-1"
-              maxLength={300}
+              maxLength={CONTENT_LIMITS.DISCUSSION_TITLE_MAX}
             />
           </div>
           <div>
             <label className="text-sm font-medium">{copy.detailsLabel}</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder={copy.detailsPlaceholder}
-              className="mt-1 w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
-              maxLength={MAX_CONTENT_LENGTH}
-            />
-            {remainingContent <= 100 ? (
-              <div className="mt-1 text-right text-xs text-muted-foreground">
-                {t('discussions.createDialog.charactersLeft', { count: remainingContent })}
-              </div>
-            ) : null}
+            <div className="mt-1">
+              <CompactRichText
+                value={content}
+                onChange={setContent}
+                onStatsChange={setContentStats}
+                placeholder={copy.detailsPlaceholder}
+                ariaLabel={copy.detailsLabel}
+                minHeightClass="min-h-[180px]"
+                toolbarVisibility="always"
+                countsVisibility="none"
+                imageUploadEndpoint="/api/uploads/discussions/sign"
+                imageMode="attachments"
+                imageMaxImages={MAX_DISCUSSION_IMAGES}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+              />
+            </div>
           </div>
           <div className="flex gap-2">
             <Select

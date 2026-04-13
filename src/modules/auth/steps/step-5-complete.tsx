@@ -31,7 +31,7 @@ export function Step5Complete({ studentName }: Step5Props) {
         </div>
         <div className="space-y-1">
           <p className="text-xs font-medium text-muted-foreground">{copy.badge}</p>
-          <h2 className="text-2xl font-semibold tracking-tight">
+          <h2 className="text-2xl font-medium tracking-tight">
             {welcomeText}
           </h2>
         </div>
@@ -64,7 +64,7 @@ export function Step5Complete({ studentName }: Step5Props) {
           router.push('/dashboard');
           router.refresh();
         }}
-        className="h-10 w-full text-sm font-semibold"
+        className="h-10 w-full text-sm font-medium"
       >
         {copy.dashboard}
       </Button>

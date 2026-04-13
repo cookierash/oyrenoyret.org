@@ -1,116 +1,240 @@
 /**
- * Public Certificate Verification Page
+ * Public Academic Record Page
  *
- * View certificate details by verification ID.
+ * View academic record details by public ID.
  */
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/src/db/client';
 import { PageHeader } from '@/src/components/ui/page-header';
-import { Card, CardContent } from '@/components/ui/card';
-import { PiMedal as Award, PiCalendar as Calendar, PiCheckCircle as CheckCircle } from 'react-icons/pi';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import type { AcademicRecord } from '@prisma/client';
 import { getI18n } from '@/src/i18n/server';
 import { getLocaleCode } from '@/src/i18n';
+import { getAcademicProgressSummary } from '@/src/modules/academic-record/progress';
+import {
+  PiSparkle as Sparkles,
+  PiUsersThree as UsersThree,
+  PiBooks as Books,
+  PiChatCircle as ChatCircle,
+  PiTrophy as Trophy,
+  PiCalendar as CalendarDays,
+} from 'react-icons/pi';
 
-interface CertificatePageProps {
+function MetricTile({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <div className="card-frame bg-muted/10 p-3 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="text-lg font-medium truncate">{value}</p>
+      </div>
+      <Icon className="h-5 w-5 text-muted-foreground/70 shrink-0" />
+    </div>
+  );
+}
+
+interface PublicRecordPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function CertificateVerifyPage({ params }: CertificatePageProps) {
+export default async function PublicRecordPage({ params }: PublicRecordPageProps) {
   const { id } = await params;
+  const publicId = id.trim().toLowerCase();
   const { locale, messages } = await getI18n();
-  const copy = messages.record.certificate;
+  const copy = messages.record.publicRecord;
+  const recordCopy = messages.app.academicRecord;
 
   const user = await prisma.user.findFirst({
-    where: { publicId: id, deletedAt: null },
+    where: { publicId, deletedAt: null },
     select: { id: true, firstName: true, lastName: true, publicId: true },
   });
 
   if (!user) return notFound();
 
-  let certificate = await prisma.certificate.findFirst({
-    where: { userId: user.id, deletedAt: null },
-    orderBy: { issuedAt: 'desc' },
-  });
+  const [records, progress] = await Promise.all([
+    prisma.academicRecord.findMany({
+      where: { userId: user.id, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getAcademicProgressSummary(user.id),
+  ]);
 
-  if (!certificate) {
-    certificate = await prisma.certificate.create({
-      data: {
-        userId: user.id,
-        title: copy.certificateTitle,
-        description: copy.certificateDescription,
-      },
-    });
-  }
+  const numberFmt = new Intl.NumberFormat(getLocaleCode(locale), { maximumFractionDigits: 1 });
+  const hoursFmt = new Intl.NumberFormat(getLocaleCode(locale), { maximumFractionDigits: 1 });
+  const teachingHours = progress.guidedGroupTeachingMinutes / 60;
 
   return (
     <div className="max-w-3xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-      <PageHeader
-        title={copy.headerTitle}
-        description={copy.headerDescription}
-      />
+      <PageHeader title={copy.title} description={copy.description} />
 
-      <Card className="mt-2 border border-primary/20 bg-card overflow-hidden relative">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-bl-[100%] -z-10" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-secondary/10 rounded-tr-[100%] -z-10" />
-
-        <CardContent className="p-10 sm:p-16 text-center space-y-8">
-          <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center ring-8 ring-background outline outline-1 outline-primary/20">
-              <Award className="w-10 h-10 text-primary" />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h1 className="text-3xl sm:text-4xl font-bold font-comfortaa text-primary tracking-tight">
-              {copy.completionTitle}
-            </h1>
-            <p className="text-muted-foreground uppercase tracking-widest text-sm font-semibold">
-              {copy.acknowledges}
-            </p>
-            <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+      <div className="mt-2 space-y-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">{copy.ownerTitle}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <p className="text-sm">
+              <span className="text-muted-foreground">{copy.ownerLabel}</span>{' '}
               {user.firstName} {user.lastName}
-            </h2>
-          </div>
+            </p>
+            <p className="text-xs text-muted-foreground font-mono">
+              {copy.publicIdLabel} {user.publicId}
+            </p>
+          </CardContent>
+        </Card>
 
-          <div className="pt-4 pb-4 border-y border-border/50">
-            <p className="text-muted-foreground mb-4">{copy.completed}</p>
-            <h3 className="text-xl font-semibold mb-2">{certificate.title}</h3>
-            {certificate.description && (
-              <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
-                {certificate.description}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-8 text-sm text-foreground/80 pt-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary" />
-              <span>
-                {copy.issued}{' '}
-                {new Date(certificate.issuedAt).toLocaleDateString(getLocaleCode(locale), {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </span>
+        <div className="space-y-5">
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">{recordCopy.progressSections.credits}</h3>
             </div>
-            <div className="flex items-center gap-2 font-medium">
-              <CheckCircle className="w-4 h-4 text-emerald-500" />
-              <span className="text-emerald-600 dark:text-emerald-400">
-                {copy.verifiedByPrefix}
-                {copy.verifiedByPrefix ? ' ' : null}
-                <span className="font-comfortaa lowercase">oyrenoyret</span>
-                {copy.verifiedBySuffix ? ` ${copy.verifiedBySuffix}` : null}
-              </span>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricTile
+                label={recordCopy.metrics.lifetimeCreditsEarned}
+                value={numberFmt.format(progress.lifetimeCreditsEarned)}
+                icon={Sparkles}
+              />
             </div>
-          </div>
+          </section>
 
-          <div className="pt-8 text-xs text-muted-foreground font-mono">
-            {copy.certificateId} {user.publicId}
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <UsersThree className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">{recordCopy.progressSections.guidedSessions}</h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricTile
+                label={recordCopy.metrics.guidedGroupSessionsFacilitated}
+                value={progress.guidedGroupSessionsFacilitated}
+                icon={UsersThree}
+              />
+              <MetricTile
+                label={recordCopy.metrics.totalTeachingTime}
+                value={`${hoursFmt.format(teachingHours)} ${recordCopy.units.hoursShort}`}
+                icon={UsersThree}
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <Books className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">{recordCopy.progressSections.publishing}</h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricTile
+                label={recordCopy.metrics.materialsPublishedTextual}
+                value={progress.materialsPublishedTextual}
+                icon={Books}
+              />
+              <MetricTile
+                label={recordCopy.metrics.materialsPublishedPracticeTests}
+                value={progress.materialsPublishedPracticeTests}
+                icon={Books}
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <ChatCircle className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">{recordCopy.progressSections.discussions}</h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricTile
+                label={recordCopy.metrics.discussionsStarted}
+                value={progress.discussionsStarted}
+                icon={ChatCircle}
+              />
+              <MetricTile
+                label={recordCopy.metrics.discussionsReplied}
+                value={progress.discussionsReplied}
+                icon={ChatCircle}
+              />
+              <MetricTile
+                label={recordCopy.metrics.replyReplies}
+                value={progress.replyReplies}
+                icon={ChatCircle}
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">{recordCopy.progressSections.problemSprints}</h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricTile
+                label={recordCopy.metrics.problemSprintsRegistered}
+                value={progress.problemSprintsRegistered}
+                icon={Trophy}
+              />
+              <MetricTile
+                label={recordCopy.metrics.sprintFirstPlaces}
+                value={progress.sprintFirstPlaces}
+                icon={Trophy}
+              />
+              <MetricTile
+                label={recordCopy.metrics.sprintSecondPlaces}
+                value={progress.sprintSecondPlaces}
+                icon={Trophy}
+              />
+              <MetricTile
+                label={recordCopy.metrics.sprintThirdPlaces}
+                value={progress.sprintThirdPlaces}
+                icon={Trophy}
+              />
+            </div>
+          </section>
+
+          <section>
+            <div className="flex items-center gap-2 mb-2">
+              <CalendarDays className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-medium">{recordCopy.progressSections.liveEvents}</h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <MetricTile
+                label={recordCopy.metrics.liveEventsRegistered}
+                value={progress.liveEventsRegistered}
+                icon={CalendarDays}
+              />
+            </div>
+          </section>
+        </div>
+
+        {records.length === 0 ? null : (
+          <div className="space-y-4">
+            {records.map((r: AcademicRecord) => (
+              <Card key={r.id}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">
+                    {r.subject ?? recordCopy.subjectFallback}{' '}
+                    {r.grade ? `· ${recordCopy.gradeLabel} ${r.grade}` : ''}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  {r.score != null && (
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">{recordCopy.scoreLabel}</span> {r.score}
+                    </p>
+                  )}
+                  {r.notes && <p className="text-sm text-muted-foreground">{r.notes}</p>}
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
     </div>
   );
 }

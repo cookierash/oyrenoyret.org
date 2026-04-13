@@ -22,6 +22,29 @@ enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+  BANNED
+}
+
+enum UserReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum UserReportReason {
+  SPAM
+  HARASSMENT
+  CHEATING
+  IMPERSONATION
+  OTHER
+}
+
+enum ReportTargetType {
+  PROFILE
+  DISCUSSION
+  DISCUSSION_REPLY
+  MATERIAL
+  MATERIAL_COMMENT
 }
 
 enum ConsentStatus {
@@ -31,10 +54,57 @@ enum ConsentStatus {
   EXPIRED
 }
 
+enum ModerationTargetType {
+  USER
+  DISCUSSION
+  DISCUSSION_REPLY
+  MATERIAL
+  MATERIAL_COMMENT
+}
+
+enum ModerationActionType {
+  SUSPEND
+  UNSUSPEND
+  SUSPENSION_EXPIRED
+  BAN
+  UNBAN
+  REMOVE_CONTENT
+}
+
+enum ModerationNoticeType {
+  ACCOUNT_SUSPENDED
+  ACCOUNT_UNSUSPENDED
+  ACCOUNT_BANNED
+  ACCOUNT_UNBANNED
+  CONTENT_REMOVED
+}
+
 enum SessionStatus {
   ACTIVE
   COMPLETED
   ABANDONED
+}
+
+model ContactMessage {
+  id        String  @id @default(uuid())
+  userId    String?
+  name      String?
+  email     String
+  subject   String?
+  message   String
+  ipAddress String?
+  userAgent String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([email])
+  @@index([createdAt])
+  @@index([deletedAt])
 }
 
 model User {
@@ -44,9 +114,16 @@ model User {
   passwordHash String? // Nullable for OAuth users
   role      UserRole @default(STUDENT)
   status    UserStatus @default(INACTIVE) // Start as INACTIVE until registration completes
+  emailVerifiedAt DateTime? // User email verification timestamp (required for write actions)
+  suspensionUntil DateTime?
+  suspensionReason String? @db.Text
+  bannedAt DateTime?
+  banReason String? @db.Text
   dateOfBirth DateTime? // Required for minors, nullable for parents/admins
   firstName String?
   lastName  String?
+  // Avatar color/theme variant. Maps to public `/avatar-<variant>.png`.
+  avatarVariant String @default("regular")
   grade     String? // Student grade: 5, 6, 7, 8, 9, 10, 11
   
   // Registration flow tracking
@@ -64,6 +141,8 @@ model User {
   // Relations
   parentalConsents ParentalConsent[]
   guardianVerifications GuardianVerification[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
   authSessions     AuthSession[]
   sessions         Session[]
   academicRecords  AcademicRecord[]
@@ -72,13 +151,27 @@ model User {
   userDailyVisits  UserDailyVisit[]
   liveEventsCreated LiveEvent[] @relation("LiveEventsCreated")
   liveEventEnrollments LiveEventEnrollment[]
+  liveEventSubmissions LiveEventSubmission[]
   liveAnnouncementsCreated LiveAnnouncement[] @relation("LiveAnnouncementsCreated")
   activityStats    UserActivityStats?
   materials        Material[]
+  materialsRemoved Material[] @relation("MaterialRemovedBy")
   discussions      Discussion[]
+  discussionsRemoved Discussion[] @relation("DiscussionRemovedBy")
   discussionReplies DiscussionReply[]
+  discussionRepliesRemoved DiscussionReply[] @relation("DiscussionReplyRemovedBy")
   discussionVotes  DiscussionVote[]
   replyVotes       ReplyVote[]
+  materialComments MaterialComment[]
+  materialCommentsRemoved MaterialComment[] @relation("MaterialCommentRemovedBy")
+  materialCommentVotes MaterialCommentVote[]
+  contactMessages ContactMessage[]
+  reportsMade    UserReport[] @relation("UserReportsReporter")
+  reportsReceived UserReport[] @relation("UserReportsReported")
+  reportsResolved UserReport[] @relation("UserReportsResolvedBy")
+  moderationActions ModerationAction[] @relation("ModerationActor")
+  moderationActionsTargeted ModerationAction[] @relation("ModerationTargetUser")
+  moderationNotices ModerationNotice[]
   
   // Timestamps
   createdAt DateTime @default(now())
@@ -90,6 +183,118 @@ model User {
   @@index([status])
   @@index([deletedAt])
   @@index([parentEmail])
+  @@index([emailVerifiedAt])
+  @@index([suspensionUntil])
+  @@index([bannedAt])
+}
+
+model ModerationAction {
+  id           String               @id @default(uuid())
+  actorId      String?
+  targetUserId String?
+  targetType   ModerationTargetType @default(USER)
+  targetId     String?
+  actionType   ModerationActionType
+  reason       String               @db.Text
+  durationSeconds Int?
+  metadata     Json?
+
+  actor        User? @relation("ModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  targetUser   User? @relation("ModerationTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  notices      ModerationNotice[]
+
+  createdAt    DateTime @default(now())
+
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model ModerationNotice {
+  id        String               @id @default(uuid())
+  userId    String
+  type      ModerationNoticeType
+  title     String
+  body      String               @db.Text
+  linkUrl   String?
+  actionId  String?
+  readAt    DateTime?
+
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    ModerationAction?    @relation(fields: [actionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([readAt])
+  @@index([actionId])
+}
+
+model UserReport {
+  id             String           @id @default(uuid())
+  reporterId     String
+  reportedUserId String
+  targetType     ReportTargetType @default(PROFILE)
+  targetId       String?
+  reason         UserReportReason
+  details        String?          @db.Text
+  contextUrl     String?
+  status         UserReportStatus @default(PENDING)
+  resolvedAt     DateTime?
+  resolvedById   String?
+
+  reporter       User @relation("UserReportsReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reportedUser   User @relation("UserReportsReported", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  resolvedBy     User? @relation("UserReportsResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([targetType])
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([email])
+  @@index([expiresAt])
+  @@index([usedAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([usedAt])
 }
 
 model UserActivityStats {
@@ -177,7 +382,8 @@ model ParentalConsent {
 model AuthSession {
   id          String   @id @default(uuid())
   userId      String
-  token       String   @unique // Session token
+  tokenHash   String?  @unique // SHA-256(session token)
+  token       String?  @unique // Legacy raw session token (nullable)
   expiresAt   DateTime
   ipAddress   String?
   userAgent   String?
@@ -190,7 +396,6 @@ model AuthSession {
   updatedAt   DateTime @updatedAt
   
   @@index([userId])
-  @@index([token])
   @@index([expiresAt])
 }
 
@@ -297,10 +502,13 @@ model LiveEvent {
   difficulty      MaterialDifficulty?
   creditCost      Float
   type            LiveEventType @default(PROBLEM_SPRINT)
+  maxParticipants Int?
+  prompt          String?  @db.Text
 
   createdById     String?
   createdBy       User?    @relation("LiveEventsCreated", fields: [createdById], references: [id], onDelete: SetNull)
   enrollments     LiveEventEnrollment[]
+  submissions     LiveEventSubmission[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -308,6 +516,25 @@ model LiveEvent {
 
   @@index([date])
   @@index([type])
+  @@index([deletedAt])
+}
+
+model LiveEventSubmission {
+  id          String   @id @default(uuid())
+  liveEventId String
+  userId      String
+  answer      String   @db.Text
+
+  liveEvent   LiveEvent @relation(fields: [liveEventId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([liveEventId, userId])
+  @@index([liveEventId])
+  @@index([userId])
   @@index([deletedAt])
 }
 
@@ -334,6 +561,7 @@ model LiveAnnouncement {
   id          String   @id @default(uuid())
   title       String
   body        String   @db.Text
+  imageUrl    String?  @db.Text
   createdById String?
   createdBy   User?    @relation("LiveAnnouncementsCreated", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -342,6 +570,43 @@ model LiveAnnouncement {
   deletedAt DateTime?
 
   @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model Subject {
+  id            String   @id @default(uuid())
+  slug          String   @unique
+  nameEn        String
+  nameAz        String
+  descriptionEn String?  @db.Text
+  descriptionAz String?  @db.Text
+
+  topics        Topic[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@index([slug])
+  @@index([deletedAt])
+}
+
+model Topic {
+  id        String   @id @default(uuid())
+  subjectId String
+  slug      String
+  nameEn    String
+  nameAz    String
+
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  @@unique([subjectId, slug])
+  @@index([subjectId])
+  @@index([slug])
   @@index([deletedAt])
 }
 
@@ -376,21 +641,76 @@ model Material {
   publishCreditsGrantedAt DateTime?  // Set when we grant 0.5 for first publish (idempotency)
   alignmentScore Float?         // AI rating [0.5, 1.0] for credit formulas; default 0.75
   difficulty    MaterialDifficulty? // basic=1 bar green, intermediate=2 bars yellow, advanced=3 bars red
+  ratingAvg     Float          @default(0)
+  ratingCount   Int            @default(0)
   
   // Relations
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   accesses      MaterialAccess[]
+  comments      MaterialComment[]
   
   // Timestamps
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   deletedAt   DateTime?      // Soft delete support
+  removedAt   DateTime?
+  removedById String?
+  removedReason String?      @db.Text
+  removedBy   User?          @relation("MaterialRemovedBy", fields: [removedById], references: [id], onDelete: SetNull)
   
   @@index([userId])
   @@index([subjectId, topicId])
   @@index([status])
   @@index([deletedAt])
   @@index([subjectId, topicId, status, deletedAt, publishedAt])
+  @@index([removedAt])
+  @@index([removedById])
+}
+
+model MaterialComment {
+  id              String   @id @default(uuid())
+  materialId      String
+  parentCommentId String?
+  userId          String
+  content         String   @db.Text
+  rating          Int?
+  removedAt       DateTime?
+  removedById     String?
+  removedReason   String?  @db.Text
+
+  material        Material        @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  parentComment   MaterialComment? @relation("MaterialCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  childComments   MaterialComment[] @relation("MaterialCommentReplies")
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes           MaterialCommentVote[]
+  removedBy       User?           @relation("MaterialCommentRemovedBy", fields: [removedById], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@index([materialId])
+  @@index([parentCommentId])
+  @@index([userId])
+  @@index([deletedAt])
+  @@index([removedAt])
+  @@index([removedById])
+}
+
+model MaterialCommentVote {
+  id        String @id @default(uuid())
+  commentId String
+  userId    String
+  value     Int
+
+  comment   MaterialComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
 }
 
 model Discussion {
@@ -413,12 +733,18 @@ model Discussion {
   // Timestamps
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  removedAt DateTime?
+  removedById String?
+  removedReason String? @db.Text
+  removedBy User? @relation("DiscussionRemovedBy", fields: [removedById], references: [id], onDelete: SetNull)
   
   @@index([userId])
   @@index([subjectId, topicId])
   @@index([archivedAt])
   @@index([lastActivityAt])
   @@index([archivedAt, lastActivityAt])
+  @@index([removedAt])
+  @@index([removedById])
 }
 
 model DiscussionReply {
@@ -427,6 +753,9 @@ model DiscussionReply {
   parentReplyId String?   // null = top-level reply
   userId       String
   content      String    @db.Text
+  removedAt    DateTime?
+  removedById  String?
+  removedReason String? @db.Text
   
   // Relations
   discussion   Discussion       @relation("DiscussionReplies", fields: [discussionId], references: [id], onDelete: Cascade)
@@ -435,6 +764,7 @@ model DiscussionReply {
   childReplies DiscussionReply[] @relation("ReplyReplies")
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   votes        ReplyVote[]
+  removedBy    User?             @relation("DiscussionReplyRemovedBy", fields: [removedById], references: [id], onDelete: SetNull)
   
   // Timestamps
   createdAt DateTime @default(now())
@@ -443,6 +773,8 @@ model DiscussionReply {
   @@index([discussionId])
   @@index([parentReplyId])
   @@index([userId])
+  @@index([removedAt])
+  @@index([removedById])
 }
 
 model DiscussionVote {

@@ -19,9 +19,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { getLocaleCode, type Locale } from '@/src/i18n';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { CompactRichText, type CompactRichTextStats } from '@/src/components/rich-text/compact-rich-text';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
+import { discussionRichTextHasContent } from '@/src/lib/discussion-rich-text';
+import { appendDiscussionAttachmentsToHtml } from '@/src/lib/discussion-attachments';
+import { MAX_DISCUSSION_IMAGES } from '@/src/config/uploads';
+import type { CompactRichTextImage } from '@/src/components/rich-text/compact-rich-text';
+import { DiscussionRichText } from '@/src/modules/discussions/components/discussion-rich-text';
+import { ReportButton } from '@/src/modules/reports/report-user-button';
+import { AdminRemoveContentButton } from '@/src/modules/moderation/admin-remove-content-button';
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogDescription,
@@ -35,6 +48,8 @@ interface Reply {
   createdAt: string;
   voteScore: number;
   userVote?: 1 | -1 | null;
+  removedAt?: string | null;
+  removedReason?: string | null;
   childReplies?: Reply[];
 }
 
@@ -51,6 +66,8 @@ interface Discussion {
   archivedAt?: string | null;
   acceptedReplyId?: string | null;
   currentUserId?: string | null;
+  removedAt?: string | null;
+  removedReason?: string | null;
 }
 
 const formatDateTime = (iso: string, locale: Locale) => {
@@ -67,28 +84,33 @@ const formatDateTime = (iso: string, locale: Locale) => {
   return `${time} · ${day}`;
 };
 
-const formatReplyContent = (content: string) =>
-  content.replace(/<br\s*\/?>/gi, '\n');
-
 export default function DiscussionDetailPage() {
   const MAX_REPLY_LENGTH = 2000;
   const params = useParams();
   const router = useRouter();
   const { locale, messages } = useI18n();
   const copy = messages.discussions.detail;
+  const { user: currentUser, canWrite, writeRestriction } = useCurrentUser();
+  const isAdmin = currentUser.role === 'ADMIN';
   const id = params.id as string;
   const [discussion, setDiscussion] = useState<Discussion | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [acceptingReplyId, setAcceptingReplyId] = useState<string | null>(null);
   const [inlineReply, setInlineReply] = useState('');
+  const [inlineReplyStats, setInlineReplyStats] = useState<CompactRichTextStats>({ words: 0, characters: 0 });
+  const [inlineAttachments, setInlineAttachments] = useState<CompactRichTextImage[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState('');
+  const [dialogReplyStats, setDialogReplyStats] = useState<CompactRichTextStats>({ words: 0, characters: 0 });
+  const [dialogAttachments, setDialogAttachments] = useState<CompactRichTextImage[]>([]);
   const [dialogParentId, setDialogParentId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [voteLoading, setVoteLoading] = useState<string | null>(null);
-  const inlineRemaining = MAX_REPLY_LENGTH - inlineReply.length;
-  const dialogRemaining = MAX_REPLY_LENGTH - dialogContent.length;
+  const [deleteDiscussionOpen, setDeleteDiscussionOpen] = useState(false);
+  const [deleteReplyId, setDeleteReplyId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const canInteract = canWrite && !discussion?.removedAt;
 
   const fetchDiscussion = useCallback(async () => {
     try {
@@ -115,6 +137,14 @@ export default function DiscussionDetailPage() {
   }, [fetchDiscussion]);
 
   const handleVote = async (target: 'discussion' | 'reply', targetId: string, value: 1 | -1) => {
+    if (!canWrite) {
+      toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
+      return;
+    }
+    if (discussion?.removedAt) {
+      toast.error('This post was removed by moderators.');
+      return;
+    }
     if (!discussion || voteLoading) return;
 
     let previousVote: 1 | -1 | null = null;
@@ -185,22 +215,70 @@ export default function DiscussionDetailPage() {
     }
   };
 
+  const deleteDiscussion = async () => {
+    if (!discussion || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/discussions/${discussion.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+      toast.success(copy.deletedPost);
+      setDeleteDiscussionOpen(false);
+      router.push('/discussions');
+      router.refresh();
+    } catch (error) {
+      toast.error(formatErrorToast(copy.failedDelete, error instanceof Error ? error.message : null));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const deleteReply = async () => {
+    if (!deleteReplyId || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/discussions/replies/${deleteReplyId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+      toast.success(copy.deletedReply);
+      setDeleteReplyId(null);
+      router.refresh();
+      fetchDiscussion();
+    } catch (error) {
+      toast.error(formatErrorToast(copy.failedDelete, error instanceof Error ? error.message : null));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const submitReply = async (content: string, parentReplyId?: string | null) => {
-    if (!content.trim()) return;
+    if (!canWrite) {
+      toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
+      return;
+    }
+    if (discussion?.removedAt) {
+      toast.error('This post was removed by moderators.');
+      return;
+    }
+    if (!discussionRichTextHasContent(content)) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/discussions/${id}/replies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: content.trim(),
+          content: String(content ?? '').trim(),
           parentReplyId: parentReplyId || undefined,
         }),
       });
       const created = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(extractErrorMessage(created) ?? '');
       setInlineReply('');
+      setInlineReplyStats({ words: 0, characters: 0 });
+      setInlineAttachments([]);
       setDialogContent('');
+      setDialogReplyStats({ words: 0, characters: 0 });
+      setDialogAttachments([]);
       setDialogOpen(false);
       router.refresh();
       if (created?.id) {
@@ -218,6 +296,14 @@ export default function DiscussionDetailPage() {
   };
 
   const openReplyDialog = (parentReplyId?: string) => {
+    if (!canWrite) {
+      toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
+      return;
+    }
+    if (discussion?.removedAt) {
+      toast.error('This post was removed by moderators.');
+      return;
+    }
     setDialogParentId(parentReplyId ?? null);
     setDialogOpen(true);
   };
@@ -308,7 +394,7 @@ export default function DiscussionDetailPage() {
                   size="xs"
                 />
                 <div className="text-[11px] text-muted-foreground">
-                  <span className="font-semibold text-foreground/70">
+                  <span className="font-medium text-foreground/70">
                     {discussion.authorName}
                   </span>
                   <span className="px-1">·</span>
@@ -318,14 +404,23 @@ export default function DiscussionDetailPage() {
               <h1 className="text-[15px] font-semibold text-foreground break-words">
                 {discussion.title}
               </h1>
-              <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
-                {discussion.content}
-              </p>
+              <DiscussionRichText content={discussion.content} />
+              {discussion.removedAt ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+                  <div className="font-medium">Removed by moderators</div>
+                  {discussion.removedReason ? (
+                    <div className="mt-1 text-muted-foreground">
+                      Message from the moderators: {discussion.removedReason}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => openReplyDialog()}
+                  disabled={!canInteract}
                   className="h-8 gap-1 px-2 text-xs"
                 >
                   <MessageSquare className="h-3.5 w-3.5" />
@@ -336,7 +431,7 @@ export default function DiscussionDetailPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleVote('discussion', discussion.id, 1)}
-                    disabled={!!voteLoading}
+                    disabled={!!voteLoading || !canInteract}
                     aria-label={copy.upvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
@@ -347,7 +442,7 @@ export default function DiscussionDetailPage() {
                   </Button>
                   <span
                     className={cn(
-                      'min-w-[2rem] px-2 text-center text-xs font-semibold',
+                      'min-w-[2rem] px-2 text-center text-xs font-medium',
                       netPopularity > 0
                         ? 'text-primary'
                         : netPopularity < 0
@@ -361,7 +456,7 @@ export default function DiscussionDetailPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleVote('discussion', discussion.id, -1)}
-                    disabled={!!voteLoading}
+                    disabled={!!voteLoading || !canInteract}
                     aria-label={copy.downvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
@@ -371,6 +466,36 @@ export default function DiscussionDetailPage() {
                     <ArrowBigDown className={cn('h-4 w-4', discussion.userVote === -1 && 'fill-current')} />
                   </Button>
                 </div>
+
+                <ReportButton
+                  reportedUserId={discussion.authorId}
+                  reportedUserPublicId={null}
+                  reportedUserName={discussion.authorName}
+                  targetType="DISCUSSION"
+                  targetId={discussion.id}
+                  buttonVariant="danger"
+                  buttonClassName="h-8 px-2 text-xs"
+                />
+                {currentUserId === discussion.authorId ? (
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => setDeleteDiscussionOpen(true)}
+                    disabled={deleting}
+                    className="h-8 px-2 text-xs"
+                  >
+                    {copy.deletePost}
+                  </Button>
+                ) : null}
+                {isAdmin ? (
+                  <AdminRemoveContentButton
+                    targetType="DISCUSSION"
+                    targetId={discussion.id}
+                    label="Remove"
+                    buttonVariant="outline"
+                    onRemoved={() => fetchDiscussion()}
+                  />
+                ) : null}
               </div>
             </div>
 
@@ -378,23 +503,35 @@ export default function DiscussionDetailPage() {
               <div className="space-y-4">
                 <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
                   <div className="space-y-3">
-                    <textarea
+                    <CompactRichText
                       value={inlineReply}
-                      onChange={(e) => setInlineReply(e.target.value)}
+                      onChange={setInlineReply}
+                      onStatsChange={setInlineReplyStats}
                       placeholder={copy.replyPlaceholder}
-                      className="w-full min-h-[96px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-                      maxLength={MAX_REPLY_LENGTH}
+                      ariaLabel={copy.replyPlaceholder}
+                      minHeightClass="min-h-[96px]"
+                      toolbarVisibility="always"
+                      countsVisibility="none"
+                      // Moderation removal makes the post read-only.
+                      // Server already filters access; this is a UX guard.
+                      disabled={!canInteract}
+                      imageUploadEndpoint="/api/uploads/discussions/sign"
+                      imageMode="attachments"
+                      imageMaxImages={MAX_DISCUSSION_IMAGES}
+                      attachments={inlineAttachments}
+                      onAttachmentsChange={setInlineAttachments}
                     />
                     <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">
-                        {inlineRemaining <= 100
-                          ? copy.charactersLeft.replace('{{count}}', String(inlineRemaining))
-                          : ''}
-                      </div>
+                      <div />
                       <Button
                         size="sm"
-                        onClick={() => submitReply(inlineReply)}
-                        disabled={submitting || !inlineReply.trim()}
+                        onClick={() => submitReply(appendDiscussionAttachmentsToHtml(inlineReply, inlineAttachments))}
+                        disabled={
+                          !canInteract ||
+                          submitting ||
+                          !discussionRichTextHasContent(appendDiscussionAttachmentsToHtml(inlineReply, inlineAttachments)) ||
+                          inlineReplyStats.characters > MAX_REPLY_LENGTH
+                        }
                       >
                         {copy.replyAction}
                       </Button>
@@ -403,7 +540,7 @@ export default function DiscussionDetailPage() {
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-foreground">{copy.repliesTitle}</h2>
+                    <h2 className="text-sm font-medium text-foreground">{copy.repliesTitle}</h2>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {copy.repliesSubtitle}
@@ -434,18 +571,56 @@ export default function DiscussionDetailPage() {
                               size="xs"
                             />
                             <div className="text-[11px] text-muted-foreground">
-                              <span className="font-semibold text-foreground/70">
+                              <span className="font-medium text-foreground/70">
                                 {reply.authorName}
                               </span>
                               <span className="px-1">·</span>
                               <span>{formatDateTime(reply.createdAt, locale)}</span>
                             </div>
+                            <div
+                              className="ml-auto"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              role="presentation"
+                            >
+                              <div className="flex items-center gap-2">
+                                <ReportButton
+                                  reportedUserId={reply.authorId}
+                                  reportedUserPublicId={null}
+                                  reportedUserName={reply.authorName}
+                                  targetType="DISCUSSION_REPLY"
+                                  targetId={reply.id}
+                                  buttonVariant="danger"
+                                  buttonClassName="h-7 px-2 text-[11px]"
+                                />
+                                {currentUserId === reply.authorId ? (
+                                  <Button
+                                    size="sm"
+                                    variant="danger"
+                                    onClick={() => setDeleteReplyId(reply.id)}
+                                    disabled={deleting}
+                                    className="h-7 px-2 text-[11px]"
+                                  >
+                                    {copy.deleteReply}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
-                            {formatReplyContent(reply.content)}
-                          </p>
+                          <DiscussionRichText content={reply.content} />
+                          {reply.removedAt ? (
+                            <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+                              <div className="font-medium">Removed by moderators</div>
+                              {reply.removedReason ? (
+                                <div className="mt-1 text-muted-foreground">
+                                  Message from the moderators: {reply.removedReason}
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
                           {currentUserId === discussion?.authorId &&
                             reply.authorId !== discussion.authorId &&
+                            !reply.removedAt &&
                             !discussion?.archivedAt && (
                               <div className="pt-1">
                                 <button
@@ -488,30 +663,79 @@ export default function DiscussionDetailPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-3">
-              <textarea
+              <CompactRichText
                 value={dialogContent}
-                onChange={(e) => setDialogContent(e.target.value)}
+                onChange={setDialogContent}
+                onStatsChange={setDialogReplyStats}
                 placeholder={copy.dialogPlaceholder}
-                className="w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
-                maxLength={MAX_REPLY_LENGTH}
+                ariaLabel={copy.dialogPlaceholder}
+                minHeightClass="min-h-[180px]"
+                toolbarVisibility="always"
+                countsVisibility="none"
+                imageUploadEndpoint="/api/uploads/discussions/sign"
+                imageMode="attachments"
+                imageMaxImages={MAX_DISCUSSION_IMAGES}
+                attachments={dialogAttachments}
+                onAttachmentsChange={setDialogAttachments}
               />
-              {dialogRemaining <= 100 ? (
-                <div className="text-right text-xs text-muted-foreground">
-                  {copy.charactersLeft.replace('{{count}}', String(dialogRemaining))}
-                </div>
-              ) : null}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   {copy.cancel}
                 </Button>
                 <Button
-                  onClick={() => submitReply(dialogContent, dialogParentId)}
-                  disabled={submitting || !dialogContent.trim()}
+                  onClick={() =>
+                    submitReply(
+                      appendDiscussionAttachmentsToHtml(dialogContent, dialogAttachments),
+                      dialogParentId
+                    )
+                  }
+                  disabled={
+                    submitting ||
+                    !discussionRichTextHasContent(
+                      appendDiscussionAttachmentsToHtml(dialogContent, dialogAttachments)
+                    ) ||
+                    dialogReplyStats.characters > MAX_REPLY_LENGTH
+                  }
                 >
                   {copy.postReply}
                 </Button>
               </div>
             </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={deleteDiscussionOpen} onOpenChange={setDeleteDiscussionOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{copy.deleteDialogTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{copy.deleteDialogDescription}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>{copy.cancel}</AlertDialogCancel>
+              <AlertDialogAction variant="danger" onClick={deleteDiscussion} disabled={deleting}>
+                {deleting ? copy.deleting : copy.deleteConfirm}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={Boolean(deleteReplyId)}
+          onOpenChange={(open) => {
+            if (!open) setDeleteReplyId(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{copy.deleteReplyDialogTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{copy.deleteReplyDialogDescription}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>{copy.cancel}</AlertDialogCancel>
+              <AlertDialogAction variant="danger" onClick={deleteReply} disabled={deleting || !deleteReplyId}>
+                {deleting ? copy.deleting : copy.deleteConfirm}
+              </AlertDialogAction>
+            </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
     </DashboardShell>

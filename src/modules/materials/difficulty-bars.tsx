@@ -18,7 +18,7 @@ export function DifficultyBars({ difficulty, className = '' }: DifficultyBarsPro
   const config = {
     BASIC: { count: 1, color: 'bg-green-500' },
     INTERMEDIATE: { count: 2, color: 'bg-yellow-500' },
-    ADVANCED: { count: 3, color: 'bg-red-500' },
+    ADVANCED: { count: 3, color: 'bg-destructive' },
   } as const;
 
   const { count, color } = config[d] ?? config.BASIC;

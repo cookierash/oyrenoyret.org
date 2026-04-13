@@ -37,6 +37,7 @@ import { ensureDefaultCredits } from '@/src/modules/credits';
 import { CONSENT_VERSION } from '@/src/config/constants';
 import { headers } from 'next/headers';
 import { recordDailyVisit } from '@/src/modules/visits';
+import { getRandomAvatarVariant } from '@/src/lib/avatar';
 
 /**
  * Step 1: Create student account with basic information
@@ -69,6 +70,8 @@ export async function registerStudentInfo(data: StudentInfoInput) {
         await prisma.$transaction([
           prisma.guardianVerification.deleteMany({ where: { userId: existingUser.id } }),
           prisma.parentalConsent.deleteMany({ where: { userId: existingUser.id } }),
+          prisma.emailVerificationToken.deleteMany({ where: { userId: existingUser.id } }),
+          prisma.passwordResetToken.deleteMany({ where: { userId: existingUser.id } }),
           prisma.authSession.deleteMany({ where: { userId: existingUser.id } }),
           prisma.user.delete({ where: { id: existingUser.id } }),
         ]);
@@ -94,6 +97,7 @@ export async function registerStudentInfo(data: StudentInfoInput) {
         role: 'STUDENT',
         status: 'INACTIVE',
         registrationStep: 2, // Move to step 2
+        avatarVariant: getRandomAvatarVariant(),
       },
     });
     await getOrCreatePublicId(user.id);
@@ -154,7 +158,18 @@ export async function registerParentInfo(userId: string, data: ParentInfoInput) 
         parentEmail: validated.parentEmail,
         parentFirstName: validated.parentFirstName,
         parentLastName: validated.parentLastName,
-        registrationStep: 4, // Move to consent step
+        registrationStep: 3, // Move to verification step
+      },
+    });
+
+    // Invalidate any existing codes if the parent email was updated/re-submitted
+    await prisma.guardianVerification.updateMany({
+      where: {
+        userId,
+        used: false,
+      },
+      data: {
+        used: true,
       },
     });
     await issueRegistrationToken(userId);
@@ -242,6 +257,15 @@ export async function sendParentVerificationCode(userId: string) {
       success: true,
     };
   } catch (error) {
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        success: false,
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to send verification email',
+      };
+    }
     return {
       success: false,
       errorKey: 'verificationSendFailed',
@@ -387,6 +411,25 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
       };
     }
 
+    // Require parent email verification before consent can be granted
+    const verified = await prisma.guardianVerification.findFirst({
+      where: {
+        userId,
+        parentEmail: user.parentEmail,
+        verifiedAt: { not: null },
+      },
+      orderBy: {
+        verifiedAt: 'desc',
+      },
+    });
+
+    if (!verified) {
+      return {
+        success: false,
+        errorKey: 'parentEmailNotVerified',
+      };
+    }
+
     // Create consent record
     await prisma.parentalConsent.create({
       data: {
@@ -405,6 +448,7 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
         status: 'ACTIVE',
         registrationStep: 5, // Registration complete
       },
+      select: { id: true },
     });
 
     // Ensure default credits (15) for new users
@@ -418,6 +462,9 @@ export async function grantParentalConsent(userId: string, data: ConsentInput) {
     await createSession(userId, ipAddress, userAgent);
     await recordDailyVisit(userId);
     await clearRegistrationToken();
+
+    // Email verification is not sent automatically after registration.
+    // Users can request it manually via the "Verify my email" button.
 
     return {
       success: true,

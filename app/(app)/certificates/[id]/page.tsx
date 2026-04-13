@@ -63,20 +63,20 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
                     </div>
 
                     <div className="space-y-4">
-                        <h1 className="text-3xl sm:text-4xl font-bold font-comfortaa text-primary tracking-tight">
+                        <h1 className="text-3xl sm:text-4xl font-semibold font-comfortaa text-primary tracking-tight">
                             {copy.completionTitle}
                         </h1>
-                        <p className="text-muted-foreground uppercase tracking-widest text-sm font-semibold">
+                        <p className="text-muted-foreground uppercase tracking-widest text-sm font-medium">
                             {copy.acknowledgesLabel}
                         </p>
-                        <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">
+                        <h2 className="text-2xl sm:text-3xl font-medium text-foreground">
                             {certificate.user.firstName} {certificate.user.lastName}
                         </h2>
                     </div>
 
                     <div className="pt-4 pb-4 border-y border-border/50">
                         <p className="text-muted-foreground mb-4">{copy.completedLabel}</p>
-                        <h3 className="text-xl font-semibold mb-2">{certificate.title}</h3>
+                        <h3 className="text-xl font-medium mb-2">{certificate.title}</h3>
                         {certificate.description && (
                             <p className="text-sm text-muted-foreground max-w-lg mx-auto leading-relaxed">
                                 {certificate.description}
@@ -95,7 +95,7 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
                             <CheckCircle className="w-4 h-4 text-emerald-500" />
                             <span className="text-emerald-600 dark:text-emerald-400">
                               {copy.verifiedLabel}{' '}
-                              <span className="font-comfortaa lowercase">oyrenoyret</span>
+                              <span className="brand-font lowercase">oyrenoyret</span>
                             </span>
                         </div>
                     </div>

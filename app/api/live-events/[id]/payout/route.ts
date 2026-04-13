@@ -9,6 +9,10 @@ import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
 import { grantSprintPayout } from '@/src/modules/credits';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
+import { RATE_LIMITS } from '@/src/config/constants';
+import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 
 type WinnerInput = {
   rank: 1 | 2 | 3;
@@ -46,12 +50,28 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { role: true },
     });
     if (!user || !isStaff(user.role)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(`live-events:payout:${identifier}`, RATE_LIMITS.ADMIN_WRITE);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
     }
 
     const { id } = await params;
@@ -141,6 +161,12 @@ export async function POST(
 
     return NextResponse.json({ payouts: results });
   } catch (error) {
+    if (isDbSchemaMismatch(error)) {
+      return NextResponse.json(
+        { error: 'Sprint payouts are not available. Apply database migrations first.' },
+        { status: 503 },
+      );
+    }
     console.error('Error granting sprint payout:', error);
     return NextResponse.json(
       { error: 'Internal server error' },

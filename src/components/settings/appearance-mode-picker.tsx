@@ -26,38 +26,55 @@ export function AppearanceModePicker() {
             onClick={() => setTheme(option.id)}
             aria-pressed={isActive}
             className={cn(
-              'group rounded-xl border p-3 text-left transition-all',
+              'group rounded-xl border p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
               isActive
-                ? 'border-primary/60 ring-2 ring-primary/20 bg-primary/5'
-                : 'border-border/70 hover:border-primary/30 hover:bg-muted/30',
+                ? 'border-primary/55 ring-2 ring-primary/15 bg-primary/4'
+                : 'border-border/70 hover:border-primary/25 hover:bg-muted/25',
             )}
           >
             <div
               className={cn(
-                'h-24 rounded-lg border border-border/60 shadow-sm',
+                'h-24 overflow-hidden rounded-lg border shadow-sm',
                 option.id === 'light'
-                  ? 'bg-gradient-to-br from-white via-slate-50 to-slate-100'
-                  : 'bg-gradient-to-br from-slate-900 via-slate-950 to-slate-800',
+                  ? 'border-slate-200/70 bg-gradient-to-br from-white via-slate-50 to-slate-200/60 shadow-slate-900/5'
+                  : 'border-neutral-800/80 bg-gradient-to-br from-neutral-950 via-neutral-950 to-neutral-900 shadow-black/35',
               )}
             >
               <div
                 className={cn(
-                  'h-7 rounded-t-lg border-b border-border/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide',
+                  'flex h-7 items-center justify-between border-b px-2 py-1 text-[10px] font-medium uppercase tracking-wide',
                   option.id === 'light'
-                    ? 'bg-white/80 text-slate-500'
-                    : 'bg-black/30 text-slate-300',
+                    ? 'border-slate-200/60 bg-white/70 text-slate-500'
+                    : 'border-neutral-800/70 bg-neutral-950/35 text-neutral-300/90',
                 )}
               >
-                oyrenoyret
+                <span className="brand-font">oyrenoyret</span>
+                <span
+                  className={cn(
+                    'h-1.5 w-5 rounded-full',
+                    option.id === 'light' ? 'bg-slate-200/80' : 'bg-neutral-700/60',
+                  )}
+                  aria-hidden
+                />
               </div>
               <div
                 className={cn(
                   'px-2 pt-2 text-xs',
-                  option.id === 'light' ? 'text-slate-600' : 'text-slate-300',
+                  option.id === 'light' ? 'text-slate-600' : 'text-neutral-300',
                 )}
               >
-                <div className={cn('h-2 w-1/2 rounded-full', option.id === 'light' ? 'bg-slate-200' : 'bg-slate-700')} />
-                <div className={cn('mt-2 h-2 w-2/3 rounded-full', option.id === 'light' ? 'bg-slate-200' : 'bg-slate-700')} />
+                <div
+                  className={cn(
+                    'h-2 w-1/2 rounded-full',
+                    option.id === 'light' ? 'bg-slate-200/80' : 'bg-neutral-700/55',
+                  )}
+                />
+                <div
+                  className={cn(
+                    'mt-2 h-2 w-2/3 rounded-full',
+                    option.id === 'light' ? 'bg-slate-200/80' : 'bg-neutral-700/55',
+                  )}
+                />
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between text-sm font-medium text-foreground">

@@ -10,7 +10,8 @@ import { Select, SelectItem } from '@/components/ui/select';
 import { PiBookOpen as BookOpen, PiMagnifyingGlass as Search } from 'react-icons/pi';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocaleCode } from '@/src/i18n';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { StarRating } from '@/src/components/ui/star-rating';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
 
 interface PurchasedMaterial {
     purchasedAt: string;
@@ -21,6 +22,8 @@ interface PurchasedMaterial {
         topicId: string;
         materialType: 'TEXTUAL' | 'PRACTICE_TEST';
         difficulty: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED' | null;
+        ratingAvg: number;
+        ratingCount: number;
     };
 }
 
@@ -29,7 +32,7 @@ type SortOption = 'newest' | 'oldest' | 'az' | 'za';
 const DIFFICULTY_COLORS: Record<string, string> = {
     BASIC: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 dark:text-emerald-400',
     INTERMEDIATE: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-500/10 dark:text-yellow-400',
-    ADVANCED: 'text-red-600 bg-red-50 dark:bg-red-500/10 dark:text-red-400',
+    ADVANCED: 'text-destructive bg-destructive/10',
 };
 
 export default function MyMaterialsPage() {
@@ -39,10 +42,8 @@ export default function MyMaterialsPage() {
     const [sort, setSort] = useState<SortOption>('newest');
     const { locale, t, messages } = useI18n();
     const copy = messages.app.library;
-    const subjectNameMap = useMemo(
-        () => new Map(getLocalizedSubjects(messages).map((subject) => [subject.id, subject.name])),
-        [messages],
-    );
+    const guidedCopy = messages.app.guidedGroupSessions;
+    const { subjectNameMap } = useCurriculum();
     const countLabel = (count: number) =>
         count === 1
             ? t('app.library.countSingle', { count })
@@ -93,6 +94,17 @@ export default function MyMaterialsPage() {
         />
 
         <main className="space-y-4 pt-2">
+            <Link
+                href="/library/guided-group-sessions"
+                className="card-frame bg-card p-4 block hover:border-primary/40 transition-colors"
+            >
+                <div className="flex items-center justify-between gap-3">
+                    <div>
+                        <p className="text-sm font-medium">{guidedCopy.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{guidedCopy.description}</p>
+                    </div>
+                </div>
+            </Link>
             {loading ? (
                 <>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -213,6 +225,20 @@ export default function MyMaterialsPage() {
                                                     {copy.difficulty[material.difficulty]}
                                                 </span>
                                             )}
+                                            {material.ratingCount > 0 ? (
+                                              <span className="flex items-center gap-1">
+                                                <StarRating
+                                                  value={material.ratingAvg}
+                                                  sizeClass="h-3.5 w-3.5"
+                                                  ariaLabel={messages.materials.comments.ratingSummary
+                                                    .replace('{{avg}}', Number(material.ratingAvg).toFixed(1))
+                                                    .replace('{{count}}', String(material.ratingCount))}
+                                                />
+                                                <span className="text-[11px]">
+                                                  {Number(material.ratingAvg).toFixed(1)} ({material.ratingCount})
+                                                </span>
+                                              </span>
+                                            ) : null}
                                         </div>
 
                                         <p className="text-[11px] text-muted-foreground/60 mt-auto">

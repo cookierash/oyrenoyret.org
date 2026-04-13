@@ -15,6 +15,11 @@ export default function LibraryLoading() {
       </div>
 
       <main className="space-y-4 pt-2">
+        <div className="card-frame bg-card p-4 space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-72" />
+        </div>
+
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Skeleton className="h-9 w-full sm:w-96" />
           <Skeleton className="h-9 w-44" />

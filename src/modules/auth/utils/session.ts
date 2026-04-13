@@ -8,6 +8,7 @@
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { prisma } from '@/src/db/client';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 const SESSION_TOKEN_LENGTH = 32;
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days (common for educational/SaaS)
@@ -32,6 +33,37 @@ function generateSessionToken(): string {
   return crypto.randomBytes(SESSION_TOKEN_LENGTH).toString('hex');
 }
 
+function hashSessionToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function isTokenHashUnsupportedError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const name = (error as { name?: unknown }).name;
+  const message = (error as { message?: unknown }).message;
+  return (
+    name === 'PrismaClientValidationError' &&
+    typeof message === 'string' &&
+    message.includes('Unknown argument `tokenHash`')
+  );
+}
+
+function isTokenHashMissingColumnError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const code = (error as { code?: unknown }).code;
+  const message = (error as { message?: unknown }).message;
+  const metaColumn = (error as { meta?: { column?: unknown } }).meta?.column;
+  return (
+    code === 'P2022' &&
+    ((typeof metaColumn === 'string' && metaColumn.toLowerCase().includes('tokenhash')) ||
+      (typeof message === 'string' &&
+        (message.includes('tokenHash') ||
+          message.includes('"tokenHash"') ||
+          // Some Prisma builds redact the column name as "(not available)".
+          message.includes('(not available)'))))
+  );
+}
+
 /**
  * Creates a new session for a user
  * @param userId User ID
@@ -45,17 +77,41 @@ export async function createSession(
   userAgent?: string
 ): Promise<string> {
   const token = generateSessionToken();
+  const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
 
-  await prisma.authSession.create({
-    data: {
-      userId,
-      token,
-      expiresAt,
-      ipAddress,
-      userAgent,
-    },
-  });
+  try {
+    await prisma.authSession.create({
+      data: {
+        userId,
+        tokenHash,
+        token: null,
+        expiresAt,
+        ipAddress,
+        userAgent,
+      },
+    });
+  } catch (error) {
+    // Safe rollout fallback:
+    // - If Prisma Client is outdated (no tokenHash), or DB migration isn't applied yet,
+    //   fall back to legacy raw-token sessions to avoid a hard outage.
+    if (isTokenHashUnsupportedError(error) || isTokenHashMissingColumnError(error)) {
+      console.warn(
+        'AuthSession.tokenHash is not available yet; falling back to legacy session tokens. Ensure prisma generate + migrate deploy ran in production.',
+      );
+      await prisma.authSession.create({
+        data: {
+          userId,
+          token,
+          expiresAt,
+          ipAddress,
+          userAgent,
+        },
+      });
+    } else {
+      throw error;
+    }
+  }
 
   // Set httpOnly cookie
   const cookieStore = await cookies();
@@ -92,15 +148,45 @@ export async function validateSession(token: string): Promise<string | null> {
     return cached.userId;
   }
 
-  const session = await prisma.authSession.findUnique({
-    where: { token },
-    select: {
-      id: true,
-      userId: true,
-      expiresAt: true,
-      user: { select: { status: true } },
-    },
-  });
+  const tokenHash = hashSessionToken(token);
+  const baseSelect = {
+    id: true,
+    userId: true,
+    expiresAt: true,
+  } as const;
+
+  const hashedSelect = {
+    ...baseSelect,
+    token: true,
+    tokenHash: true,
+  } as const;
+
+  let session: any = null;
+
+  try {
+    session = await prisma.authSession.findUnique({
+      where: { tokenHash },
+      select: hashedSelect as any,
+    });
+  } catch (error) {
+    if (isTokenHashUnsupportedError(error) || isTokenHashMissingColumnError(error)) {
+      session = null;
+    } else {
+      throw error;
+    }
+  }
+
+  if (!session) {
+    // Legacy sessions (pre-hash migration): fall back to raw token lookup.
+    try {
+      session = await prisma.authSession.findUnique({
+        where: { token },
+        select: { ...baseSelect, token: true } as any,
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
 
   if (!session) {
     sessionCache.delete(token);
@@ -114,10 +200,73 @@ export async function validateSession(token: string): Promise<string | null> {
     return null;
   }
 
-  // Check if user is active
-  if (session.user.status !== 'ACTIVE') {
+  // Fetch user status separately so missing/new user columns don't break session validation.
+  // This prevents "random logouts" during partial rollouts when only auth tables are migrated.
+  let userStatus: any = null;
+  try {
+    userStatus = await prisma.user.findUnique({
+      where: { id: session.userId },
+      select: { status: true, suspensionUntil: true } as any,
+    });
+  } catch (error) {
+    if (isDbSchemaMismatch(error)) {
+      try {
+        userStatus = await prisma.user.findUnique({
+          where: { id: session.userId },
+          select: { status: true } as any,
+        });
+      } catch (fallbackError) {
+        if (!isDbSchemaMismatch(fallbackError)) throw fallbackError;
+        userStatus = { status: 'ACTIVE' } as any;
+      }
+    } else {
+      throw error;
+    }
+  }
+
+  // Check if user is allowed to browse while logged in.
+  // - INACTIVE: registration incomplete → treat as unauthenticated.
+  // - SUSPENDED/BANNED: session is valid, but app will gate features and show a blocking dialog.
+  const status = userStatus?.status as string | undefined;
+  if (!status) {
+    // If the user was deleted, the session is no longer valid.
+    await prisma.authSession.delete({ where: { id: session.id } });
     sessionCache.delete(token);
     return null;
+  }
+  if (status === 'INACTIVE') {
+    await prisma.authSession.delete({ where: { id: session.id } });
+    sessionCache.delete(token);
+    return null;
+  }
+
+  // Auto-lift suspension once the window expires.
+  if (status === 'SUSPENDED') {
+    const until = (userStatus as any)?.suspensionUntil as Date | null | undefined;
+    if (until && until.getTime() <= Date.now()) {
+      try {
+        await prisma.user.update({
+          where: { id: session.userId },
+          data: { status: 'ACTIVE', suspensionUntil: null, suspensionReason: null },
+          select: { id: true },
+        });
+      } catch (error) {
+        if (!isDbSchemaMismatch(error)) throw error;
+        // If migrations aren't applied yet, ignore and keep the session usable.
+      }
+    }
+  }
+
+  // Opportunistically migrate legacy sessions to hashed storage.
+  if (!session.tokenHash && session.token) {
+    try {
+      await prisma.authSession.update({
+        where: { id: session.id },
+        data: { tokenHash, token: null },
+      });
+    } catch {
+      // Ignore race conditions / unique collisions; session remains usable for this request.
+    }
   }
 
   sessionCache.set(token, {
@@ -166,9 +315,22 @@ export async function deleteSession(token?: string): Promise<void> {
   const sessionToken = token || cookieStore.get('session_token')?.value;
 
   if (sessionToken) {
-    await prisma.authSession.deleteMany({
-      where: { token: sessionToken },
-    });
+    const tokenHash = hashSessionToken(sessionToken);
+    try {
+      await prisma.authSession.deleteMany({
+        where: {
+          OR: [{ tokenHash }, { token: sessionToken }],
+        },
+      });
+    } catch (error) {
+      if (isTokenHashUnsupportedError(error) || isTokenHashMissingColumnError(error)) {
+        await prisma.authSession.deleteMany({
+          where: { token: sessionToken },
+        });
+      } else {
+        throw error;
+      }
+    }
     sessionCache.delete(sessionToken);
   }
 

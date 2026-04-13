@@ -10,6 +10,7 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { grantDiscussionHelp, hasGrantedHelpForReply } from '@/src/modules/credits';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 
 export async function POST(
   request: Request,
@@ -19,6 +20,15 @@ export async function POST(
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
     }
 
     const identifier = getRateLimitIdentifier(request, userId);
@@ -43,7 +53,7 @@ export async function POST(
     }
 
     const discussion = await prisma.discussion.findFirst({
-      where: { id: discussionId, userId, archivedAt: null },
+      where: { id: discussionId, userId, archivedAt: null, removedAt: null },
       select: { id: true },
     });
 
@@ -52,7 +62,7 @@ export async function POST(
     }
 
     const reply = await prisma.discussionReply.findFirst({
-      where: { id: replyId, discussionId },
+      where: { id: replyId, discussionId, removedAt: null },
       select: { id: true, userId: true },
     });
 

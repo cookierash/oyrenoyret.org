@@ -1,6 +1,6 @@
 'use client';
 
-import { LiveAnnouncementsList } from '@/src/modules/live-activities/live-announcements-list';
+import { LiveAnnouncementsList } from '@/src/modules/interactive-sessions/live-announcements-list';
 import { PiMegaphone as Megaphone } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
@@ -21,7 +21,7 @@ export function LiveActivitiesRightSidebar({ className }: LiveActivitiesRightSid
       <div className="flex-1 overflow-y-auto">
         <section className="flex h-14 items-center gap-2 px-4">
           <Megaphone className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold text-foreground">
+          <h2 className="text-sm font-medium text-foreground">
             {t('sidebar.announcements')}
           </h2>
         </section>

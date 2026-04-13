@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/src/i18n/i18n-provider';
 
-export default function CertificateVerifyPage() {
+export default function RecordVerifyPage() {
   const router = useRouter();
   const [value, setValue] = useState('');
   const { messages } = useI18n();

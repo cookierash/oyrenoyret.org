@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { cn } from '@/src/lib/utils';
-import { sanitizeHtml } from '@/src/security/validation';
+import { sanitizeRichTextHtml } from '@/src/security/validation';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/src/i18n/i18n-provider';
 
@@ -39,11 +39,11 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
         ) => ({
           id: q.id ?? `q-${idx}`,
           type: q.type ?? 'multiple_choice',
-          questionHtml: sanitizeHtml(q.question || copy.missingQuestion),
+          questionHtml: sanitizeRichTextHtml(q.question || copy.missingQuestion),
           options: Array.isArray(q.options)
             ? q.options.map((opt, optIdx) => ({
                 id: opt.id ?? `${q.id ?? `q-${idx}`}-opt-${optIdx}`,
-                textHtml: sanitizeHtml(opt.text || copy.emptyOption),
+                textHtml: sanitizeRichTextHtml(opt.text || copy.emptyOption),
               }))
             : [],
           correctOptionId: q.correctOptionId,
@@ -127,7 +127,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
                         }}
                       />
                       {isRevealed ? (
-                        <span className="text-[10px] font-semibold uppercase tracking-wide">
+                        <span className="text-[10px] font-medium uppercase tracking-wide">
                           {showCorrect
                             ? copy.correctLabel
                             : showIncorrect

@@ -10,7 +10,9 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { roundCredits } from '@/src/modules/credits';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
+import { getSettingsPreferences } from '@/src/lib/settings-preferences-server';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export async function GET(request: Request) {
   const userId = await getCurrentSession();
@@ -26,85 +28,128 @@ export async function GET(request: Request) {
       return NextResponse.json(body, { status, headers });
     }
 
-    const [replyNotifications, transactions, pendingEnrollments] = await Promise.all([
-      prisma.discussionReply.findMany({
-        where: {
-          userId: { not: userId },
-          OR: [
-            { discussion: { userId } },
-            { parentReply: { userId } },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          content: true,
-          createdAt: true,
-          discussionId: true,
-          parentReplyId: true,
-          discussion: {
-            select: {
-              title: true,
-              userId: true,
+    const { notifications } = await getSettingsPreferences();
+    const now = new Date();
+
+    const [replyNotifications, transactions, pendingEnrollments, moderationNotices] = await Promise.all([
+      notifications.replies
+        ? prisma.discussionReply.findMany({
+            where: {
+              userId: { not: userId },
+              OR: [{ discussion: { userId } }, { parentReply: { userId } }],
             },
-          },
-          parentReply: {
-            select: {
-              userId: true,
-            },
-          },
-          user: {
-            select: {
-              firstName: true,
-              lastName: true,
-              email: true,
-            },
-          },
-        },
-      }),
-      prisma.creditTransaction.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-        select: {
-          id: true,
-          amount: true,
-          balanceAfter: true,
-          type: true,
-          createdAt: true,
-          metadata: true,
-        },
-      }),
-      prisma.liveEventEnrollment.findMany({
-        where: {
-          userId,
-          status: { in: ['PENDING', 'CANCELLED'] },
-          liveEvent: {
-            deletedAt: null,
-            type: 'PROBLEM_SPRINT',
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-        select: {
-          id: true,
-          createdAt: true,
-          status: true,
-          liveEvent: {
+            orderBy: { createdAt: 'desc' },
+            take: 50,
             select: {
               id: true,
-              topic: true,
-              date: true,
-              creditCost: true,
-              durationMinutes: true,
+              content: true,
+              createdAt: true,
+              discussionId: true,
+              parentReplyId: true,
+              discussion: {
+                select: {
+                  title: true,
+                  userId: true,
+                },
+              },
+              parentReply: {
+                select: {
+                  userId: true,
+                },
+              },
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
             },
-          },
-        },
-      }),
+          })
+        : Promise.resolve([]),
+      notifications.credits
+        ? prisma.creditTransaction.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+            select: {
+              id: true,
+              amount: true,
+              balanceAfter: true,
+              type: true,
+              createdAt: true,
+              metadata: true,
+            },
+          })
+        : Promise.resolve([]),
+      notifications.sprints
+        ? (async () => {
+            try {
+              return await prisma.liveEventEnrollment.findMany({
+                where: {
+                  userId,
+                  status: { in: ['PENDING', 'CANCELLED'] },
+                  liveEvent: {
+                    deletedAt: null,
+                    type: 'PROBLEM_SPRINT',
+                    date: { gte: now },
+                  },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: 50,
+                select: {
+                  id: true,
+                  createdAt: true,
+                  status: true,
+                  liveEvent: {
+                    select: {
+                      id: true,
+                      topic: true,
+                      date: true,
+                      creditCost: true,
+                      durationMinutes: true,
+                    },
+                  },
+                },
+              });
+            } catch (error) {
+              if (isDbSchemaMismatch(error)) return [];
+              throw error;
+            }
+          })()
+        : Promise.resolve([]),
+      (async () => {
+        try {
+          return await prisma.moderationNotice.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+            select: {
+              id: true,
+              type: true,
+              title: true,
+              body: true,
+              linkUrl: true,
+              createdAt: true,
+            },
+          });
+        } catch (error) {
+          if (isDbSchemaMismatch(error)) return [];
+          throw error;
+        }
+      })(),
     ]);
 
     const items = [
+      ...moderationNotices.map((notice) => ({
+        type: 'moderation' as const,
+        id: notice.id,
+        noticeType: notice.type,
+        title: notice.title,
+        body: notice.body,
+        linkUrl: notice.linkUrl,
+        createdAt: notice.createdAt.toISOString(),
+      })),
       ...replyNotifications.map((reply) => {
         const authorName =
           [reply.user.firstName, reply.user.lastName].filter(Boolean).join(' ') ||

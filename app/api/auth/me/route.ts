@@ -30,7 +30,10 @@ export async function GET(request: Request) {
         id: true,
         firstName: true,
         lastName: true,
+        avatarVariant: true,
         email: true,
+        role: true,
+        emailVerifiedAt: true,
       },
     });
 
@@ -43,7 +46,10 @@ export async function GET(request: Request) {
         id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
+        avatarVariant: user.avatarVariant,
         email: user.email,
+        role: user.role,
+        emailVerifiedAt: user.emailVerifiedAt ? user.emailVerifiedAt.toISOString() : null,
       },
     }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {

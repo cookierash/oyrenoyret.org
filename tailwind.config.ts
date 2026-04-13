@@ -18,6 +18,14 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontWeight: {
+        // Typography tuning: GitHub-like contrast without heavy "bold" rendering.
+        // Inter (variable) supports these intermediate weights.
+        medium: '500',
+        semibold: '560',
+        // Keep `font-bold` restrained if it appears.
+        bold: '600',
+      },
       fontFamily: {
         // Use Inter (Next font) everywhere via Tailwind's font-sans
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],

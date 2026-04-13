@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo } from 'react';
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { createTranslator, getMessages, normalizeLocale, DEFAULT_LOCALE, type Locale, type Messages, type MessageKey, type TranslateVars } from '@/src/i18n';
 
 interface I18nContextValue {
@@ -18,7 +19,9 @@ interface I18nProviderProps {
 }
 
 export function I18nProvider({ locale, children }: I18nProviderProps) {
-  const resolvedLocale = normalizeLocale(typeof locale === 'string' ? locale : locale);
+  const pathname = usePathname();
+  const forcedLocale = pathname.startsWith('/admin') ? 'en' : locale;
+  const resolvedLocale = normalizeLocale(forcedLocale);
   const value = useMemo<I18nContextValue>(() => {
     return {
       locale: resolvedLocale,

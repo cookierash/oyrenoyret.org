@@ -13,8 +13,9 @@ import { PiMagnifyingGlass as Search, PiX as X } from 'react-icons/pi';
 import { CreateDiscussionDialog } from '@/src/modules/discussions/create-discussion-dialog';
 import { DiscussionList } from '@/src/modules/discussions/discussion-list';
 import { useI18n } from '@/src/i18n/i18n-provider';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 import { buildTagIndex, normalizeTagToken, TAG_MATCH_REGEX } from '@/src/lib/tagging';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
 
 export default function DiscussionsPage() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +27,8 @@ export default function DiscussionsPage() {
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
   const { t, messages } = useI18n();
   const copy = messages.discussions.page;
-  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const { canWrite } = useCurrentUser();
+  const { subjects } = useCurriculum();
   const subjectTagIndex = useMemo(
     () =>
       buildTagIndex(
@@ -67,11 +69,7 @@ export default function DiscussionsPage() {
     let active = true;
     const ping = async () => {
       try {
-        const res = await fetch('/api/online-users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          cache: 'no-store',
-        });
+        const res = await fetch('/api/online-users', { cache: 'no-store' });
         const data = await res.json().catch(() => ({}));
         if (active && typeof data?.count === 'number') {
           setOnlineCount(data.count);
@@ -168,7 +166,7 @@ export default function DiscussionsPage() {
         title={copy.title}
         description={copy.description}
         actions={
-          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)} disabled={!canWrite}>
             {copy.newPost}
           </Button>
         }
@@ -250,7 +248,7 @@ export default function DiscussionsPage() {
                         <div className="text-xs text-muted-foreground">{subject.name}</div>
                       </div>
                       {selectedSubjects.includes(subject.id) ? (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                           {copy.added}
                         </span>
                       ) : null}
@@ -273,8 +271,8 @@ export default function DiscussionsPage() {
       </main>
 
       <CreateDiscussionDialog
-        open={showCreate}
-        onOpenChange={setShowCreate}
+        open={showCreate && canWrite}
+        onOpenChange={(open) => setShowCreate(open && canWrite)}
         onCreated={() => setRefreshKey((k) => k + 1)}
       />
     </DashboardShell>

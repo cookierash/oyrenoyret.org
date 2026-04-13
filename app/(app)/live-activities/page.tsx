@@ -1,27 +1,12 @@
 /**
- * Live Activities Page
+ * Legacy Live Activities Route
  *
- * Problem sprint listings + enrollment flow.
+ * Redirects to /interactive-sessions.
  */
 
-import { DashboardShell } from '@/src/components/ui/dashboard-shell';
-import { PageHeader } from '@/src/components/ui/page-header';
-import { LiveEventsBoard } from '@/src/modules/live-activities/live-events-board';
-import { getI18n } from '@/src/i18n/server';
+import { redirect } from 'next/navigation';
 
-export default async function LiveActivitiesPage() {
-  const { messages } = await getI18n();
-  const copy = messages.app.liveActivities;
-  return (
-    <DashboardShell>
-      <PageHeader
-        title={copy.title}
-        description={copy.description}
-      />
-
-      <main className="space-y-4 pt-2">
-        <LiveEventsBoard />
-      </main>
-    </DashboardShell>
-  );
+export default function LegacyLiveActivitiesPage() {
+  redirect('/interactive-sessions');
 }
+

@@ -9,7 +9,7 @@ export const MESSAGES = {
 export type Locale = keyof typeof MESSAGES;
 export type Messages = (typeof MESSAGES)['en'];
 
-export const DEFAULT_LOCALE: Locale = 'en';
+export const DEFAULT_LOCALE: Locale = 'az';
 export const SUPPORTED_LOCALES = Object.keys(MESSAGES) as Locale[];
 
 export function isSupportedLocale(value?: string): value is Locale {

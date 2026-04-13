@@ -8,6 +8,7 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { refundDiscussionCreate } from '@/src/modules/credits';
 
 export async function GET(
   request: Request,
@@ -16,6 +17,10 @@ export async function GET(
   try {
     const { id } = await params;
     const currentUserId = await getCurrentSession();
+    const currentUser = currentUserId
+      ? await prisma.user.findUnique({ where: { id: currentUserId }, select: { role: true } })
+      : null;
+    const isAdminUser = currentUser?.role === 'ADMIN';
 
     const identifier = getRateLimitIdentifier(request, currentUserId);
     const rateLimit = await checkRateLimit(`discussions:detail:${identifier}`, RATE_LIMITS.GENERAL);
@@ -35,6 +40,8 @@ export async function GET(
         lastActivityAt: true,
         archivedAt: true,
         acceptedReplyId: true,
+        removedAt: true,
+        removedReason: true,
         createdAt: true,
         user: {
           select: {
@@ -45,12 +52,22 @@ export async function GET(
           },
         },
         replies: {
-          where: { parentReplyId: null },
+          where: isAdminUser
+            ? { parentReplyId: null }
+            : {
+                parentReplyId: null,
+                OR: [
+                  { removedAt: null },
+                  ...(currentUserId ? [{ userId: currentUserId }] : []),
+                ],
+              },
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,
             content: true,
             createdAt: true,
+            removedAt: true,
+            removedReason: true,
             user: {
               select: {
                 id: true,
@@ -60,11 +77,21 @@ export async function GET(
               },
             },
             childReplies: {
+              where: isAdminUser
+                ? {}
+                : {
+                    OR: [
+                      { removedAt: null },
+                      ...(currentUserId ? [{ userId: currentUserId }] : []),
+                    ],
+                  },
               orderBy: { createdAt: 'asc' },
               select: {
                 id: true,
                 content: true,
                 createdAt: true,
+                removedAt: true,
+                removedReason: true,
                 user: {
                   select: {
                     id: true,
@@ -81,6 +108,9 @@ export async function GET(
     });
 
     if (!discussion || discussion.archivedAt) {
+      return NextResponse.json({ error: 'Discussion not found' }, { status: 404 });
+    }
+    if (discussion.removedAt && !(isAdminUser || (currentUserId && discussion.user.id === currentUserId))) {
       return NextResponse.json({ error: 'Discussion not found' }, { status: 404 });
     }
 
@@ -127,6 +157,8 @@ export async function GET(
       id: r.id,
       content: r.content,
       createdAt: r.createdAt,
+      removedAt: r.removedAt,
+      removedReason: r.removedReason,
       authorId: r.user.id,
       authorName:
         [r.user.firstName, r.user.lastName].filter(Boolean).join(' ') ||
@@ -137,6 +169,8 @@ export async function GET(
         id: c.id,
         content: c.content,
         createdAt: c.createdAt,
+        removedAt: c.removedAt,
+        removedReason: c.removedReason,
         authorId: c.user.id,
         authorName:
           [c.user.firstName, c.user.lastName].filter(Boolean).join(' ') ||
@@ -155,6 +189,8 @@ export async function GET(
       lastActivityAt: discussion.lastActivityAt,
       createdAt: discussion.createdAt,
       archivedAt: discussion.archivedAt,
+      removedAt: discussion.removedAt,
+      removedReason: discussion.removedReason,
       authorId: discussion.user.id,
       acceptedReplyId: discussion.acceptedReplyId,
       authorName:
@@ -171,5 +207,72 @@ export async function GET(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const userId = await getCurrentSession();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(`discussions:delete:${identifier}`, RATE_LIMITS.WRITE);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
+    const { id } = await params;
+    const discussion = await prisma.discussion.findUnique({
+      where: { id },
+      select: { id: true, userId: true, archivedAt: true, removedAt: true },
+    });
+
+    if (!discussion || discussion.archivedAt) {
+      return NextResponse.json({ error: 'Discussion not found' }, { status: 404 });
+    }
+
+    if (discussion.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (discussion.removedAt) {
+      return NextResponse.json({ ok: true, alreadyDeleted: true }, { headers: getPrivateNoStoreHeaders() });
+    }
+
+    const now = new Date();
+    const replyCount = await prisma.discussionReply.count({ where: { discussionId: id } });
+
+    if (replyCount === 0) {
+      const outcome = await prisma.$transaction(async (tx) => {
+        const refund = await refundDiscussionCreate(userId, id, tx);
+        if (!refund.success) {
+          throw new Error(refund.error ?? 'Refund failed');
+        }
+        await tx.discussion.delete({ where: { id } });
+        return { refunded: refund.amount > 0 };
+      });
+
+      return NextResponse.json(
+        { ok: true, deleted: true, refunded: outcome.refunded },
+        { headers: getPrivateNoStoreHeaders() },
+      );
+    }
+
+    await prisma.discussion.update({
+      where: { id },
+      data: { removedAt: now, removedById: userId, removedReason: 'author_deleted' },
+      select: { id: true },
+    });
+
+    return NextResponse.json({ ok: true, deleted: true }, { headers: getPrivateNoStoreHeaders() });
+  } catch (error) {
+    console.error('Error deleting discussion:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

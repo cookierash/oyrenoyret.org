@@ -25,6 +25,10 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const expectedDiscussionId = searchParams.get('discussionId');
     const currentUserId = await getCurrentSession();
+    const currentUser = currentUserId
+      ? await prisma.user.findUnique({ where: { id: currentUserId }, select: { role: true } })
+      : null;
+    const isAdminUser = currentUser?.role === 'ADMIN';
 
     const reply = await prisma.discussionReply.findUnique({
       where: { id: replyId },
@@ -34,6 +38,8 @@ export async function GET(
         createdAt: true,
         discussionId: true,
         parentReplyId: true,
+        removedAt: true,
+        removedReason: true,
         user: {
           select: {
             id: true,
@@ -52,6 +58,9 @@ export async function GET(
     if (expectedDiscussionId && reply.discussionId !== expectedDiscussionId) {
       return NextResponse.json({ error: 'Reply not found' }, { status: 404 });
     }
+    if (reply.removedAt && !(isAdminUser || (currentUserId && reply.user.id === currentUserId))) {
+      return NextResponse.json({ error: 'Reply not found' }, { status: 404 });
+    }
 
     const [voteScore, userVote] = await Promise.all([
       prisma.replyVote.aggregate({
@@ -66,8 +75,9 @@ export async function GET(
         : Promise.resolve(null),
     ]);
 
-    const parentReply = reply.parentReplyId
-      ? await prisma.discussionReply.findUnique({
+    let parentReply: any = null;
+    if (reply.parentReplyId) {
+      parentReply = await prisma.discussionReply.findUnique({
         where: { id: reply.parentReplyId },
         select: {
           id: true,
@@ -75,6 +85,8 @@ export async function GET(
           createdAt: true,
           discussionId: true,
           parentReplyId: true,
+          removedAt: true,
+          removedReason: true,
           user: {
             select: {
               id: true,
@@ -84,8 +96,14 @@ export async function GET(
             },
           },
         },
-      })
-      : null;
+      });
+      if (
+        parentReply?.removedAt &&
+        !(isAdminUser || (currentUserId && parentReply.user.id === currentUserId))
+      ) {
+        parentReply = null;
+      }
+    }
 
     const parentVoteScore = parentReply
       ? await prisma.replyVote.aggregate({
@@ -101,6 +119,8 @@ export async function GET(
         title: true,
         content: true,
         createdAt: true,
+        removedAt: true,
+        removedReason: true,
         user: {
           select: {
             id: true,
@@ -111,6 +131,12 @@ export async function GET(
         },
       },
     });
+    if (
+      discussion?.removedAt &&
+      !(isAdminUser || (currentUserId && discussion.user.id === currentUserId))
+    ) {
+      return NextResponse.json({ error: 'Reply not found' }, { status: 404 });
+    }
 
     const ancestors: { id: string; parentReplyId: string | null }[] = [];
     let cursor = reply.parentReplyId;
@@ -161,6 +187,8 @@ export async function GET(
         createdAt: reply.createdAt,
         discussionId: reply.discussionId,
         parentReplyId: reply.parentReplyId,
+        removedAt: reply.removedAt,
+        removedReason: reply.removedReason,
         authorId: reply.user.id,
         authorName:
           [reply.user.firstName, reply.user.lastName].filter(Boolean).join(' ') ||
@@ -176,5 +204,57 @@ export async function GET(
       { error: 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const userId = await getCurrentSession();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const identifier = getRateLimitIdentifier(request, userId);
+    const rateLimit = await checkRateLimit(`discussions:reply:delete:${identifier}`, RATE_LIMITS.WRITE);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
+
+    const { id: replyId } = await params;
+    const reply = await prisma.discussionReply.findUnique({
+      where: { id: replyId },
+      select: { id: true, userId: true, parentReplyId: true },
+    });
+
+    if (!reply) {
+      return NextResponse.json({ error: 'Reply not found' }, { status: 404 });
+    }
+
+    if (reply.userId !== userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const lifted = await tx.discussionReply.updateMany({
+        where: { parentReplyId: replyId },
+        data: { parentReplyId: reply.parentReplyId },
+      });
+
+      await tx.discussionReply.delete({ where: { id: replyId } });
+
+      return { liftedReplies: lifted.count };
+    });
+
+    return NextResponse.json(
+      { ok: true, deleted: true, liftedReplies: result.liftedReplies },
+      { headers: getPrivateNoStoreHeaders() },
+    );
+  } catch (error) {
+    console.error('Error deleting reply:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

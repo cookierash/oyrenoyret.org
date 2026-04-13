@@ -11,38 +11,11 @@ import { getI18n } from '@/src/i18n/server';
 import { roundCredits } from '@/src/modules/credits';
 import { cn } from '@/src/lib/utils';
 import { PiTrophy as Trophy, PiMedal as Medal, PiStar as Star } from 'react-icons/pi';
+import { PostAvatar } from '@/src/modules/discussions/post-avatar';
 
 export const metadata = {
   title: 'Leaderboard',
 };
-
-const AVATAR_COLORS = [
-  'bg-blue-400',
-  'bg-emerald-400',
-  'bg-violet-400',
-  'bg-amber-400',
-  'bg-rose-400',
-] as const;
-
-function getAvatarColor(seed: string): string {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function getInitials(firstName?: string | null, lastName?: string | null, email?: string) {
-  const initials = [firstName, lastName]
-    .filter(Boolean)
-    .map((value) => value!.trim().charAt(0).toUpperCase())
-    .join('')
-    .slice(0, 2);
-  if (initials) return initials;
-  if (email) return email.trim().charAt(0).toUpperCase();
-  return '?';
-}
 
 function getDisplayName(
   firstName?: string | null,
@@ -58,15 +31,15 @@ function getDisplayName(
 
 const TOP_STYLES: Record<number, { badge: string; row: string }> = {
   1: {
-    badge: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200',
+    badge: 'bg-amber-500/15 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/20 dark:text-amber-200 dark:ring-amber-500/30',
     row: 'bg-gradient-to-r from-amber-50 via-transparent to-transparent dark:from-amber-500/10',
   },
   2: {
-    badge: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200',
+    badge: 'bg-slate-500/12 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-400/15 dark:text-slate-200 dark:ring-slate-400/30',
     row: 'bg-gradient-to-r from-slate-50 via-transparent to-transparent dark:from-slate-400/10',
   },
   3: {
-    badge: 'bg-rose-100 text-rose-700 ring-1 ring-rose-200',
+    badge: 'bg-rose-500/15 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/20 dark:text-rose-200 dark:ring-rose-500/30',
     row: 'bg-gradient-to-r from-rose-50 via-transparent to-transparent dark:from-rose-500/10',
   },
 };
@@ -93,6 +66,7 @@ export default async function LeaderboardPage() {
       id: true,
       firstName: true,
       lastName: true,
+      avatarVariant: true,
       email: true,
       credits: true,
     },
@@ -111,7 +85,7 @@ export default async function LeaderboardPage() {
           <div className="pointer-events-none absolute -bottom-12 left-4 h-28 w-28 rounded-full bg-amber-400/20 blur-3xl animate-pulse-soft motion-reduce:animate-none" />
 
           <div className="relative">
-            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
               <span>{copy.rankLabel}</span>
               <span>{copy.learnerLabel}</span>
               <span className="text-right">{copy.creditsLabel}</span>
@@ -119,7 +93,7 @@ export default async function LeaderboardPage() {
 
             {users.length === 0 ? (
               <div className="px-6 py-10 text-center">
-                <p className="text-sm font-semibold text-foreground">{copy.emptyTitle}</p>
+                <p className="text-sm font-medium text-foreground">{copy.emptyTitle}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{copy.emptyDescription}</p>
               </div>
             ) : (
@@ -128,7 +102,6 @@ export default async function LeaderboardPage() {
                   const rank = index + 1;
                   const topStyle = TOP_STYLES[rank];
                   const Icon = TOP_ICONS[rank];
-                  const initials = getInitials(user.firstName, user.lastName, user.email);
                   const displayName = getDisplayName(
                     user.firstName,
                     user.lastName,
@@ -150,31 +123,29 @@ export default async function LeaderboardPage() {
                       <div className="flex items-center gap-3">
                         <div
                           className={cn(
-                            'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold',
+                            'flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium',
                             topStyle?.badge ?? 'bg-muted text-muted-foreground ring-1 ring-border',
                           )}
                         >
                           {Icon ? <Icon className="h-4 w-4" /> : rank}
                         </div>
-                        <div
-                          className={cn(
-                            'flex h-10 w-10 items-center justify-center rounded-full text-xs font-semibold text-white ring-1 ring-black/5',
-                            getAvatarColor(user.id),
-                          )}
-                        >
-                          {initials}
-                        </div>
+                        <PostAvatar
+                          userId={user.id}
+                          authorName={displayName}
+                          avatarVariant={user.avatarVariant}
+                          size="sm"
+                        />
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-foreground">{displayName}</p>
+                        <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
                         <p className="text-xs text-muted-foreground">
                           {t('app.leaderboard.rankValue', { rank })}
                         </p>
                       </div>
 
                       <div className="text-left sm:text-right">
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-sm font-medium text-foreground">
                           {t('sidebar.creditsValue', { count: credits })}
                         </p>
                         <p className="text-xs text-muted-foreground">{copy.creditsCaption}</p>

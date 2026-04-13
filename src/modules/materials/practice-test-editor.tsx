@@ -13,12 +13,15 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { cn } from '@/src/lib/utils';
 import { CREDITS_MATERIAL } from '@/src/config/credits';
+import { PRACTICE_TEST_LIMITS } from '@/src/config/practice-test';
 import { toast } from 'sonner';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
-import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextAa as SubscriptIcon, PiTextH as SuperscriptIcon, PiCode as Code, PiEraser as Eraser, PiFunction as Sigma, PiPlus as Plus, PiTrash as Trash2 } from 'react-icons/pi';
+import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextSubscript as SubscriptIcon, PiTextSuperscript as SuperscriptIcon, PiCode as Code, PiEraser as Eraser, PiFunction as Sigma, PiPlus as Plus, PiTrash as Trash2 } from 'react-icons/pi';
 import { useI18n } from '@/src/i18n/i18n-provider';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
-import { getLocalizedTopics } from '@/src/i18n/topic-utils';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
+import { splitObjectives } from '@/src/modules/materials/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -56,8 +59,8 @@ function generateId() {
 }
 
 function ensureOptions(options?: { id: string; text: string }[]) {
-  const next = (options ?? []).slice(0, 5);
-  while (next.length < 3) next.push({ id: generateId(), text: '' });
+  const next = (options ?? []).slice(0, PRACTICE_TEST_LIMITS.OPTIONS_MAX);
+  while (next.length < PRACTICE_TEST_LIMITS.OPTIONS_MIN) next.push({ id: generateId(), text: '' });
   return next;
 }
 
@@ -66,7 +69,7 @@ function parseInitialQuestions(initialContent?: string) {
   try {
     const parsed = JSON.parse(initialContent);
     if (!Array.isArray(parsed.questions)) return [];
-    return parsed.questions.map((q: PracticeQuestion) => {
+    return parsed.questions.slice(0, PRACTICE_TEST_LIMITS.QUESTIONS_MAX).map((q: PracticeQuestion) => {
       const options = ensureOptions(q.options);
       const correctOptionId = options.some((o) => o.id === q.correctOptionId)
         ? q.correctOptionId
@@ -112,6 +115,7 @@ function hasText(html: string): boolean {
 
 interface PracticeValidationCopy {
   addQuestion: string;
+  maxQuestions: string;
   removeEmpty: string;
   questionPrompt: string;
   optionCount: string;
@@ -125,6 +129,9 @@ function validateQuestions(
   enforceComplete: boolean,
   copy: PracticeValidationCopy,
 ): { ok: boolean; error?: string; normalized?: PracticeQuestion[] } {
+  if (questions.length > PRACTICE_TEST_LIMITS.QUESTIONS_MAX) {
+    return { ok: false, error: copy.maxQuestions };
+  }
   if (questions.length === 0) {
     return { ok: false, error: copy.addQuestion };
   }
@@ -133,7 +140,7 @@ function validateQuestions(
 
   for (const q of questions) {
     const questionHasText = hasText(q.question);
-    const options = (q.options ?? []).slice(0, 5);
+    const options = (q.options ?? []).slice(0, PRACTICE_TEST_LIMITS.OPTIONS_MAX);
     const filledOptions = options.filter((o) => hasText(o.text));
     const hasAnyOptionText = filledOptions.length > 0;
 
@@ -153,7 +160,10 @@ function validateQuestions(
       continue;
     }
 
-    if (options.length < 3 || options.length > 5) {
+    if (
+      options.length < PRACTICE_TEST_LIMITS.OPTIONS_MIN ||
+      options.length > PRACTICE_TEST_LIMITS.OPTIONS_MAX
+    ) {
       return { ok: false, error: copy.optionCount };
     }
 
@@ -162,7 +172,7 @@ function validateQuestions(
     }
 
     if (enforceComplete) {
-      if (filledOptions.length < 3) {
+      if (filledOptions.length < PRACTICE_TEST_LIMITS.OPTIONS_MIN) {
         return { ok: false, error: copy.minOptions };
       }
       const correctOption = options.find((o) => o.id === q.correctOptionId);
@@ -192,6 +202,7 @@ interface RichTextFieldProps {
   ariaLabel: string;
   minHeightClass?: string;
   toolbarVisibility?: 'always' | 'focus' | 'none';
+  disabled?: boolean;
 }
 
 function RichTextField({
@@ -201,12 +212,26 @@ function RichTextField({
   ariaLabel,
   minHeightClass = 'min-h-[44px]',
   toolbarVisibility = 'always',
+  disabled = false,
 }: RichTextFieldProps) {
   const { messages } = useI18n();
   const toolbar = messages.editor.toolbar;
+  const statusCopy = messages.editor.status;
   const symbolsCopy = messages.studio.practice.symbols;
   const [showSymbols, setShowSymbols] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [wordCount, setWordCount] = useState(0);
+  const [charCount, setCharCount] = useState(0);
+  const [, setToolbarTick] = useState(0);
+  const isMac = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  }, []);
+  const modifierKey = isMac ? 'Cmd' : 'Ctrl';
+  const withShortcut = useCallback(
+    (label: string, shortcut: string) => `${label} (${shortcut})`,
+    []
+  );
 
   useEffect(() => {
     if (!showSymbols) return;
@@ -220,6 +245,7 @@ function RichTextField({
 
   const editor = useEditor({
     immediatelyRender: false,
+    editable: !disabled,
     extensions: [
       StarterKit.configure({
         heading: false,
@@ -237,6 +263,10 @@ function RichTextField({
     ],
     content: value || '<p></p>',
     editorProps: {
+      clipboardTextSerializer: (slice) => {
+        const text = slice.content.textBetween(0, slice.content.size, '\n');
+        return text.replace(/\n+$/g, '');
+      },
       attributes: {
         class: cn(
           'document-editor-content practice-test-editor-content text-sm leading-relaxed focus:outline-none px-3 py-2',
@@ -248,6 +278,12 @@ function RichTextField({
       },
     },
   });
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(!disabled);
+    if (disabled) setShowSymbols(false);
+  }, [editor, disabled]);
 
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
@@ -264,6 +300,23 @@ function RichTextField({
     };
   }, [editor, onChange]);
 
+  const updateCounts = useCallback(() => {
+    const text = editor?.getText() ?? '';
+    const trimmed = text.trim();
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    setWordCount(words);
+    setCharCount(text.length);
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    updateCounts();
+    editor.on('update', updateCounts);
+    return () => {
+      editor.off('update', updateCounts);
+    };
+  }, [editor, updateCounts]);
+
   useEffect(() => {
     if (!editor) return;
     const onFocus = () => setIsFocused(true);
@@ -273,6 +326,17 @@ function RichTextField({
     return () => {
       editor.off('focus', onFocus);
       editor.off('blur', onBlur);
+    };
+  }, [editor]);
+
+  useEffect(() => {
+    if (!editor) return;
+    const bump = () => setToolbarTick((x) => x + 1);
+    editor.on('selectionUpdate', bump);
+    editor.on('transaction', bump);
+    return () => {
+      editor.off('selectionUpdate', bump);
+      editor.off('transaction', bump);
     };
   }, [editor]);
 
@@ -306,10 +370,11 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleBold().run()}
+            disabled={disabled}
             data-active={editor.isActive('bold')}
             aria-label={toolbar.bold}
             aria-pressed={editor.isActive('bold')}
-            title={toolbar.bold}
+            title={withShortcut(toolbar.bold, `${modifierKey}B`)}
           >
             <Bold className="h-3.5 w-3.5" />
           </Button>
@@ -319,10 +384,11 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleItalic().run()}
+            disabled={disabled}
             data-active={editor.isActive('italic')}
             aria-label={toolbar.italic}
             aria-pressed={editor.isActive('italic')}
-            title={toolbar.italic}
+            title={withShortcut(toolbar.italic, `${modifierKey}I`)}
           >
             <Italic className="h-3.5 w-3.5" />
           </Button>
@@ -332,10 +398,11 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleUnderline().run()}
+            disabled={disabled}
             data-active={editor.isActive('underline')}
             aria-label={toolbar.underline}
             aria-pressed={editor.isActive('underline')}
-            title={toolbar.underline}
+            title={withShortcut(toolbar.underline, `${modifierKey}U`)}
           >
             <UnderlineIcon className="h-3.5 w-3.5" />
           </Button>
@@ -346,6 +413,7 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleSubscript().run()}
+            disabled={disabled}
             data-active={editor.isActive('subscript')}
             aria-label={toolbar.subscript}
             aria-pressed={editor.isActive('subscript')}
@@ -359,6 +427,7 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleSuperscript().run()}
+            disabled={disabled}
             data-active={editor.isActive('superscript')}
             aria-label={toolbar.superscript}
             aria-pressed={editor.isActive('superscript')}
@@ -372,6 +441,7 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={() => editor.chain().focus().toggleCode().run()}
+            disabled={disabled}
             data-active={editor.isActive('code')}
             aria-label={toolbar.inlineCode}
             aria-pressed={editor.isActive('code')}
@@ -385,6 +455,7 @@ function RichTextField({
             size="icon"
             className="h-7 w-7"
             onClick={clearFormatting}
+            disabled={disabled}
             aria-label={toolbar.clearFormatting}
             title={toolbar.clearFormatting}
           >
@@ -400,6 +471,7 @@ function RichTextField({
                 e.stopPropagation();
                 setShowSymbols((s) => !s);
               }}
+              disabled={disabled}
               aria-label={toolbar.insertSymbol}
               aria-haspopup="menu"
               aria-expanded={showSymbols}
@@ -417,6 +489,7 @@ function RichTextField({
                     onClick={() => insertSymbol(symbol.value)}
                     aria-label={symbolsCopy[symbol.key]}
                     title={symbolsCopy[symbol.key]}
+                    disabled={disabled}
                   >
                     {symbol.value}
                   </button>
@@ -428,10 +501,17 @@ function RichTextField({
       ) : null}
       <div className={cn(
         'rounded-md border border-border bg-background transition-shadow',
+        disabled && 'opacity-80',
         isFocused ? 'ring-2 ring-primary/15 border-primary/40' : 'focus-within:ring-2 focus-within:ring-primary/10'
       )}>
         <EditorContent editor={editor} />
       </div>
+      {isFocused && (
+        <div className="flex flex-wrap items-center gap-3 px-1 text-[11px] text-muted-foreground">
+          <span>{statusCopy.words}: {wordCount}</span>
+          <span>{statusCopy.characters}: {charCount}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -451,14 +531,19 @@ export function PracticeTestEditor({
   const { messages, t } = useI18n();
   const practiceCopy = messages.studio.practice;
   const editorCopy = messages.studio.editor;
-  const subjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
+  const { subjects } = useCurriculum();
   const difficultyCopy = messages.materials.difficulty;
+  const { canWrite, writeRestriction } = useCurrentUser();
+  const writeBlockedMessage = useMemo(
+    () => getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified),
+    [writeRestriction, messages.auth.errors.emailNotVerified],
+  );
   const router = useRouter();
   const [subjectId, setSubjectId] = useState(initialSubjectId);
   const [topicId, setTopicId] = useState(initialTopicId);
   const [title, setTitle] = useState(initialTitle);
   const [objectiveSlots, setObjectiveSlots] = useState<string[]>(() => {
-    const slots = (initialObjectives || '').split('\n').filter(Boolean);
+    const slots = splitObjectives(initialObjectives);
     while (slots.length < 5) slots.push('');
     return slots.slice(0, 5);
   });
@@ -491,31 +576,56 @@ export function PracticeTestEditor({
     index: number;
   } | null>(null);
 
-  const topics = subjectId ? getLocalizedTopics(messages, subjectId) : [];
+  const topics = useMemo(() => {
+    if (!subjectId) return [];
+    return subjects.find((subject) => subject.id === subjectId)?.topics ?? [];
+  }, [subjectId, subjects]);
+  const validationCopy = useMemo(
+    () => ({
+      ...practiceCopy.validation,
+      maxQuestions: t('studio.practice.validation.maxQuestions', {
+        count: PRACTICE_TEST_LIMITS.QUESTIONS_MAX,
+      }),
+    }),
+    [practiceCopy.validation, t],
+  );
 
   const addQuestion = useCallback(() => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
+    if (questions.length >= PRACTICE_TEST_LIMITS.QUESTIONS_MAX) {
+      toast.error(
+        t('studio.practice.toast.maxQuestions', { count: PRACTICE_TEST_LIMITS.QUESTIONS_MAX }),
+      );
+      return;
+    }
     const options = ensureOptions();
     setQuestions((q) => [
       ...q,
       { id: generateId(), type: 'multiple_choice', question: '', options, correctOptionId: options[0]?.id },
     ]);
-  }, []);
+  }, [canWrite, messages.auth.errors.emailNotVerified, questions.length, t]);
 
   const updateQuestion = useCallback((id: string, updates: Partial<PracticeQuestion>) => {
+    if (!canWrite) return;
     setQuestions((q) => q.map((x) => (x.id === id ? { ...x, ...updates } : x)));
-  }, []);
+  }, [canWrite]);
 
   const removeQuestion = useCallback((id: string) => {
+    if (!canWrite) return;
     setQuestions((q) => q.filter((x) => x.id !== id));
-  }, []);
+  }, [canWrite]);
 
   const addOption = useCallback((questionId: string) => {
+    if (!canWrite) return;
     setQuestions((q) =>
       q.map((x) =>
         x.id === questionId
           ? (() => {
               const current = x.options ?? [];
-              if (current.length >= 5) return x;
+              if (current.length >= PRACTICE_TEST_LIMITS.OPTIONS_MAX) return x;
               const nextOptions = [...current, { id: generateId(), text: '' }];
               return {
                 ...x,
@@ -526,9 +636,10 @@ export function PracticeTestEditor({
           : x
       )
     );
-  }, []);
+  }, [canWrite]);
 
   const updateOption = useCallback((questionId: string, optionId: string, text: string) => {
+    if (!canWrite) return;
     setQuestions((q) =>
       q.map((x) =>
         x.id === questionId
@@ -536,15 +647,16 @@ export function PracticeTestEditor({
           : x
       )
     );
-  }, []);
+  }, [canWrite]);
 
   const removeOption = useCallback((questionId: string, optionId: string) => {
+    if (!canWrite) return;
     setQuestions((q) =>
       q.map((x) =>
         x.id === questionId
           ? (() => {
               const current = x.options ?? [];
-              if (current.length <= 3) return x;
+              if (current.length <= PRACTICE_TEST_LIMITS.OPTIONS_MIN) return x;
               const nextOptions = current.filter((o) => o.id !== optionId);
               const nextCorrect =
                 x.correctOptionId && nextOptions.some((o) => o.id === x.correctOptionId)
@@ -555,13 +667,17 @@ export function PracticeTestEditor({
           : x
       )
     );
-  }, []);
+  }, [canWrite]);
 
   const save = useCallback(async (
     andPublish = false,
     skipRedirect = false,
     strict = false
   ): Promise<string | undefined> => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!subjectId || !topicId || !title.trim()) {
       toast.error(practiceCopy.toast.requiredFields);
       return;
@@ -569,7 +685,7 @@ export function PracticeTestEditor({
     const finalObjectives = objectiveSlots.map(s => s.trim()).filter(Boolean).join('\n');
 
     const enforceComplete = strict || andPublish;
-    const validation = validateQuestions(questions, enforceComplete, practiceCopy.validation);
+    const validation = validateQuestions(questions, enforceComplete, validationCopy);
     if (!validation.ok || !validation.normalized) {
       toast.error(validation.error ?? practiceCopy.toast.completeQuestions);
       return;
@@ -654,15 +770,19 @@ export function PracticeTestEditor({
     } finally {
       setSaving(false);
     }
-  }, [mode, materialId, draftId, subjectId, topicId, title, objectiveSlots, difficulty, questions, router, onSaved]);
+  }, [canWrite, messages.auth.errors.emailNotVerified, mode, materialId, draftId, subjectId, topicId, title, objectiveSlots, difficulty, questions, router, onSaved, practiceCopy.toast.requiredFields, practiceCopy.toast.completeQuestions, practiceCopy.toast.createFailed, practiceCopy.toast.saveFailed, practiceCopy.toast.savedPractice, practiceCopy.toast.saved, validationCopy]);
 
   const publish = useCallback(async (confirmed = false) => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!subjectId || !topicId || !title.trim()) {
       toast.error(practiceCopy.toast.requiredFields);
       return;
     }
 
-    const publishCheck = validateQuestions(questions, true, practiceCopy.validation);
+    const publishCheck = validateQuestions(questions, true, validationCopy);
     if (!publishCheck.ok) {
       toast.error(publishCheck.error ?? practiceCopy.toast.completeQuestions);
       return;
@@ -682,10 +802,7 @@ export function PracticeTestEditor({
           const res = await fetch(`/api/materials/${materialId}`, { cache: 'no-store' });
           if (res.ok) {
             const data = await res.json();
-            const existing = (data.objectives ?? '')
-              .split('\n')
-              .map((s: string) => s.trim())
-              .filter(Boolean);
+            const existing = splitObjectives(data.objectives ?? '');
             const nextSlots = existing.slice(0, 5);
             while (nextSlots.length < 5) nextSlots.push('');
             setObjectiveSlots(nextSlots);
@@ -749,9 +866,13 @@ export function PracticeTestEditor({
     } finally {
       setPublishing(false);
     }
-  }, [subjectId, topicId, title, objectiveSlots, mode, materialId, difficulty, questions, save, router, onSaved]);
+  }, [canWrite, messages.auth.errors.emailNotVerified, subjectId, topicId, title, objectiveSlots, mode, materialId, difficulty, questions, save, router, onSaved, practiceCopy.toast.requiredFields, practiceCopy.toast.completeQuestions, practiceCopy.toast.objectivesRequired, practiceCopy.toast.publishFailed, t, validationCopy]);
 
   const unpublish = useCallback(async () => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!materialId) return;
     setUnpublishing(true);
     try {
@@ -781,9 +902,13 @@ export function PracticeTestEditor({
     } finally {
       setUnpublishing(false);
     }
-  }, [materialId, router, onSaved]);
+  }, [canWrite, messages.auth.errors.emailNotVerified, materialId, router, onSaved]);
 
   const deleteMaterial = useCallback(async () => {
+    if (!canWrite) {
+      toast.error(writeBlockedMessage);
+      return;
+    }
     if (!materialId) return;
     setDeleting(true);
     try {
@@ -807,14 +932,14 @@ export function PracticeTestEditor({
     } finally {
       setDeleting(false);
     }
-  }, [materialId, router]);
+  }, [canWrite, messages.auth.errors.emailNotVerified, materialId, router]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pt-6">
       <div className="card-frame bg-card p-6 space-y-5 mb-4 flex-shrink-0">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">{practiceCopy.setupTitle}</h2>
+            <h2 className="text-lg font-medium">{practiceCopy.setupTitle}</h2>
             <p className="text-xs text-muted-foreground">
               {practiceCopy.setupDescription}
             </p>
@@ -825,7 +950,7 @@ export function PracticeTestEditor({
                 <Button
                   variant="danger"
                   onClick={() => setShowDeleteDialog(true)}
-                  disabled={deleting || publishing || unpublishing || saving}
+                  disabled={!canWrite || deleting || publishing || unpublishing || saving}
                 >
                   {deleting ? editorCopy.actions.deleting : editorCopy.actions.delete}
                 </Button>
@@ -833,20 +958,20 @@ export function PracticeTestEditor({
                   <Button
                     variant="secondary-primary"
                     onClick={unpublish}
-                    disabled={deleting || publishing || unpublishing || saving}
+                    disabled={!canWrite || deleting || publishing || unpublishing || saving}
                   >
                     {unpublishing ? editorCopy.actions.unpublishing : editorCopy.actions.unpublish}
                   </Button>
                 ) : null}
               </>
             ) : null}
-            <Button variant="secondary-primary" onClick={() => save(false)} disabled={saving || publishing || unpublishing || deleting}>
+            <Button variant="secondary-primary" onClick={() => save(false)} disabled={!canWrite || saving || publishing || unpublishing || deleting}>
               {saving ? editorCopy.actions.saving : editorCopy.actions.saveDraft}
             </Button>
             <Button
               variant="primary"
               onClick={() => publish(false)}
-              disabled={publishing || saving || unpublishing || deleting || (isPublished && !hasChanges)}
+              disabled={!canWrite || publishing || saving || unpublishing || deleting || (isPublished && !hasChanges)}
             >
               {publishing
                 ? editorCopy.actions.publishing
@@ -868,6 +993,7 @@ export function PracticeTestEditor({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={editorCopy.labels.titlePlaceholder}
+              disabled={!canWrite}
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -877,7 +1003,7 @@ export function PracticeTestEditor({
                 value={subjectId}
                 onChange={(e) => { setSubjectId(e.target.value); setTopicId(''); }}
                 placeholder={editorCopy.labels.subjectPlaceholder}
-                disabled={mode === 'edit' || Boolean(draftId)}
+                disabled={!canWrite || mode === 'edit' || Boolean(draftId)}
               >
                 {subjects.map((subject) => (
                   <SelectItem key={subject.id} value={subject.id}>{subject.name}</SelectItem>
@@ -889,7 +1015,7 @@ export function PracticeTestEditor({
               <Select
                 value={topicId}
                 onChange={(e) => setTopicId(e.target.value)}
-                disabled={!subjectId || mode === 'edit' || Boolean(draftId)}
+                disabled={!canWrite || !subjectId || mode === 'edit' || Boolean(draftId)}
                 placeholder={editorCopy.labels.topicPlaceholder}
               >
                 {topics.map((t) => (
@@ -903,6 +1029,7 @@ export function PracticeTestEditor({
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')}
                 placeholder={editorCopy.labels.difficultyPlaceholder}
+                disabled={!canWrite}
               >
                 <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
                 <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
@@ -916,12 +1043,17 @@ export function PracticeTestEditor({
       <div className="flex-1 min-h-[500px] space-y-6 pb-8">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">{practiceCopy.questionsTitle}</h2>
+            <h2 className="text-lg font-medium">{practiceCopy.questionsTitle}</h2>
             <p className="text-xs text-muted-foreground">
               {practiceCopy.questionsDescription}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={addQuestion}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addQuestion}
+            disabled={!canWrite || questions.length >= PRACTICE_TEST_LIMITS.QUESTIONS_MAX}
+          >
             <Plus className="h-4 w-4 mr-1" />
             {practiceCopy.addQuestion}
           </Button>
@@ -935,7 +1067,12 @@ export function PracticeTestEditor({
                 {practiceCopy.noQuestionsDescription}
               </p>
             </div>
-            <Button variant="primary" size="sm" onClick={addQuestion}>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={addQuestion}
+              disabled={!canWrite || questions.length >= PRACTICE_TEST_LIMITS.QUESTIONS_MAX}
+            >
               {practiceCopy.addFirstQuestion}
             </Button>
           </div>
@@ -957,6 +1094,7 @@ export function PracticeTestEditor({
                     size="icon"
                     className="text-destructive hover:text-destructive"
                     onClick={() => setQuestionToRemove({ id: q.id, index: i })}
+                    disabled={!canWrite}
                     aria-label={t('studio.practice.removeQuestionAria', { count: i + 1 })}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -972,6 +1110,7 @@ export function PracticeTestEditor({
                     ariaLabel={t('studio.practice.promptAriaLabel', { count: i + 1 })}
                     minHeightClass="min-h-[88px]"
                     toolbarVisibility="always"
+                    disabled={!canWrite}
                   />
                 </div>
 
@@ -995,10 +1134,11 @@ export function PracticeTestEditor({
                               className="h-4 w-4 accent-primary"
                               checked={q.correctOptionId === opt.id}
                               onChange={() => updateQuestion(q.id, { correctOptionId: opt.id })}
+                              disabled={!canWrite}
                               aria-label={t('studio.practice.optionCorrectAria', { label: optionLabel })}
                               aria-describedby={`correct-help-${q.id}`}
                             />
-                            <span className="text-xs font-semibold text-muted-foreground w-6">
+                            <span className="text-xs font-medium text-muted-foreground w-6">
                               {optionLabel}
                             </span>
                           </div>
@@ -1010,6 +1150,7 @@ export function PracticeTestEditor({
                               ariaLabel={t('studio.practice.optionAriaLabel', { label: optionLabel, count: i + 1 })}
                               minHeightClass="min-h-[44px]"
                               toolbarVisibility="focus"
+                              disabled={!canWrite}
                             />
                           </div>
                           <Button
@@ -1017,7 +1158,7 @@ export function PracticeTestEditor({
                             size="icon"
                             className="shrink-0"
                             onClick={() => removeOption(q.id, opt.id)}
-                            disabled={(q.options?.length ?? 0) <= 3}
+                            disabled={!canWrite || (q.options?.length ?? 0) <= PRACTICE_TEST_LIMITS.OPTIONS_MIN}
                             aria-label={t('studio.practice.removeOptionAria', { label: optionLabel })}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -1030,7 +1171,7 @@ export function PracticeTestEditor({
                     variant="ghost"
                     size="sm"
                     onClick={() => addOption(q.id)}
-                    disabled={(q.options?.length ?? 0) >= 5}
+                    disabled={!canWrite || (q.options?.length ?? 0) >= PRACTICE_TEST_LIMITS.OPTIONS_MAX}
                   >
                     <Plus className="h-3 w-3 mr-1" />
                     {practiceCopy.addOption}
@@ -1042,7 +1183,12 @@ export function PracticeTestEditor({
         )}
 
         <div className="flex justify-center pb-8">
-          <Button variant="outline" size="sm" onClick={addQuestion}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={addQuestion}
+            disabled={questions.length >= PRACTICE_TEST_LIMITS.QUESTIONS_MAX}
+          >
             <Plus className="h-4 w-4 mr-1" />
             {practiceCopy.addAnotherQuestion}
           </Button>

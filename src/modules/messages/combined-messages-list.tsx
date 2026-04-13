@@ -49,7 +49,21 @@ type SprintEnrollmentItem = {
   createdAt: string;
 };
 
-type CombinedMessageItem = ReplyNotificationItem | CreditActivityItem | SprintEnrollmentItem;
+type ModerationNoticeItem = {
+  type: 'moderation';
+  id: string;
+  noticeType: string;
+  title: string;
+  body: string;
+  linkUrl?: string | null;
+  createdAt: string;
+};
+
+type CombinedMessageItem =
+  | ReplyNotificationItem
+  | CreditActivityItem
+  | SprintEnrollmentItem
+  | ModerationNoticeItem;
 
 function SprintEnrollmentRow({
   item,
@@ -303,7 +317,7 @@ function SprintEnrollmentRow({
                       </p>
                     ) : null}
                   </div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     {copy.required}
                   </span>
                 </div>
@@ -436,6 +450,42 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                   </div>
                   <ul className="divide-y divide-border">
                     {group.items.map((item) => {
+                      if (item.type === 'moderation') {
+                        const preview = String(item.body || '')
+                          .replace(/\s+/g, ' ')
+                          .trim()
+                          .slice(0, 220);
+                        return (
+                          <li key={`moderation-${item.id}`}>
+                            <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/20">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                                <ShieldCheck className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-foreground truncate">
+                                  {item.title || 'Moderator update'}
+                                </p>
+                                <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
+                                  {preview || copy.noContent}
+                                </p>
+                                {item.linkUrl ? (
+                                  <div className="mt-1">
+                                    <Link
+                                      href={item.linkUrl}
+                                      className="text-[11px] text-primary hover:underline underline-offset-2"
+                                    >
+                                      Contact support
+                                    </Link>
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="shrink-0 text-[11px] text-muted-foreground">
+                                {timeFormatter.format(new Date(item.createdAt))}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      }
                       if (item.type === 'reply') {
                         const contextLabel =
                           item.contextType === 'reply'
@@ -490,7 +540,7 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                           <div className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/20">
                             <div
                               className={cn(
-                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium',
                                 isGain
                                   ? 'bg-primary/10 text-primary'
                                   : 'bg-destructive/10 text-destructive',

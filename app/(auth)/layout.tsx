@@ -38,7 +38,7 @@ export default async function AuthLayout({
               className="h-auto w-full max-w-[220px] animate-figure-drift motion-reduce:animate-none"
               priority
             />
-            <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl font-comfortaa lowercase">
+            <h1 className="text-4xl tracking-tight sm:text-5xl brand-font lowercase">
               oyrenoyret
             </h1>
             <p className="max-w-xs text-sm text-muted-foreground">
@@ -62,8 +62,9 @@ export default async function AuthLayout({
                   width={40}
                   height={40}
                   className="h-10 w-10"
+                  priority
                 />
-                <span className="text-xl font-semibold tracking-tight font-comfortaa lowercase">
+                <span className="text-xl tracking-tight brand-font lowercase">
                   oyrenoyret.org
                 </span>
               </Link>

@@ -13,14 +13,27 @@ import { cn } from '@/src/lib/utils';
 import { getLocaleCode, type Locale } from '@/src/i18n';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { CompactRichText, type CompactRichTextImage, type CompactRichTextStats } from '@/src/components/rich-text/compact-rich-text';
+import { richTextHtmlToPlainText } from '@/src/lib/rich-text';
+import { discussionRichTextHasContent } from '@/src/lib/discussion-rich-text';
+import { appendDiscussionAttachmentsToHtml } from '@/src/lib/discussion-attachments';
+import { MAX_DISCUSSION_IMAGES } from '@/src/config/uploads';
 import {
   AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
 import { PostAvatar } from '@/src/modules/discussions/post-avatar';
+import { DiscussionRichText } from '@/src/modules/discussions/components/discussion-rich-text';
+import { ReportButton } from '@/src/modules/reports/report-user-button';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
+import { AdminRemoveContentButton } from '@/src/modules/moderation/admin-remove-content-button';
 
 interface Reply {
   id: string;
@@ -32,6 +45,8 @@ interface Reply {
   userVote?: 1 | -1 | null;
   discussionId?: string;
   parentReplyId?: string | null;
+  removedAt?: string | null;
+  removedReason?: string | null;
   childReplies?: Reply[];
 }
 
@@ -42,6 +57,8 @@ interface DiscussionSummary {
   authorId: string;
   authorName: string;
   createdAt: string;
+  removedAt?: string | null;
+  removedReason?: string | null;
 }
 
 const formatDateTime = (iso: string, locale: Locale) => {
@@ -58,9 +75,6 @@ const formatDateTime = (iso: string, locale: Locale) => {
   return `${time} · ${day}`;
 };
 
-const formatReplyContent = (content: string) =>
-  content.replace(/<br\s*\/?>/gi, '\n');
-
 export default function ReplyPage() {
   const MAX_REPLY_LENGTH = 2000;
   const { id: rawId, replyId: rawReplyId } = useParams();
@@ -69,6 +83,8 @@ export default function ReplyPage() {
   const router = useRouter();
   const { locale, messages } = useI18n();
   const copy = messages.discussions.replyDetail;
+  const { user: currentUser, canWrite, writeRestriction } = useCurrentUser();
+  const isAdmin = currentUser.role === 'ADMIN';
 
   const [parentReply, setParentReply] = useState<Reply | null>(null);
   const [previousReply, setPreviousReply] = useState<Reply | null>(null);
@@ -78,12 +94,17 @@ export default function ReplyPage() {
   const [childReplies, setChildReplies] = useState<Reply[]>([]);
   const [childLoading, setChildLoading] = useState(false);
   const [replyContent, setReplyContent] = useState('');
+  const [replyStats, setReplyStats] = useState<CompactRichTextStats>({ words: 0, characters: 0 });
+  const [replyAttachments, setReplyAttachments] = useState<CompactRichTextImage[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogContent, setDialogContent] = useState('');
+  const [dialogStats, setDialogStats] = useState<CompactRichTextStats>({ words: 0, characters: 0 });
+  const [dialogAttachments, setDialogAttachments] = useState<CompactRichTextImage[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [voteLoading, setVoteLoading] = useState(false);
-  const replyRemaining = MAX_REPLY_LENGTH - replyContent.length;
-  const dialogRemaining = MAX_REPLY_LENGTH - dialogContent.length;
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const canInteract = canWrite && !parentReply?.removedAt && !discussionInfo?.removedAt;
 
   useEffect(() => {
     if (!id || !replyId) return;
@@ -138,6 +159,14 @@ export default function ReplyPage() {
   }, [loadChildReplies]);
 
   const handleVote = async (value: 1 | -1) => {
+    if (!canWrite) {
+      toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
+      return;
+    }
+    if (parentReply?.removedAt) {
+      toast.error('This reply was removed by moderators.');
+      return;
+    }
     if (!parentReply || voteLoading) return;
 
     const previousVote = parentReply.userVote ?? null;
@@ -168,22 +197,63 @@ export default function ReplyPage() {
     }
   };
 
+  const deleteReply = async () => {
+    if (!deleteTargetId || deleting) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/discussions/replies/${deleteTargetId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(extractErrorMessage(data) ?? '');
+      toast.success(copy.deletedReply);
+      const deletingCurrent = deleteTargetId === replyId;
+      setDeleteTargetId(null);
+      if (deletingCurrent) {
+        const pathIds = threadPath.length ? threadPath : replyId ? [replyId] : [];
+        const backHref =
+          pathIds.length > 1
+            ? `/discussions/${id}/replies/${pathIds[pathIds.length - 2]}`
+            : `/discussions/${id}`;
+        router.push(backHref);
+        router.refresh();
+        return;
+      }
+      await loadChildReplies();
+      router.refresh();
+    } catch (error) {
+      toast.error(formatErrorToast(copy.failedDelete, error instanceof Error ? error.message : null));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const submitReply = async (content: string) => {
-    if (!content.trim()) return;
+    if (!canWrite) {
+      toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
+      return;
+    }
+    if (parentReply?.removedAt || discussionInfo?.removedAt) {
+      toast.error('This thread was removed by moderators.');
+      return;
+    }
+    if (!discussionRichTextHasContent(content)) return;
     setSubmitting(true);
     try {
       const res = await fetch(`/api/discussions/${id}/replies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: content.trim(),
+          content: String(content ?? '').trim(),
           parentReplyId: replyId,
         }),
       });
       const created = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(extractErrorMessage(created) ?? '');
       setReplyContent('');
+      setReplyStats({ words: 0, characters: 0 });
+      setReplyAttachments([]);
       setDialogContent('');
+      setDialogStats({ words: 0, characters: 0 });
+      setDialogAttachments([]);
       setDialogOpen(false);
       if (created?.id) {
         router.push(`/discussions/${id}/replies/${created.id}`);
@@ -331,12 +401,12 @@ export default function ReplyPage() {
                           authorName={previousReply.authorName}
                           size="xs"
                         />
-                        <span className="text-xs font-semibold text-foreground/80">
+                        <span className="text-xs font-medium text-foreground/80">
                           {previousReply.authorName}
                         </span>
                       </div>
                       <p className="mt-2 max-h-24 overflow-hidden text-sm text-foreground/80 whitespace-pre-wrap break-words">
-                        {previousReply.content}
+                        {richTextHtmlToPlainText(previousReply.content)}
                       </p>
                     </Link>
                   </div>
@@ -358,15 +428,15 @@ export default function ReplyPage() {
                           authorName={discussionInfo.authorName}
                           size="xs"
                         />
-                        <span className="text-xs font-semibold text-foreground/80">
+                        <span className="text-xs font-medium text-foreground/80">
                           {discussionInfo.authorName}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold text-foreground/90 line-clamp-2 break-words">
+                      <p className="mt-2 text-sm font-medium text-foreground/90 line-clamp-2 break-words">
                         {discussionInfo.title}
                       </p>
                       <p className="mt-1 max-h-20 overflow-hidden text-sm text-foreground/80 whitespace-pre-wrap break-words">
-                        {discussionInfo.content}
+                        {richTextHtmlToPlainText(discussionInfo.content)}
                       </p>
                     </Link>
                   </div>
@@ -379,21 +449,52 @@ export default function ReplyPage() {
                   size="xs"
                 />
                 <div className="text-[11px] text-muted-foreground">
-                  <span className="font-semibold text-foreground/70">
+                  <span className="font-medium text-foreground/70">
                     {parentReply.authorName}
                   </span>
                   <span className="px-1">·</span>
                   <span>{formatDateTime(parentReply.createdAt, locale)}</span>
                 </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <ReportButton
+                    reportedUserId={parentReply.authorId}
+                    reportedUserPublicId={null}
+                    reportedUserName={parentReply.authorName}
+                    targetType="DISCUSSION_REPLY"
+                    targetId={parentReply.id}
+                    buttonVariant="danger"
+                    buttonClassName="h-7 px-2 text-[11px]"
+                  />
+                  {currentUser.id === parentReply.authorId ? (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => setDeleteTargetId(parentReply.id)}
+                      disabled={deleting}
+                      className="h-7 px-2 text-[11px]"
+                    >
+                      {copy.deleteReply}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
-              <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed break-words">
-                {parentReply.content}
-              </p>
+              <DiscussionRichText content={parentReply.content} />
+              {parentReply.removedAt ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
+                  <div className="font-medium">Removed by moderators</div>
+                  {parentReply.removedReason ? (
+                    <div className="mt-1 text-muted-foreground">
+                      Message from the moderators: {parentReply.removedReason}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={() => setDialogOpen(true)}
+                  disabled={!canInteract}
                   className="h-8 gap-1 px-2 text-xs"
                 >
                   <MessageSquare className="h-3.5 w-3.5" />
@@ -404,7 +505,7 @@ export default function ReplyPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleVote(1)}
-                    disabled={voteLoading}
+                    disabled={voteLoading || !canInteract}
                     aria-label={copy.upvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
@@ -415,7 +516,7 @@ export default function ReplyPage() {
                   </Button>
                   <span
                     className={cn(
-                      'min-w-[2rem] px-2 text-center text-xs font-semibold',
+                      'min-w-[2rem] px-2 text-center text-xs font-medium',
                       parentReply.voteScore > 0
                         ? 'text-primary'
                         : parentReply.voteScore < 0
@@ -429,7 +530,7 @@ export default function ReplyPage() {
                     size="icon"
                     variant="ghost"
                     onClick={() => handleVote(-1)}
-                    disabled={voteLoading}
+                    disabled={voteLoading || !canInteract}
                     aria-label={copy.downvote}
                     className={cn(
                       'h-8 w-8 rounded-none text-muted-foreground hover:bg-muted/60',
@@ -439,6 +540,24 @@ export default function ReplyPage() {
                     <ArrowBigDown className={cn('h-4 w-4', parentReply.userVote === -1 && 'fill-current')} />
                   </Button>
                 </div>
+                <ReportButton
+                  reportedUserId={parentReply.authorId}
+                  reportedUserPublicId={null}
+                  reportedUserName={parentReply.authorName}
+                  targetType="DISCUSSION_REPLY"
+                  targetId={parentReply.id}
+                  buttonVariant="danger"
+                  buttonClassName="h-8 px-2 text-xs"
+                />
+                {isAdmin ? (
+                  <AdminRemoveContentButton
+                    targetType="DISCUSSION_REPLY"
+                    targetId={parentReply.id}
+                    label="Remove"
+                    buttonVariant="outline"
+                    onRemoved={() => router.refresh()}
+                  />
+                ) : null}
               </div>
             </div>
 
@@ -446,28 +565,48 @@ export default function ReplyPage() {
               <div className="space-y-3">
                 <div className="rounded-2xl border border-border/60 bg-muted/30 p-4">
                   <div className="space-y-3">
-                    <textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder={copy.replyPlaceholder}
-                      className="w-full min-h-[96px] resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-                      maxLength={MAX_REPLY_LENGTH}
-                    />
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-muted-foreground">
-                        {replyRemaining <= 100
-                          ? copy.charactersLeft.replace('{{count}}', String(replyRemaining))
-                          : ''}
-                      </div>
-                      <Button size="sm" onClick={() => submitReply(replyContent)} disabled={submitting || !replyContent.trim()}>
-                        {copy.replyAction}
-                      </Button>
+			                    <CompactRichText
+			                      value={replyContent}
+			                      onChange={setReplyContent}
+			                      onStatsChange={setReplyStats}
+			                      placeholder={copy.replyPlaceholder}
+			                      ariaLabel={copy.replyPlaceholder}
+		                      minHeightClass="min-h-[96px]"
+		                      toolbarVisibility="always"
+		                      countsVisibility="none"
+                          disabled={!canInteract}
+		                      imageUploadEndpoint="/api/uploads/discussions/sign"
+		                      imageMode="attachments"
+		                      imageMaxImages={MAX_DISCUSSION_IMAGES}
+			                      attachments={replyAttachments}
+			                      onAttachmentsChange={setReplyAttachments}
+		                    />
+	                    <div className="flex items-center justify-between">
+	                      <div />
+			                      <Button
+			                        size="sm"
+			                        onClick={() =>
+                                submitReply(
+                                  appendDiscussionAttachmentsToHtml(replyContent, replyAttachments)
+                                )
+                              }
+			                        disabled={
+                                !canInteract ||
+                                submitting ||
+                                !discussionRichTextHasContent(
+                                  appendDiscussionAttachmentsToHtml(replyContent, replyAttachments)
+                                ) ||
+                                replyStats.characters > MAX_REPLY_LENGTH
+                              }
+		                      >
+		                        {copy.replyAction}
+		                      </Button>
                     </div>
                   </div>
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <h2 className="text-sm font-semibold text-foreground">{copy.repliesTitle}</h2>
+                    <h2 className="text-sm font-medium text-foreground">{copy.repliesTitle}</h2>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     {copy.repliesSubtitle}
@@ -503,16 +642,46 @@ export default function ReplyPage() {
                               size="xs"
                             />
                             <div className="text-[11px] text-muted-foreground">
-                              <span className="font-semibold text-foreground/70">
+                              <span className="font-medium text-foreground/70">
                                 {reply.authorName}
                               </span>
                               <span className="px-1">·</span>
                               <span>{formatDateTime(reply.createdAt, locale)}</span>
                             </div>
+                            <div
+                              className="ml-auto"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              role="presentation"
+                            >
+                              <div className="flex items-center gap-2">
+                                <ReportButton
+                                  reportedUserId={reply.authorId}
+                                  reportedUserPublicId={null}
+                                  reportedUserName={reply.authorName}
+                                  targetType="DISCUSSION_REPLY"
+                                  targetId={reply.id}
+                                  buttonVariant="danger"
+                                  buttonClassName="h-7 px-2 text-[11px]"
+                                />
+                                {currentUser.id === reply.authorId ? (
+                                  <Button
+                                    size="sm"
+                                    variant="danger"
+                                    onClick={() => setDeleteTargetId(reply.id)}
+                                    disabled={deleting}
+                                    className="h-7 px-2 text-[11px]"
+                                  >
+                                    {copy.deleteReply}
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
-                            {formatReplyContent(reply.content)}
-                          </p>
+		                          <DiscussionRichText content={reply.content} />
                         </div>
                       </Link>
                     ))}
@@ -532,30 +701,63 @@ export default function ReplyPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="space-y-3">
-              <textarea
-                value={dialogContent}
-                onChange={(e) => setDialogContent(e.target.value)}
-                placeholder={copy.dialogPlaceholder}
-                className="w-full h-[180px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
-                maxLength={MAX_REPLY_LENGTH}
-              />
-              {dialogRemaining <= 100 ? (
-                <div className="text-right text-xs text-muted-foreground">
-                  {copy.charactersLeft.replace('{{count}}', String(dialogRemaining))}
-                </div>
-              ) : null}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  {copy.cancel}
-                </Button>
-                <Button
-                  onClick={() => submitReply(dialogContent)}
-                  disabled={submitting || !dialogContent.trim()}
-                >
-                  {copy.postReply}
-                </Button>
+			              <CompactRichText
+			                value={dialogContent}
+			                onChange={setDialogContent}
+			                onStatsChange={setDialogStats}
+			                placeholder={copy.dialogPlaceholder}
+			                ariaLabel={copy.dialogPlaceholder}
+			                minHeightClass="min-h-[180px]"
+			                toolbarVisibility="always"
+			                countsVisibility="none"
+			                imageUploadEndpoint="/api/uploads/discussions/sign"
+			                imageMode="attachments"
+			                imageMaxImages={MAX_DISCUSSION_IMAGES}
+			                attachments={dialogAttachments}
+			                onAttachmentsChange={setDialogAttachments}
+			              />
+	              <div className="flex justify-end gap-2">
+	                <Button variant="outline" onClick={() => setDialogOpen(false)}>
+	                  {copy.cancel}
+	                </Button>
+		                <Button
+		                  onClick={() =>
+                        submitReply(
+                          appendDiscussionAttachmentsToHtml(dialogContent, dialogAttachments)
+                        )
+                      }
+		                  disabled={
+                        submitting ||
+                        !discussionRichTextHasContent(
+                          appendDiscussionAttachmentsToHtml(dialogContent, dialogAttachments)
+                        ) ||
+                        dialogStats.characters > MAX_REPLY_LENGTH
+                      }
+		                >
+		                  {copy.postReply}
+		                </Button>
               </div>
             </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog
+          open={Boolean(deleteTargetId)}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTargetId(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{copy.deleteDialogTitle}</AlertDialogTitle>
+              <AlertDialogDescription>{copy.deleteDialogDescription}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>{copy.cancel}</AlertDialogCancel>
+              <AlertDialogAction variant="danger" onClick={deleteReply} disabled={deleting || !deleteTargetId}>
+                {deleting ? copy.deleting : copy.deleteConfirm}
+              </AlertDialogAction>
+            </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
     </DashboardShell>

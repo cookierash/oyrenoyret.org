@@ -34,7 +34,7 @@ interface Step4Props {
   initialValues?: Partial<ConsentInput>;
   onValuesChange?: (values: ConsentInput) => void;
 }
-const BUTTON_CLASS = 'h-10 text-sm font-semibold';
+const BUTTON_CLASS = 'h-10 text-sm font-medium';
 
 export function Step4Consent({
   userId,
@@ -93,7 +93,7 @@ export function Step4Consent({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {copy.badge}
             </p>
-            <h3 className="text-lg font-semibold">{copy.title}</h3>
+            <h3 className="text-lg font-medium">{copy.title}</h3>
             <p className="text-sm text-muted-foreground">
               {copy.subtitle}
             </p>
@@ -146,7 +146,7 @@ export function Step4Consent({
                       {copy.requiredHint}
                     </p>
                   </div>
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     {copy.requiredBadge}
                   </span>
                 </div>

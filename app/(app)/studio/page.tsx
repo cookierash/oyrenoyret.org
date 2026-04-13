@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { PiFileText as FileText, PiClipboardText as ClipboardList } from 'react-icons/pi';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
 
 export default function StudioPage() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -28,6 +29,7 @@ export default function StudioPage() {
   const router = useRouter();
   const { messages } = useI18n();
   const copy = messages.studio.page;
+  const { canWrite } = useCurrentUser();
 
   const refreshList = () => setRefreshKey((k) => k + 1);
 
@@ -36,12 +38,17 @@ export default function StudioPage() {
       <PageHeader
         title={
           <span className="lowercase">
-            <span className="font-comfortaa">oyrenoyret</span> {copy.titleSuffix}
+            <span className="brand-font">oyrenoyret</span> {copy.titleSuffix}
           </span>
         }
         description={copy.description}
         actions={
-          <Button variant="primary" size="sm" onClick={() => setShowCreateModal(true)}>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCreateModal(true)}
+            disabled={!canWrite}
+          >
             {copy.createButton}
           </Button>
         }
@@ -60,7 +67,8 @@ export default function StudioPage() {
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              className="group card-frame border bg-muted/30 flex flex-col items-center gap-3 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              disabled={!canWrite}
+              className="group card-frame border bg-muted/30 flex flex-col items-center gap-3 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-muted/30 disabled:focus:ring-0"
               onClick={() => {
                 setShowCreateModal(false);
                 router.push('/studio/new');
@@ -78,7 +86,8 @@ export default function StudioPage() {
             </button>
             <button
               type="button"
-              className="group card-frame border bg-muted/30 flex flex-col items-center gap-3 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              disabled={!canWrite}
+              className="group card-frame border bg-muted/30 flex flex-col items-center gap-3 p-6 text-left transition-colors hover:border-primary/50 hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:border-border disabled:hover:bg-muted/30 disabled:focus:ring-0"
               onClick={() => {
                 setShowCreateModal(false);
                 router.push('/studio/new/practice-test');

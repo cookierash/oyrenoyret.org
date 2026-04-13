@@ -107,7 +107,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
             <p className="text-sm text-muted-foreground">
               {copy.bannerTitle}
             </p>
-            <p className="font-semibold text-primary mt-2">
+            <p className="font-medium text-primary mt-2">
               {parentEmail}
             </p>
             <p className="text-xs text-muted-foreground mt-2">
@@ -161,7 +161,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
             variant="outline"
             size="lg"
             onClick={onPrevious}
-            className="h-10 flex-1 text-sm font-semibold"
+            className="h-10 flex-1 text-sm font-medium"
           >
             {copy.previous}
           </Button>
@@ -169,7 +169,7 @@ export function Step3Verification({ userId, parentEmail, onSuccess, onPrevious }
             type="submit"
             variant="primary"
             size="lg"
-            className="h-10 flex-1 text-sm font-semibold"
+            className="h-10 flex-1 text-sm font-medium"
             disabled={isSubmitting || !form.formState.isValid}
           >
             {isSubmitting ? copy.verifying : copy.next}

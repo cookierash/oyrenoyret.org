@@ -11,6 +11,8 @@ interface MaterialWithCost {
   materialType: 'TEXTUAL' | 'PRACTICE_TEST';
   difficulty: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED' | null;
   publishedAt: Date | null;
+  ratingAvg: number;
+  ratingCount: number;
   user: { firstName: string | null; lastName: string | null };
   _count: { accesses: number };
   estimatedCost: number;
@@ -61,6 +63,8 @@ export function CatalogMaterialsGrid({
             estimatedCost={m.estimatedCost}
             balance={balance}
             unlockCount={m._count.accesses}
+            ratingAvg={m.ratingAvg}
+            ratingCount={m.ratingCount}
             difficulty={m.difficulty}
             subjectId={subjectId}
             topicId={topicId}

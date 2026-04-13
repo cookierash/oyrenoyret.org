@@ -11,6 +11,8 @@ import { spendMaterialUnlock, calcMaterialUnlockCost, getBalance, roundCredits }
 import { getPracticeTestQuestionCount, getTextWordCount } from '@/src/modules/materials/utils';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
 export async function POST(
   request: Request,
@@ -20,6 +22,15 @@ export async function POST(
     const userId = await getCurrentSession();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const verified = await requireVerifiedEmailForWrite(userId);
+    if (!verified.ok) {
+      const message = 'error' in verified ? verified.error : 'Unauthorized';
+      return NextResponse.json(
+        { error: message, errorKey: verified.errorKey },
+        { status: verified.status }
+      );
     }
 
     const identifier = getRateLimitIdentifier(request, userId);
@@ -34,16 +45,31 @@ export async function POST(
 
     const { materialId } = await params;
 
-    const material = await prisma.material.findFirst({
-      where: { id: materialId, status: 'PUBLISHED', deletedAt: null },
-      select: {
-        id: true,
-        userId: true,
-        materialType: true,
-        content: true,
-        questionCount: true,
-      },
-    });
+    let material: any = null;
+    try {
+      material = await prisma.material.findFirst({
+        where: { id: materialId, status: 'PUBLISHED', deletedAt: null, removedAt: null },
+        select: {
+          id: true,
+          userId: true,
+          materialType: true,
+          content: true,
+          questionCount: true,
+        },
+      });
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      material = await prisma.material.findFirst({
+        where: { id: materialId, status: 'PUBLISHED', deletedAt: null },
+        select: {
+          id: true,
+          userId: true,
+          materialType: true,
+          content: true,
+          questionCount: true,
+        },
+      });
+    }
 
     if (!material) {
       return NextResponse.json({ error: 'Material not found' }, { status: 404 });

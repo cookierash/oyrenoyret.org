@@ -4,6 +4,12 @@ import {
   TIME_FORMAT_COOKIE,
   normalizeLanguage,
   normalizeTimeFormat,
+  NOTIFY_REPLIES_COOKIE,
+  NOTIFY_CREDITS_COOKIE,
+  NOTIFY_SPRINTS_COOKIE,
+  normalizeNotifyReplies,
+  normalizeNotifyCredits,
+  normalizeNotifySprints,
 } from '@/src/lib/settings-preferences';
 
 export async function getSettingsPreferences() {
@@ -22,5 +28,10 @@ export async function getSettingsPreferences() {
   return {
     language: normalizeLanguage(getCookie?.(LANGUAGE_COOKIE)?.value),
     timeFormat: normalizeTimeFormat(getCookie?.(TIME_FORMAT_COOKIE)?.value),
+    notifications: {
+      replies: normalizeNotifyReplies(getCookie?.(NOTIFY_REPLIES_COOKIE)?.value),
+      credits: normalizeNotifyCredits(getCookie?.(NOTIFY_CREDITS_COOKIE)?.value),
+      sprints: normalizeNotifySprints(getCookie?.(NOTIFY_SPRINTS_COOKIE)?.value),
+    },
   };
 }

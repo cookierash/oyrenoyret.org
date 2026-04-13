@@ -4,7 +4,7 @@
  * Compact, friendly student dashboard with:
  * - Greeting and daily focus
  * - Micro progress tiles
- * - Upcoming live activities
+ * - Upcoming interactive sessions
  * - Recent materials
  * - Quick actions
  */
@@ -14,13 +14,40 @@ import { redirect } from 'next/navigation';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { STREAK_OFFSET_HOURS, toDayNumber } from '@/src/lib/streak';
 import { recordDailyVisit } from '@/src/modules/visits';
-import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiVideoCamera as Video } from 'react-icons/pi';
+import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiMegaphone as Megaphone, PiVideoCamera as Video } from 'react-icons/pi';
 import { getSettingsPreferences } from '@/src/lib/settings-preferences-server';
 import { getI18n } from '@/src/i18n/server';
 import { getLocaleCode } from '@/src/i18n';
 import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
+import { getAnnouncementImageSrc } from '@/src/lib/announcement-images';
+
+type LiveAnnouncement = { id: string; title: string; body: string; createdAt: Date; imageUrl?: string | null };
+
+async function getLatestLiveAnnouncements(take: number): Promise<LiveAnnouncement[]> {
+  const safeTake = Number.isFinite(take) ? Math.min(Math.max(take, 1), 20) : 3;
+  try {
+    return await prisma.liveAnnouncement.findMany({
+      where: { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: safeTake,
+      select: { id: true, title: true, body: true, imageUrl: true, createdAt: true },
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+    try {
+      return await prisma.liveAnnouncement.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: safeTake,
+        select: { id: true, title: true, body: true, createdAt: true },
+      });
+    } catch {
+      return [];
+    }
+  }
+}
 
 function calcStreakStats(dayNumbers: number[], labels: readonly string[]) {
   const daySet = new Set<number>(dayNumbers);
@@ -101,14 +128,64 @@ function getGreeting(copy: { morning: string; afternoon: string; evening: string
   return copy.evening;
 }
 
+function StreakMetric({
+  title,
+  value,
+  unit,
+  message,
+  align = 'left',
+}: {
+  title: string;
+  value: number;
+  unit: string;
+  message?: string;
+  align?: 'left' | 'right';
+}) {
+  const isRight = align === 'right';
+  return (
+    <div className={`space-y-1 ${isRight ? 'text-right' : ''}`}>
+      <p className="text-[10px] font-medium uppercase text-muted-foreground">
+        {title}
+      </p>
+      <div className={`flex items-baseline gap-2 ${isRight ? 'justify-end' : ''}`}>
+        <span className="text-2xl font-medium text-foreground sm:text-3xl">
+          {value}
+        </span>
+        <span className="text-xs text-muted-foreground sm:text-sm">{unit}</span>
+      </div>
+      {message ? (
+        <p className="text-xs text-muted-foreground">{message}</p>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const userId = await getCurrentSession();
   if (!userId) redirect('/login');
   const { timeFormat } = await getSettingsPreferences();
-  const { locale, messages } = await getI18n();
+  const { locale, messages, t } = await getI18n();
   const copy = messages.app.dashboard;
+  let dbSubjects: Array<{ slug: string; nameEn: string; nameAz: string }> = [];
+  try {
+    dbSubjects = await prisma.subject.findMany({
+      where: { deletedAt: null },
+      select: { slug: true, nameEn: true, nameAz: true },
+      orderBy: { slug: 'asc' },
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+    dbSubjects = [];
+  }
   const subjectNameMap = new Map(
-    getLocalizedSubjects(messages).map((subject) => [subject.id, subject.name]),
+    (dbSubjects.length
+      ? dbSubjects.map((subject) => [
+          subject.slug,
+          locale === 'az' ? subject.nameAz : subject.nameEn,
+        ])
+      : getLocalizedSubjects(messages).map((subject) => [subject.id, subject.name])) as Array<
+      [string, string]
+    >,
   );
   const difficultyCopy = messages.materials.difficulty;
 
@@ -116,7 +193,7 @@ export default async function DashboardPage() {
   await recordDailyVisit(userId, now);
 
   // Fetch user info + upcoming activities + recent purchases in parallel
-  const [user, upcomingActivities, recentPurchases, dailyVisits] = await Promise.all([
+  const [user, upcomingActivities, recentPurchases, dailyVisits, liveAnnouncements] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { firstName: true, lastName: true, role: true },
@@ -152,10 +229,11 @@ export default async function DashboardPage() {
       take: 365,
       select: { dayNumber: true },
     }),
+    getLatestLiveAnnouncements(3),
   ]);
 
   if (user?.role === 'ADMIN' || user?.role === 'TEACHER') {
-    redirect('/admin/dashboard');
+    redirect('/admin/interactive-sessions');
   }
 
   const displayName = user?.firstName || copy.fallbackName;
@@ -169,6 +247,16 @@ export default async function DashboardPage() {
     : streakStats.hasYesterday
       ? copy.streakMessages.yesterday
       : copy.streakMessages.start;
+  const currentUnit =
+    streakStats.current === 1 ? copy.dayLabel.singular : copy.dayLabel.plural;
+  const bestUnit =
+    streakStats.best === 1 ? copy.dayLabel.singular : copy.dayLabel.plural;
+
+  const announcementEmptyCopy = messages.liveActivities.announcements.empty;
+  const announcementsDateFormatter = new Intl.DateTimeFormat(getLocaleCode(locale), {
+    month: 'short',
+    day: 'numeric',
+  });
 
   return (
     <DashboardShell>
@@ -189,29 +277,21 @@ export default async function DashboardPage() {
               <div className="pointer-events-none absolute -bottom-12 left-6 h-32 w-32 rounded-full bg-rose-300/40 blur-3xl dark:bg-rose-400/20" />
               <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.7),transparent_65%)] dark:bg-[radial-gradient(ellipse_at_top,rgba(15,23,42,0.55),transparent_70%)]" />
 
-              <div className="relative grid gap-6 md:grid-cols-[1fr_3fr_1fr] md:items-center">
-                <div className="flex items-center gap-4 md:flex-col md:items-start">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      {copy.today}
-                    </p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-semibold text-foreground">
-                        {streakStats.current}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {streakStats.current === 1 ? copy.dayLabel.singular : copy.dayLabel.plural}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{streakMessage}</p>
-                  </div>
+              <div className="relative grid grid-cols-2 gap-4 md:grid-cols-[1fr_3fr_1fr] md:items-center md:gap-6">
+                <div className="order-1 md:order-none">
+                  <StreakMetric
+                    title={copy.today}
+                    value={streakStats.current}
+                    unit={currentUnit}
+                    message={streakMessage}
+                  />
                 </div>
 
-                <div className="flex flex-col items-center gap-4">
+                <div className="order-3 col-span-2 flex flex-col items-center gap-4 md:order-none md:col-auto">
                   <div className="grid grid-cols-7 gap-2 sm:gap-3">
                     {streakStats.weekDays.map((day) => (
                       <div key={day.key} className="flex flex-col items-center gap-2">
-                        <span className="text-xs font-semibold text-muted-foreground/70">
+                        <span className="text-xs font-medium text-muted-foreground/70">
                           {day.label}
                         </span>
                         <div
@@ -228,20 +308,69 @@ export default async function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-4 md:flex-col md:items-end md:text-right">
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                      {copy.bestStreak}
-                    </p>
-                    <div className="flex items-baseline gap-2 md:justify-end">
-                      <span className="text-2xl font-semibold text-foreground">
-                        {streakStats.best}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{copy.dayLabel.plural}</span>
-                    </div>
-                  </div>
+                <div className="order-2 md:order-none">
+                  <StreakMetric
+                    title={copy.bestStreak}
+                    value={streakStats.best}
+                    unit={bestUnit}
+                    align="right"
+                  />
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Megaphone className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-medium text-foreground">
+                  {t('sidebar.announcements')}
+                </h2>
+              </div>
+
+              {liveAnnouncements.length === 0 ? (
+                <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+                  <Megaphone className="mx-auto mb-2 h-7 w-7 text-muted-foreground/60" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {announcementEmptyCopy}
+                  </p>
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {liveAnnouncements.map((announcement) => (
+                    (() => {
+                      const imageSrc = getAnnouncementImageSrc(announcement.imageUrl);
+                      return (
+                    <Link
+                      key={announcement.id}
+                      href={`/a/${announcement.id}`}
+                      className="block space-y-2 rounded-lg outline-none ring-offset-background transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-md border border-border/50 bg-muted/30">
+                        {imageSrc ? (
+                          <img
+                            src={imageSrc}
+                            alt=""
+                            loading="lazy"
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="flex items-start justify-between gap-2 px-1 pb-1">
+                        <h3 className="font-medium text-sm leading-snug line-clamp-2">
+                          {announcement.title}
+                        </h3>
+                        <div className="shrink-0 flex items-center gap-1">
+                          <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted/60 text-foreground">
+                            {announcementsDateFormatter.format(announcement.createdAt)}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                      );
+                    })()
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -250,10 +379,10 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Video className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">{copy.upcoming}</h2>
+              <h2 className="text-sm font-medium">{copy.upcoming}</h2>
             </div>
             <Link
-              href="/live-activities"
+              href="/interactive-sessions"
               className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               {copy.viewAll}
@@ -280,15 +409,15 @@ export default async function DashboardPage() {
                   >
                     <div className="flex flex-wrap items-center gap-4">
                       <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-muted/60 text-center">
-                        <span className="text-[11px] font-semibold uppercase text-muted-foreground">
+                        <span className="text-[11px] font-medium uppercase text-muted-foreground">
                           {activityDate.toLocaleDateString(getLocaleCode(locale), { month: 'short' })}
                         </span>
-                        <span className="text-lg font-semibold text-foreground">
+                        <span className="text-lg font-medium text-foreground">
                           {activityDate.toLocaleDateString(getLocaleCode(locale), { day: '2-digit' })}
                         </span>
                       </div>
                       <div className="min-w-[200px] flex-1">
-                        <p className="text-sm font-semibold text-foreground line-clamp-1">
+                        <p className="text-sm font-medium text-foreground line-clamp-1">
                           {activity.title}
                         </p>
                         {activity.description && (
@@ -332,7 +461,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-muted-foreground" />
-              <h2 className="text-sm font-semibold">{copy.recentMaterials}</h2>
+              <h2 className="text-sm font-medium">{copy.recentMaterials}</h2>
             </div>
             <Link
               href="/library"
@@ -388,7 +517,7 @@ export default async function DashboardPage() {
                       <span
                         className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                           material.difficulty === 'ADVANCED'
-                            ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                            ? 'bg-destructive/10 text-destructive'
                             : material.difficulty === 'INTERMEDIATE'
                               ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400'
                               : 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400'

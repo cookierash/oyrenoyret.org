@@ -6,8 +6,7 @@ import { PiMagnifyingGlass as SearchIcon, PiX as X } from 'react-icons/pi';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/src/i18n/i18n-provider';
-import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
-import { getLocalizedTopicNameMap } from '@/src/i18n/topic-utils';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
 import {
   buildTagIndex,
   createTagMap,
@@ -53,12 +52,7 @@ export function CatalogSearch({
   const [focused, setFocused] = useState(false);
   const blurTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const localizedSubjects = useMemo(() => getLocalizedSubjects(messages), [messages]);
-  const subjectNameMap = useMemo(
-    () => new Map(localizedSubjects.map((subject) => [subject.id, subject.name])),
-    [localizedSubjects],
-  );
-  const topicNameMap = useMemo(() => getLocalizedTopicNameMap(messages), [messages]);
+  const { subjects: localizedSubjects, subjectNameMap, topicNameMap } = useCurriculum();
   const tagSource = useMemo(
     () =>
       tagMode === 'topic'
@@ -275,7 +269,7 @@ export function CatalogSearch({
                     <div className="text-xs text-muted-foreground">{tag.name}</div>
                   </div>
                   {selectedTags.includes(tag.id) ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                       {copy.added}
                     </span>
                   ) : null}
@@ -313,7 +307,7 @@ export function CatalogSearch({
                         className="group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30"
                       >
                       <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                          <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                             {item.title}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">

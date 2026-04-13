@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 import { PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiMagnifyingGlass as Search } from 'react-icons/pi';
 import {
@@ -21,6 +22,7 @@ import { Select, SelectItem } from '@/components/ui/select';
 import { DifficultyBars, MaterialDifficulty } from '@/src/modules/materials/difficulty-bars';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { MAX_IMAGE_UPLOAD_BYTES } from '@/src/config/uploads';
 
 interface LiveEvent {
   id: string;
@@ -36,6 +38,7 @@ interface LiveAnnouncement {
   id: string;
   title: string;
   body: string;
+  imageUrl?: string | null;
   createdAt: string;
 }
 
@@ -91,9 +94,11 @@ interface LiveEventsAdminPanelProps {
 }
 
 function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelProps) {
-  const { messages } = useI18n();
+  const { t, messages } = useI18n();
   const difficultyCopy = messages.materials.difficulty;
   const adminCopy = messages.liveActivities.admin;
+  const uiCopy = messages.liveActivities.admin.ui;
+  const commonCopy = uiCopy.common;
   const initialForm = useMemo(
     () => ({
       topic: '',
@@ -101,6 +106,8 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       durationMinutes: defaults?.durationMinutes ?? '10',
       difficulty: defaults?.difficulty ?? 'BASIC',
       creditCost: defaults?.creditCost ?? '5',
+      maxParticipants: '30',
+      prompt: '',
     }),
     [defaults?.creditCost, defaults?.difficulty, defaults?.durationMinutes],
   );
@@ -134,6 +141,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     const params = new URLSearchParams();
     params.set('take', '200');
     params.set('type', type);
+    params.set('includePast', '1');
     fetch(`/api/live-events?${params.toString()}`, { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setEvents(Array.isArray(data) ? data : []))
@@ -166,6 +174,9 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     }
     const duration = Number(eventForm.durationMinutes);
     const creditCost = Number(eventForm.creditCost);
+    const maxParticipants = eventForm.maxParticipants.trim()
+      ? Number(eventForm.maxParticipants)
+      : null;
     if (!Number.isFinite(duration) || duration <= 0) {
       toast.error(adminCopy.toasts.durationPositive);
       return;
@@ -177,6 +188,16 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     if (!Number.isFinite(creditCost) || creditCost < 0 || !Number.isInteger(creditCost)) {
       toast.error(adminCopy.toasts.creditCostWhole);
       return;
+    }
+    if (maxParticipants !== null) {
+      if (!Number.isFinite(maxParticipants) || !Number.isInteger(maxParticipants)) {
+        toast.error(adminCopy.toasts.maxParticipantsWhole);
+        return;
+      }
+      if (maxParticipants <= 0 || maxParticipants > 500) {
+        toast.error(adminCopy.toasts.maxParticipantsRange);
+        return;
+      }
     }
 
     try {
@@ -190,6 +211,8 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
           difficulty: eventForm.difficulty,
           creditCost,
           type,
+          maxParticipants,
+          ...(type === 'PROBLEM_SPRINT' ? { prompt: eventForm.prompt } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -372,17 +395,31 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
           </AlertDialogHeader>
           <form className="mt-4 grid gap-4" onSubmit={handleCreateEvent}>
             <div className="grid gap-2">
-              <Label htmlFor={`${type}-topic`}>Topic</Label>
+              <Label htmlFor={`${type}-topic`}>{commonCopy.topicLabel}</Label>
               <Input
                 id={`${type}-topic`}
                 value={eventForm.topic}
                 onChange={(e) => setEventForm((prev) => ({ ...prev, topic: e.target.value }))}
-                placeholder="Scientific topic or challenge"
+                placeholder={commonCopy.topicPlaceholder}
               />
             </div>
+            {type === 'PROBLEM_SPRINT' ? (
+              <div className="grid gap-2">
+                <Label htmlFor={`${type}-prompt`}>{commonCopy.problemStatementLabel}</Label>
+                <textarea
+                  id={`${type}-prompt`}
+                  className="min-h-[120px] max-h-[420px] overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
+                  value={eventForm.prompt}
+                  onChange={(e) =>
+                    setEventForm((prev) => ({ ...prev, prompt: e.target.value }))
+                  }
+                  placeholder={commonCopy.problemStatementPlaceholder}
+                />
+              </div>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor={`${type}-date`}>Date & time</Label>
+                <Label htmlFor={`${type}-date`}>{commonCopy.dateTimeLabel}</Label>
                 <Input
                   id={`${type}-date`}
                   type="datetime-local"
@@ -392,7 +429,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor={`${type}-duration`}>Session duration (minutes)</Label>
+                <Label htmlFor={`${type}-duration`}>{commonCopy.durationLabel}</Label>
                 <Input
                   id={`${type}-duration`}
                   type="number"
@@ -408,7 +445,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor={`${type}-difficulty`}>Difficulty</Label>
+                <Label htmlFor={`${type}-difficulty`}>{commonCopy.difficultyLabel}</Label>
                 <Select
                   id={`${type}-difficulty`}
                   value={eventForm.difficulty}
@@ -425,7 +462,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor={`${type}-credit`}>Credits to join</Label>
+                <Label htmlFor={`${type}-credit`}>{commonCopy.creditsToJoinLabel}</Label>
                 <Input
                   id={`${type}-credit`}
                   type="number"
@@ -438,10 +475,27 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                 />
               </div>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor={`${type}-maxParticipants`}>{commonCopy.maxParticipantsLabel}</Label>
+              <Input
+                id={`${type}-maxParticipants`}
+                type="number"
+                min={1}
+                max={500}
+                step={1}
+                value={eventForm.maxParticipants}
+                onChange={(e) =>
+                  setEventForm((prev) => ({ ...prev, maxParticipants: e.target.value }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                {commonCopy.maxParticipantsHint}
+              </p>
+            </div>
 
             <AlertDialogFooter className="mt-2">
               <AlertDialogCancel type="button" onClick={() => setEventDialogOpen(false)}>
-                Cancel
+                {commonCopy.cancel}
               </AlertDialogCancel>
               <AlertDialogAction type="submit">{labels.formButton}</AlertDialogAction>
             </AlertDialogFooter>
@@ -461,24 +515,23 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove event?</AlertDialogTitle>
+            <AlertDialogTitle>{commonCopy.removeEventTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget ? (
-                <>
-                  This will remove <strong>{deleteTarget.topic}</strong> on{' '}
-                  {formatDate(new Date(deleteTarget.date))} at{' '}
-                  {formatTime(new Date(deleteTarget.date))} from the live activities list.
-                  This action cannot be undone.
-                </>
+                t('liveActivities.admin.ui.common.removeEventDescription', {
+                  topic: deleteTarget.topic,
+                  date: formatDate(new Date(deleteTarget.date)),
+                  time: formatTime(new Date(deleteTarget.date)),
+                })
               ) : (
-                'This action cannot be undone.'
+                commonCopy.removeEventFallback
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{commonCopy.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} disabled={deleting}>
-              {deleting ? 'Removing...' : 'Remove event'}
+              {deleting ? commonCopy.removing : commonCopy.removeEventConfirm}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -496,50 +549,50 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Payout sprint winners</AlertDialogTitle>
+            <AlertDialogTitle>{commonCopy.payoutDialogTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              Enter the winners by email, user ID, or public ID. Leave a rank blank if there is no winner.
+              {commonCopy.payoutDialogDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor={`${type}-payout-first`}>
-                1st place (cost + 3)
+                {commonCopy.firstPlaceLabel}
               </Label>
               <Input
                 id={`${type}-payout-first`}
                 value={payoutForm.first}
                 onChange={(e) => setPayoutForm((prev) => ({ ...prev, first: e.target.value }))}
-                placeholder="Email or user id"
+                placeholder={commonCopy.payoutPlaceholder}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor={`${type}-payout-second`}>
-                2nd place (cost + 2)
+                {commonCopy.secondPlaceLabel}
               </Label>
               <Input
                 id={`${type}-payout-second`}
                 value={payoutForm.second}
                 onChange={(e) => setPayoutForm((prev) => ({ ...prev, second: e.target.value }))}
-                placeholder="Email or user id"
+                placeholder={commonCopy.payoutPlaceholder}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor={`${type}-payout-third`}>
-                3rd place (cost + 1)
+                {commonCopy.thirdPlaceLabel}
               </Label>
               <Input
                 id={`${type}-payout-third`}
                 value={payoutForm.third}
                 onChange={(e) => setPayoutForm((prev) => ({ ...prev, third: e.target.value }))}
-                placeholder="Email or user id"
+                placeholder={commonCopy.payoutPlaceholder}
               />
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={payingOut}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={payingOut}>{commonCopy.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmPayout} disabled={payingOut}>
-              {payingOut ? 'Paying out...' : 'Pay winners'}
+              {payingOut ? commonCopy.payingOut : commonCopy.payWinners}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -548,14 +601,16 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">{labels.listTitle}</h2>
+            <h2 className="text-sm font-medium text-foreground">{labels.listTitle}</h2>
             <p className="mt-1 text-xs text-muted-foreground">{labels.listDescription}</p>
           </div>
           <div className="flex items-center gap-3">
             {loading ? (
               <Skeleton className="h-3 w-16" />
             ) : (
-              <span className="text-xs text-muted-foreground">{events.length} total</span>
+              <span className="text-xs text-muted-foreground">
+                {t('liveActivities.admin.ui.common.totalLabel', { count: events.length })}
+              </span>
             )}
             <Button size="sm" onClick={() => setEventDialogOpen(true)}>
               {labels.addButton}
@@ -585,19 +640,19 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             </div>
             <div className="flex items-center gap-2">
               <label htmlFor={`${type}-sort`} className="text-sm text-muted-foreground whitespace-nowrap">
-                Sort by
+                {uiCopy.sortBy}
               </label>
               <Select
                 id={`${type}-sort`}
                 value={sort}
                 onChange={(e) => setSort(e.target.value as EventSortKey)}
                 className="w-[180px]"
-                aria-label="Sort events"
+                aria-label={commonCopy.sortAria}
               >
-                <SelectItem value="soonest">Soonest first</SelectItem>
-                <SelectItem value="latest">Latest first</SelectItem>
-                <SelectItem value="topicAz">Topic A-Z</SelectItem>
-                <SelectItem value="topicZa">Topic Z-A</SelectItem>
+                <SelectItem value="soonest">{commonCopy.sortSoonest}</SelectItem>
+                <SelectItem value="latest">{commonCopy.sortLatest}</SelectItem>
+                <SelectItem value="topicAz">{commonCopy.sortTopicAz}</SelectItem>
+                <SelectItem value="topicZa">{commonCopy.sortTopicZa}</SelectItem>
               </Select>
             </div>
           </div>
@@ -628,24 +683,24 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
         ) : filteredAndSorted.length === 0 ? (
           <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
             <Search className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground font-medium">No matches found.</p>
+            <p className="text-sm text-muted-foreground font-medium">{uiCopy.noMatches}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Try a different keyword or clear the filters.
+              {commonCopy.noMatchesHint}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse">
+            <div className="overflow-x-auto pb-1">
+              <table className="min-w-[980px] w-max table-auto border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">Topic</th>
-                    <th className="py-2 pr-4 font-medium">Date</th>
-                    <th className="py-2 pr-4 font-medium">Time</th>
-                    <th className="py-2 pr-4 font-medium">Duration</th>
-                    <th className="py-2 pr-4 font-medium">Difficulty</th>
-                    <th className="py-2 pr-4 font-medium">Credits</th>
-                    <th className="py-2 pr-2 text-right font-medium">Actions</th>
+                  <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                    <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
+                    <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
+                    <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
+                    <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.duration}</th>
+                    <th className="w-[150px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.difficulty}</th>
+                    <th className="w-[120px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.credits}</th>
+                    <th className="w-[190px] py-2 pr-2 text-right font-medium">{commonCopy.tableHeaders.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -653,43 +708,50 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                     const eventDate = new Date(liveEvent.date);
                     return (
                       <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
-                        <td className="py-3 pr-4 min-w-[220px]">
-                          <div className="font-medium">{liveEvent.topic}</div>
+                        <td className="py-3 pr-4">
+                          <div className="font-medium truncate">{liveEvent.topic}</div>
                         </td>
-                        <td className="py-3 pr-4 min-w-[140px] text-muted-foreground">
+                        <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
                           {formatDate(eventDate)}
                         </td>
-                        <td className="py-3 pr-4 min-w-[120px] text-muted-foreground">
+                        <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
                           {formatTime(eventDate)}
                         </td>
-                        <td className="py-3 pr-4 min-w-[120px]">
+                        <td className="py-3 pr-4">
                           <span className="inline-flex items-center gap-1 text-muted-foreground">
                             <Clock className="h-3.5 w-3.5" />
-                            {liveEvent.durationMinutes} min
+                            {liveEvent.durationMinutes} {commonCopy.minutesShort}
                           </span>
                         </td>
-                        <td className="py-3 pr-4 min-w-[140px]">
+                        <td className="py-3 pr-4">
                           {liveEvent.difficulty ? (
                             <DifficultyBars difficulty={liveEvent.difficulty} />
                           ) : (
-                            <span className="text-xs text-muted-foreground">N/A</span>
+                            <span className="text-xs text-muted-foreground">
+                              {commonCopy.notAvailable}
+                            </span>
                           )}
                         </td>
-                        <td className="py-3 pr-4 min-w-[120px] text-muted-foreground">
+                        <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
                           <span className="inline-flex items-center gap-1">
                             <Coins className="h-3.5 w-3.5" />
-                            {Math.round(liveEvent.creditCost)} credits
+                            {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
                           </span>
                         </td>
                         <td className="py-3 pr-2">
-                          <div className="flex justify-start gap-2">
+                          <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
+                            {type === 'PROBLEM_SPRINT' ? (
+                              <Button asChild variant="outline" size="sm">
+                                <Link href={`/cms/sprint/${liveEvent.id}`}>{commonCopy.openCms}</Link>
+                              </Button>
+                            ) : null}
                             {type === 'PROBLEM_SPRINT' ? (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => requestPayout(liveEvent)}
                               >
-                                Payout winners
+                                {commonCopy.payoutWinners}
                               </Button>
                             ) : null}
                             <Button
@@ -697,7 +759,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                               size="sm"
                               onClick={() => requestDelete(liveEvent)}
                             >
-                              Delete
+                              {commonCopy.delete}
                             </Button>
                           </div>
                         </td>
@@ -714,7 +776,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                   size="sm"
                   onClick={() => setPage((current) => current + 1)}
                 >
-                  Load more items
+                  {uiCopy.loadMore}
                 </Button>
               </div>
             ) : null}
@@ -726,47 +788,32 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
 }
 
 export function ProblemSprintsAdminPanel() {
+  const { messages } = useI18n();
   return (
     <LiveEventsAdminPanel
       type="PROBLEM_SPRINT"
       defaults={{ durationMinutes: '10', difficulty: 'BASIC', creditCost: '3' }}
-      labels={{
-        formTitle: 'Create a problem sprint',
-        formDescription: 'Set up a new timed sprint and publish it to the live activities page.',
-        formButton: 'Publish sprint',
-        addButton: 'Add sprint',
-        listTitle: 'Scheduled problem sprints',
-        listDescription: 'Manage upcoming problem sprints.',
-        emptyTitle: 'No problem sprints scheduled yet.',
-        emptyDescription: 'Use the add button above to schedule the first sprint.',
-        searchPlaceholder: 'Search sprints...',
-      }}
+      labels={messages.liveActivities.admin.ui.problemSprints}
     />
   );
 }
 
 export function EventsAdminPanel() {
+  const { messages } = useI18n();
   return (
     <LiveEventsAdminPanel
       type="EVENT"
-      labels={{
-        formTitle: 'Create a live event',
-        formDescription: 'Schedule a new event for the live activities calendar.',
-        formButton: 'Publish event',
-        addButton: 'Add event',
-        listTitle: 'Scheduled events',
-        listDescription: 'Manage upcoming live events.',
-        emptyTitle: 'No events scheduled yet.',
-        emptyDescription: 'Use the add button above to schedule the first event.',
-        searchPlaceholder: 'Search events...',
-      }}
+      labels={messages.liveActivities.admin.ui.events}
     />
   );
 }
 
 export function AnnouncementsAdminPanel() {
-  const { messages } = useI18n();
+  const { t, messages } = useI18n();
   const adminCopy = messages.liveActivities.admin;
+  const uiCopy = messages.liveActivities.admin.ui;
+  const announcementCopy = uiCopy.announcements;
+  const commonCopy = uiCopy.common;
   const [announcements, setAnnouncements] = useState<LiveAnnouncement[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -775,8 +822,12 @@ export function AnnouncementsAdminPanel() {
   const [announcementForm, setAnnouncementForm] = useState({
     title: '',
     body: '',
+    imageUrl: '',
   });
   const [announcementDialogOpen, setAnnouncementDialogOpen] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const maxBannerMb = Math.floor(MAX_IMAGE_UPLOAD_BYTES / 1024 / 1024);
 
   const loadData = () => {
     setLoading(true);
@@ -804,6 +855,7 @@ export function AnnouncementsAdminPanel() {
         body: JSON.stringify({
           title: announcementForm.title,
           body: announcementForm.body,
+          imageUrl: announcementForm.imageUrl || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -814,7 +866,7 @@ export function AnnouncementsAdminPanel() {
         return;
       }
       toast.success(adminCopy.toasts.announcementPublished);
-      setAnnouncementForm({ title: '', body: '' });
+      setAnnouncementForm({ title: '', body: '', imageUrl: '' });
       setAnnouncementDialogOpen(false);
       loadData();
     } catch (error) {
@@ -824,6 +876,78 @@ export function AnnouncementsAdminPanel() {
           error instanceof Error ? error.message : null,
         ),
       );
+    }
+  };
+
+  const uploadBanner = async (file: File) => {
+    if (!/^image\/(png|jpeg|webp)$/i.test(file.type)) {
+      toast.error(adminCopy.toasts.announcementBannerUnsupported ?? 'Unsupported image type.');
+      return;
+    }
+    if (!Number.isFinite(file.size) || file.size <= 0) {
+      toast.error(adminCopy.toasts.announcementBannerUploadFailed ?? 'Upload failed.');
+      return;
+    }
+    if (file.size > MAX_IMAGE_UPLOAD_BYTES) {
+      toast.error(
+        (adminCopy.toasts.announcementBannerTooLarge ?? 'Image is too large.').replace('{{count}}', String(maxBannerMb)),
+      );
+      return;
+    }
+
+    setBannerUploading(true);
+    try {
+      const signRes = await fetch('/api/uploads/announcements/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ size: file.size, type: file.type }),
+      });
+      const signData = await signRes.json().catch(() => ({}));
+
+      if (
+        signRes.ok &&
+        signData?.provider === 'r2' &&
+        String(signData?.method ?? '').toUpperCase() === 'PUT' &&
+        typeof signData?.uploadUrl === 'string' &&
+        (typeof signData?.publicUrl === 'string' || typeof signData?.proxyUrl === 'string')
+      ) {
+        const signedHeaders: Record<string, string> = {};
+        if (signData?.headers && typeof signData.headers === 'object') {
+          for (const [k, v] of Object.entries(signData.headers as Record<string, unknown>)) {
+            if (typeof v === 'string' && v) signedHeaders[k] = v;
+          }
+        }
+        const uploadRes = await fetch(signData.uploadUrl as string, {
+          method: 'PUT',
+          headers: {
+            ...signedHeaders,
+            'Content-Type': String(signedHeaders['Content-Type'] ?? file.type),
+          },
+          body: file,
+        });
+        if (!uploadRes.ok) {
+          throw new Error('Upload failed');
+        }
+        const nextUrl =
+          typeof signData?.proxyUrl === 'string' && signData.proxyUrl
+            ? String(signData.proxyUrl)
+            : String(signData.publicUrl);
+        setAnnouncementForm((prev) => ({ ...prev, imageUrl: nextUrl }));
+        return;
+      }
+
+      const message = typeof signData?.error === 'string' ? signData.error : null;
+      throw new Error(message || 'Upload failed');
+    } catch (error) {
+      toast.error(
+        formatErrorToast(
+          adminCopy.toasts.announcementBannerUploadFailed ?? 'Failed to upload banner.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
+    } finally {
+      setBannerUploading(false);
+      if (bannerInputRef.current) bannerInputRef.current.value = '';
     }
   };
 
@@ -888,36 +1012,97 @@ export function AnnouncementsAdminPanel() {
 
   return (
     <div className="space-y-6">
-      <AlertDialog open={announcementDialogOpen} onOpenChange={setAnnouncementDialogOpen}>
+      <AlertDialog
+        open={announcementDialogOpen}
+        onOpenChange={(next) => {
+          setAnnouncementDialogOpen(next);
+          if (!next) {
+            setAnnouncementForm({ title: '', body: '', imageUrl: '' });
+            setBannerUploading(false);
+            if (bannerInputRef.current) bannerInputRef.current.value = '';
+          }
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Create an announcement</AlertDialogTitle>
-            <AlertDialogDescription>
-              Post updates that appear in the live activities sidebar.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{announcementCopy.dialogTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{announcementCopy.dialogDescription}</AlertDialogDescription>
           </AlertDialogHeader>
+          <input
+            ref={bannerInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              void uploadBanner(file);
+            }}
+          />
           <form className="mt-4 grid gap-4" onSubmit={handleCreateAnnouncement}>
             <div className="grid gap-2">
-              <Label htmlFor="announcement-title">Title</Label>
+              <Label htmlFor="announcement-title">{announcementCopy.titleLabel}</Label>
               <Input
                 id="announcement-title"
                 value={announcementForm.title}
                 onChange={(e) =>
                   setAnnouncementForm((prev) => ({ ...prev, title: e.target.value }))
                 }
-                placeholder="Update title"
+                placeholder={announcementCopy.titlePlaceholder}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="announcement-body">Announcement</Label>
+              <Label>{announcementCopy.bannerLabel}</Label>
+              <div className="flex flex-col gap-3">
+                {announcementForm.imageUrl ? (
+                  <div className="relative overflow-hidden rounded-md border border-border bg-muted/20">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={announcementForm.imageUrl}
+                      alt=""
+                      className="h-40 w-full object-cover"
+                      decoding="async"
+                    />
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => bannerInputRef.current?.click()}
+                    disabled={bannerUploading}
+                  >
+                    {bannerUploading ? announcementCopy.bannerUploading : announcementCopy.bannerUpload}
+                  </Button>
+                  {announcementForm.imageUrl ? (
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setAnnouncementForm((prev) => ({ ...prev, imageUrl: '' }))}
+                      disabled={bannerUploading}
+                    >
+                      {announcementCopy.bannerRemove}
+                    </Button>
+                  ) : null}
+                  <p className="text-[11px] text-muted-foreground">
+                    {announcementCopy.bannerHint.replace('{{count}}', String(maxBannerMb))}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="announcement-body">{announcementCopy.bodyLabel}</Label>
               <textarea
                 id="announcement-body"
-                className="min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
+                className="min-h-[90px] max-h-[420px] overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
                 value={announcementForm.body}
                 onChange={(e) =>
                   setAnnouncementForm((prev) => ({ ...prev, body: e.target.value }))
                 }
-                placeholder="Write the announcement text"
+                placeholder={announcementCopy.bodyPlaceholder}
               />
             </div>
             <AlertDialogFooter className="mt-2">
@@ -925,9 +1110,9 @@ export function AnnouncementsAdminPanel() {
                 type="button"
                 onClick={() => setAnnouncementDialogOpen(false)}
               >
-                Cancel
+                {announcementCopy.cancel}
               </AlertDialogCancel>
-              <AlertDialogAction type="submit">Publish announcement</AlertDialogAction>
+              <AlertDialogAction type="submit">{announcementCopy.publish}</AlertDialogAction>
             </AlertDialogFooter>
           </form>
         </AlertDialogContent>
@@ -936,17 +1121,19 @@ export function AnnouncementsAdminPanel() {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Announcements</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Manage shared updates.</p>
+            <h2 className="text-sm font-medium text-foreground">{announcementCopy.sectionTitle}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{announcementCopy.sectionDescription}</p>
           </div>
           <div className="flex items-center gap-3">
             {loading ? (
               <Skeleton className="h-3 w-16" />
             ) : (
-              <span className="text-xs text-muted-foreground">{announcements.length} total</span>
+              <span className="text-xs text-muted-foreground">
+                {t('liveActivities.admin.ui.common.totalLabel', { count: announcements.length })}
+              </span>
             )}
             <Button size="sm" onClick={() => setAnnouncementDialogOpen(true)}>
-              Add announcement
+              {announcementCopy.addButton}
             </Button>
           </div>
         </div>
@@ -964,28 +1151,28 @@ export function AnnouncementsAdminPanel() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <Input
                 type="search"
-                placeholder="Search announcements..."
+                placeholder={announcementCopy.searchPlaceholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
-                aria-label="Search announcements"
+                aria-label={announcementCopy.searchLabel}
               />
             </div>
             <div className="flex items-center gap-2">
               <label htmlFor="announcements-sort" className="text-sm text-muted-foreground whitespace-nowrap">
-                Sort by
+                {uiCopy.sortBy}
               </label>
               <Select
                 id="announcements-sort"
                 value={sort}
                 onChange={(e) => setSort(e.target.value as AnnouncementSortKey)}
                 className="w-[180px]"
-                aria-label="Sort announcements"
+                aria-label={announcementCopy.sortAria}
               >
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="oldest">Oldest first</SelectItem>
-                <SelectItem value="titleAz">Title A-Z</SelectItem>
-                <SelectItem value="titleZa">Title Z-A</SelectItem>
+                <SelectItem value="newest">{announcementCopy.sortNewest}</SelectItem>
+                <SelectItem value="oldest">{announcementCopy.sortOldest}</SelectItem>
+                <SelectItem value="titleAz">{announcementCopy.sortTitleAz}</SelectItem>
+                <SelectItem value="titleZa">{announcementCopy.sortTitleZa}</SelectItem>
               </Select>
             </div>
           </div>
@@ -1007,53 +1194,53 @@ export function AnnouncementsAdminPanel() {
         ) : announcements.length === 0 ? (
           <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
             <Search className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground font-medium">No announcements yet.</p>
+            <p className="text-sm text-muted-foreground font-medium">{announcementCopy.noAnnouncements}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Use the add button above to publish the first update.
+              {announcementCopy.emptyHint}
             </p>
           </div>
         ) : filteredAndSorted.length === 0 ? (
           <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
             <Search className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground font-medium">No matches found.</p>
+            <p className="text-sm text-muted-foreground font-medium">{uiCopy.noMatches}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
-              Try a different keyword or clear the filters.
+              {commonCopy.noMatchesHint}
             </p>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse">
+            <div className="overflow-x-auto pb-1">
+              <table className="min-w-[920px] w-max table-auto border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-4 font-medium">Title</th>
-                    <th className="py-2 pr-4 font-medium">Announcement</th>
-                    <th className="py-2 pr-4 font-medium">Created</th>
-                    <th className="py-2 pr-2 text-right font-medium">Actions</th>
+                  <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                    <th className="min-w-[260px] py-2 pr-4 font-medium">{announcementCopy.tableHeaders.title}</th>
+                    <th className="py-2 pr-4 font-medium">{announcementCopy.tableHeaders.body}</th>
+                    <th className="w-[140px] py-2 pr-4 font-medium">{announcementCopy.tableHeaders.created}</th>
+                    <th className="w-[140px] py-2 pr-2 text-right font-medium">{announcementCopy.tableHeaders.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleAnnouncements.map((announcement) => (
                     <tr key={announcement.id} className="border-b border-border/60 text-sm text-foreground">
-                      <td className="py-3 pr-4 min-w-[220px]">
-                        <div className="font-medium">{announcement.title}</div>
+                      <td className="py-3 pr-4">
+                        <div className="font-medium truncate">{announcement.title}</div>
                       </td>
-                      <td className="py-3 pr-4 min-w-[320px]">
-                        <p className="text-xs text-muted-foreground max-w-[420px] truncate">
+                      <td className="py-3 pr-4">
+                        <div className="max-h-24 overflow-y-auto pr-2 text-xs text-muted-foreground whitespace-pre-wrap break-words">
                           {announcement.body}
-                        </p>
+                        </div>
                       </td>
-                      <td className="py-3 pr-4 min-w-[140px] text-muted-foreground">
+                      <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
                         {formatDate(new Date(announcement.createdAt))}
                       </td>
                       <td className="py-3 pr-2">
-                        <div className="flex justify-start gap-2">
+                        <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
                           <Button
                             variant="danger"
                             size="sm"
                             onClick={() => handleDeleteAnnouncement(announcement.id)}
                           >
-                            Delete
+                            {commonCopy.delete}
                           </Button>
                         </div>
                       </td>
@@ -1069,7 +1256,7 @@ export function AnnouncementsAdminPanel() {
                   size="sm"
                   onClick={() => setPage((current) => current + 1)}
                 >
-                  Load more items
+                  {uiCopy.loadMore}
                 </Button>
               </div>
             ) : null}

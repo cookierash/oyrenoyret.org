@@ -124,7 +124,7 @@ export function MessagesList({ transactions }: MessagesListProps) {
                       >
                         <div
                           className={cn(
-                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                            'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium',
                             isGain
                               ? 'bg-primary/10 text-primary'
                               : 'bg-destructive/10 text-destructive'
