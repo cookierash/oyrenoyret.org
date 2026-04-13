@@ -1779,19 +1779,19 @@ export const AZ_MESSAGES = {
     },
   },
   userReports: {
-    button: 'İstifadəçini şikayət et',
-    buttonTarget: '{{target}} şikayət et',
+    button: 'Şikayət et',
+    buttonTarget: 'Şikayət et',
     cannotReportSelf: 'Özünüzü şikayət edə bilməzsiniz.',
     dialogTitle: 'Şikayət: {{name}}',
-    dialogTitleTarget: '{{name}} adlı istifadəçinin {{target}} şikayəti',
+    dialogTitleTarget: 'Şikayət: {{name}}',
     dialogDescription:
       'Platformadan sui-istifadəni bildirmək üçün bu formdan istifadə edin. Adminlər şikayətinizi nəzərdən keçirəcək.',
     targets: {
-      PROFILE: 'profilini',
-      DISCUSSION: 'paylaşımını',
-      DISCUSSION_REPLY: 'cavabını',
-      MATERIAL: 'materialını',
-      MATERIAL_COMMENT: 'şərhini',
+      PROFILE: 'profil',
+      DISCUSSION: 'paylaşım',
+      DISCUSSION_REPLY: 'cavab',
+      MATERIAL: 'material',
+      MATERIAL_COMMENT: 'şərh',
     },
     targetsAdmin: {
       PROFILE: 'Profil',
