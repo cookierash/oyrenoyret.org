@@ -168,7 +168,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     if (!pathname) return;
     const id = requestAnimationFrame(() => {
       void fetchBalance();
-      void fetchUnreadNotifications(true);
+      void fetchUnreadNotifications();
     });
     return () => cancelAnimationFrame(id);
   }, [pathname, fetchBalance, fetchUnreadNotifications]);
@@ -200,7 +200,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       interval = window.setInterval(() => {
         if (document.visibilityState !== 'visible') return;
         void fetchUnreadNotifications(true);
-      }, 10_000);
+      }, 30_000);
     };
     const stop = () => {
       if (!interval) return;
@@ -221,56 +221,6 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   }, [fetchUnreadNotifications]);
 
   const displayCredits = credits ?? user.credits ?? 0;
-
-  // Near real-time unread badge updates (server-sent events).
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (typeof EventSource === 'undefined') return;
-
-    let closed = false;
-    let source: EventSource | null = null;
-    let reconnectTimer: number | null = null;
-    let reconnectDelayMs = 3000;
-
-    const cleanup = () => {
-      if (reconnectTimer) window.clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-      source?.close();
-      source = null;
-    };
-
-    const connect = () => {
-      cleanup();
-      if (closed) return;
-
-      source = new EventSource('/api/notifications/unread-stream');
-      source.addEventListener('unread', (event) => {
-        try {
-          const data = JSON.parse((event as MessageEvent).data ?? '{}') as { unreadCount?: unknown };
-          const nextUnread = typeof data.unreadCount === 'number' ? data.unreadCount : 0;
-          setUnreadNotifications(nextUnread);
-          lastUnreadFetchRef.current = Date.now();
-          reconnectDelayMs = 3000; // reset backoff on success
-        } catch {
-          /* ignore */
-        }
-      });
-
-      source.onerror = () => {
-        // Fall back to polling; keep trying to reconnect in the background.
-        cleanup();
-        if (closed) return;
-        reconnectTimer = window.setTimeout(connect, reconnectDelayMs);
-        reconnectDelayMs = Math.min(reconnectDelayMs * 2, 30000);
-      };
-    };
-
-    connect();
-    return () => {
-      closed = true;
-      cleanup();
-    };
-  }, []);
 
   const handleLogout = useCallback(async () => {
     if (logoutPending) return;

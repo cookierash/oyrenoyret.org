@@ -42,12 +42,12 @@ async function getCookieValue(key: string): Promise<string | undefined> {
 }
 
 export async function GET(request: Request) {
-  const userId = await getCurrentSession();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
   try {
+    const userId = await getCurrentSession();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const identifier = getRateLimitIdentifier(request, userId);
     const rateLimit = await checkRateLimit(`notifications:unread:${identifier}`, RATE_LIMITS.GENERAL);
     if (!rateLimit.allowed) {
@@ -93,6 +93,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ unreadCount: 0 }, { headers: getPrivateNoStoreHeaders() });
     }
     console.error('Error fetching notifications unread count:', error);
-    return NextResponse.json({ error: 'Failed to fetch unread count' }, { status: 500 });
+    // Badge endpoint should never hard-fail the app shell.
+    return NextResponse.json({ unreadCount: 0 }, { headers: getPrivateNoStoreHeaders() });
   }
 }

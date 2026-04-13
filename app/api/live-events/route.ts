@@ -10,7 +10,6 @@ import type { LiveEventType } from '@prisma/client';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
-import { sanitizeInput } from '@/src/security/validation';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
@@ -177,6 +176,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const { sanitizeInput } = await import('@/src/security/validation');
     const topic = typeof body.topic === 'string' ? sanitizeInput(body.topic) : '';
     const date = body.date ? new Date(body.date) : null;
     const durationMinutes = Number(body.durationMinutes);

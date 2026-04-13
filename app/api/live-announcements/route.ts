@@ -9,7 +9,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
-import { sanitizeInput } from '@/src/security/validation';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { getPublicCacheHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
@@ -108,6 +107,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const { sanitizeInput } = await import('@/src/security/validation');
     const title = typeof body.title === 'string' ? sanitizeInput(body.title) : '';
     const text = typeof body.body === 'string' ? sanitizeInput(body.body) : '';
     const imageUrlRaw = typeof (body as any)?.imageUrl === 'string' ? String((body as any).imageUrl).trim() : '';

@@ -29,6 +29,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ balance }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     console.error('Error fetching balance:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    // Credits badge is non-critical; return a safe fallback instead of a hard 500.
+    return NextResponse.json(
+      { balance: null, degraded: true },
+      { headers: getPrivateNoStoreHeaders() },
+    );
   }
 }
