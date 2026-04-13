@@ -41,6 +41,7 @@ export function DiscussionList({
 }: DiscussionListProps) {
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<{ code?: string; message?: string } | null>(null);
   const { locale, messages } = useI18n();
   const copy = messages.discussions.list;
   const { subjects } = useCurriculum();
@@ -59,17 +60,37 @@ export function DiscussionList({
   const subjectTagMap = useMemo(() => createTagMap(subjectTagIndex), [subjectTagIndex]);
 
   useEffect(() => {
+    setLoading(true);
+    setLoadError(null);
     const { tagIds: tagSubjectIds, textQuery } = parseTaggedQuery(query, subjectTagMap);
     const combinedSubjects = Array.from(new Set([...subjectIds, ...tagSubjectIds]));
     const params = new URLSearchParams();
     if (combinedSubjects.length > 0) params.set('subjects', combinedSubjects.join(','));
     if (textQuery) params.set('q', textQuery.toLowerCase());
     params.set('take', '50');
-    fetch(`/api/discussions?${params.toString()}`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setDiscussions)
-      .catch(() => setDiscussions([]))
-      .finally(() => setLoading(false));
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/discussions?${params.toString()}`, { cache: 'no-store' });
+        if (!res.ok) {
+          const errorCode = res.headers.get('x-oy-error-code') ?? undefined;
+          const payload = await res.json().catch(() => ({}));
+          setDiscussions([]);
+          setLoadError({
+            code: (payload?.code as string | undefined) ?? errorCode,
+            message: (payload?.error as string | undefined) ?? undefined,
+          });
+          return;
+        }
+        const data = await res.json();
+        setDiscussions(Array.isArray(data) ? data : []);
+      } catch {
+        setDiscussions([]);
+        setLoadError({ code: 'NETWORK_ERROR' });
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [refreshKey, query, subjectIds, subjectTagMap]);
 
   if (loading) {
@@ -87,6 +108,23 @@ export function DiscussionList({
           ))}
         </div>
       </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+        <MessageSquare className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground font-medium">{copy.loadFailed}</p>
+        {loadError.code ? (
+          <p className="mt-1 text-xs text-muted-foreground/60">
+            {copy.errorCode}: <span className="font-mono">{loadError.code}</span>
+          </p>
+        ) : null}
+        {loadError.message ? (
+          <p className="mt-1 text-xs text-muted-foreground/60">{loadError.message}</p>
+        ) : null}
+      </div>
     );
   }
 

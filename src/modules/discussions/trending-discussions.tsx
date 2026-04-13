@@ -30,20 +30,34 @@ export function TrendingDiscussions({
   const { t } = useI18n();
   const [items, setItems] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/discussions?take=50', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Discussion[]) => {
-        const sorted = [...data].sort((a, b) => {
-          const scoreDiff = b.totalPopularity - a.totalPopularity;
+    setLoading(true);
+    setLoadErrorCode(null);
+    (async () => {
+      try {
+        const res = await fetch('/api/discussions?take=50', { cache: 'no-store' });
+        if (!res.ok) {
+          const errorCode = res.headers.get('x-oy-error-code');
+          setItems([]);
+          setLoadErrorCode(errorCode || 'LOAD_FAILED');
+          return;
+        }
+        const data: Discussion[] = await res.json().catch(() => []);
+        const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
+          const scoreDiff = (b.totalPopularity ?? 0) - (a.totalPopularity ?? 0);
           if (scoreDiff !== 0) return scoreDiff;
           return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
         });
         setItems(sorted.slice(0, 5));
-      })
-      .catch(() => setItems([]))
-      .finally(() => setLoading(false));
+      } catch {
+        setItems([]);
+        setLoadErrorCode('NETWORK_ERROR');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const content = (
@@ -67,6 +81,10 @@ export function TrendingDiscussions({
             </div>
           ))}
         </div>
+      ) : loadErrorCode ? (
+        <p className="text-xs text-muted-foreground">
+          {t('discussions.trendingLoadFailed')} <span className="font-mono">({loadErrorCode})</span>
+        </p>
       ) : items.length === 0 ? (
         <p className="text-xs text-muted-foreground">{t('discussions.trendingEmpty')}</p>
       ) : (

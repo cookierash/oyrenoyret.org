@@ -352,7 +352,15 @@ export async function GET(request: Request) {
   } catch (error) {
     const classified = classifyDiscussionsListError(error);
     console.error('Error fetching discussions:', error);
-    return NextResponse.json({ error: classified.message, code: classified.code }, { status: classified.status });
+    return NextResponse.json(
+      { error: classified.message, code: classified.code },
+      {
+        status: classified.status,
+        headers: {
+          'x-oy-error-code': classified.code,
+        },
+      },
+    );
   }
 }
 

@@ -1485,6 +1485,7 @@ export const AZ_MESSAGES = {
   discussions: {
     trendingTitle: 'Trend olan müzakirələr',
     trendingEmpty: 'Hələ trend müzakirə yoxdur.',
+    trendingLoadFailed: 'Müzakirələr yüklənmədi.',
     rules: {
       title: 'İcma qaydaları',
       rule1: 'Hörmətli olun və mövzuda qalın.',
@@ -1510,6 +1511,8 @@ export const AZ_MESSAGES = {
       creating: 'Yaradılır...',
     },
     list: {
+      loadFailed: 'Müzakirələr yüklənmədi.',
+      errorCode: 'Xəta kodu',
       noFound: 'Müzakirə tapılmadı.',
       noFoundHint: 'Başqa açar söz yoxlayın və ya fənn filtrini silin.',
       clear: 'Axtarışı təmizlə',

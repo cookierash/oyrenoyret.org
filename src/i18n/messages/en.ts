@@ -1480,6 +1480,7 @@ export const EN_MESSAGES = {
   discussions: {
     trendingTitle: 'Trending discussions',
     trendingEmpty: 'No trending discussions yet.',
+    trendingLoadFailed: 'Failed to load discussions.',
     rules: {
       title: 'Community rules',
       rule1: 'Be respectful and stay on topic.',
@@ -1505,6 +1506,8 @@ export const EN_MESSAGES = {
       creating: 'Creating...',
     },
     list: {
+      loadFailed: 'Failed to load discussions.',
+      errorCode: 'Error code',
       noFound: 'No discussions found.',
       noFoundHint: 'Try a different keyword or remove the subject filter.',
       clear: 'Clear search',
