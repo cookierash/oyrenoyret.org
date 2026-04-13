@@ -148,6 +148,7 @@ export function GuidedGroupSessionsClient({
     [localeCode, hour12],
   );
 
+  const verifiedSubjectSet = useMemo(() => new Set(verifiedSubjectIds), [verifiedSubjectIds]);
   const isVerifiedGuideStudent = verifiedSubjectIds.length > 0;
   const isPendingApplication = application?.status === 'PENDING';
 
@@ -168,11 +169,6 @@ export function GuidedGroupSessionsClient({
     }
     return map;
   }, [subjects, locale]);
-
-  const verifiedSubjects = useMemo(
-    () => subjects.filter((s) => verifiedSubjectIds.includes(s.slug)),
-    [subjects, verifiedSubjectIds],
-  );
 
   const availableTopics = useMemo(() => {
     const subject = subjects.find((s) => s.slug === sessionSubjectId);
@@ -196,11 +192,11 @@ export function GuidedGroupSessionsClient({
   }, [browseSubjectId, browseTopicId, browseTopics]);
 
   useEffect(() => {
-    if (!isVerifiedGuideStudent) return;
-    if (sessionSubjectId) return;
-    const first = verifiedSubjectIds[0] ?? '';
-    if (first) setSessionSubjectId(first);
-  }, [isVerifiedGuideStudent, verifiedSubjectIds, sessionSubjectId]);
+    if (!scheduleDialogOpen) return;
+    if (sessionSubjectId && subjects.some((s) => s.slug === sessionSubjectId)) return;
+    const firstVerified = verifiedSubjectIds.find((id) => subjects.some((s) => s.slug === id)) ?? '';
+    setSessionSubjectId(firstVerified);
+  }, [scheduleDialogOpen, sessionSubjectId, subjects, verifiedSubjectIds]);
 
   useEffect(() => {
     if (!sessionSubjectId) {
@@ -340,15 +336,6 @@ export function GuidedGroupSessionsClient({
       toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
       return;
     }
-    if (!isVerifiedGuideStudent) {
-      toast.error(
-        locale === 'az'
-          ? 'Sessiya planlamaq üçün əvvəlcə bələdçi şagird kimi təsdiqlənməlisiniz.'
-          : 'To schedule a session, you must be verified first.',
-      );
-      setApplicationDialogOpen(true);
-      return;
-    }
     setScheduleDialogOpen(true);
   };
 
@@ -423,15 +410,6 @@ export function GuidedGroupSessionsClient({
       toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
       return;
     }
-    if (!isVerifiedGuideStudent) {
-      toast.error(
-        locale === 'az'
-          ? 'Sessiya planlamaq üçün əvvəlcə bələdçi şagird kimi təsdiqlənməlisiniz.'
-          : 'You are not verified to facilitate sessions yet.',
-      );
-      setApplicationDialogOpen(true);
-      return;
-    }
 
     const title = sessionTitle.trim();
     if (title.length < 3) {
@@ -441,6 +419,16 @@ export function GuidedGroupSessionsClient({
 
     if (!sessionSubjectId) {
       toast.error(locale === 'az' ? 'Fənn seçin.' : 'Select a subject.');
+      return;
+    }
+
+    if (!verifiedSubjectSet.has(sessionSubjectId)) {
+      toast.error(
+        locale === 'az'
+          ? 'Bu fənn üçün bələdçi şagird kimi təsdiqlənməmisiniz.'
+          : 'You are not verified to facilitate this subject.',
+      );
+      setApplicationDialogOpen(true);
       return;
     }
 
@@ -1007,14 +995,29 @@ export function GuidedGroupSessionsClient({
                 <Select
                   value={sessionSubjectId}
                   onChange={(e) => setSessionSubjectId(e.target.value)}
-                  disabled={loading || creatingSession || verifiedSubjects.length === 0}
+                  disabled={loading || creatingSession}
+                  placeholder={locale === 'az' ? 'Fənn seçin' : 'Select subject'}
                 >
-                  {verifiedSubjects.map((s) => (
-                    <SelectItem key={s.slug} value={s.slug}>
-                      {subjectNameById.get(s.slug) ?? s.slug}
-                    </SelectItem>
-                  ))}
+                  {subjects.map((s) => {
+                    const isVerified = verifiedSubjectSet.has(s.slug);
+                    const baseLabel = subjectNameById.get(s.slug) ?? s.slug;
+                    const label = isVerified
+                      ? baseLabel
+                      : `${baseLabel} · ${locale === 'az' ? 'təsdiqlənməyib' : 'not verified'}`;
+                    return (
+                      <SelectItem key={s.slug} value={s.slug} disabled={!isVerified}>
+                        {label}
+                      </SelectItem>
+                    );
+                  })}
                 </Select>
+                {!isVerifiedGuideStudent ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {locale === 'az'
+                      ? 'Sessiya planlamaq üçün ən azı bir fənn üzrə təsdiqlənməlisiniz.'
+                      : 'To schedule, you must be verified for at least one subject.'}
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -1072,7 +1075,12 @@ export function GuidedGroupSessionsClient({
                   await createSession();
                   setScheduleDialogOpen(false);
                 }}
-                disabled={loading || creatingSession || verifiedSubjects.length === 0}
+                disabled={
+                  loading ||
+                  creatingSession ||
+                  !sessionSubjectId ||
+                  !verifiedSubjectSet.has(sessionSubjectId)
+                }
               >
                 {creatingSession ? (locale === 'az' ? 'Planlanır…' : 'Scheduling…') : scheduleLabel}
               </Button>
@@ -1138,4 +1146,3 @@ export function GuidedGroupSessionsClient({
     </div>
   );
 }
-
