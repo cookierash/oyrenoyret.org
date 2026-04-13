@@ -54,7 +54,15 @@ export async function PATCH(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: { slug: currentSlug, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          { slug: currentSlug },
+          { slugAz: currentSlug },
+          { slug: { equals: rawSlug, mode: 'insensitive' } },
+          { slugAz: { equals: rawSlug, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
@@ -196,7 +204,15 @@ export async function DELETE(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: { slug, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          { slug },
+          { slugAz: slug },
+          { slug: { equals: rawSlug, mode: 'insensitive' } },
+          { slugAz: { equals: rawSlug, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true },
     });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });

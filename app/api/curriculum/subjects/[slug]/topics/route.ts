@@ -53,7 +53,15 @@ export async function POST(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: { slug: subjectSlug, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          { slug: subjectSlug },
+          { slugAz: subjectSlug },
+          { slug: { equals: rawSlug, mode: 'insensitive' } },
+          { slugAz: { equals: rawSlug, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true },
     });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });

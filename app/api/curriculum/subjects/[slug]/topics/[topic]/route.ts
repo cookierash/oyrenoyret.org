@@ -55,13 +55,30 @@ export async function PATCH(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: { slug: subjectSlug, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          { slug: subjectSlug },
+          { slugAz: subjectSlug },
+          { slug: { equals: rawSubject, mode: 'insensitive' } },
+          { slugAz: { equals: rawSubject, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true, slug: true },
     });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
 
     const topic = await prisma.topic.findFirst({
-      where: { subjectId: subject.id, slug: topicSlug, deletedAt: null },
+      where: {
+        subjectId: subject.id,
+        deletedAt: null,
+        OR: [
+          { slug: topicSlug },
+          { slugAz: topicSlug },
+          { slug: { equals: rawTopic, mode: 'insensitive' } },
+          { slugAz: { equals: rawTopic, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true, slug: true, slugAz: true },
     });
     if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
@@ -185,13 +202,30 @@ export async function DELETE(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: { slug: subjectSlug, deletedAt: null },
+      where: {
+        deletedAt: null,
+        OR: [
+          { slug: subjectSlug },
+          { slugAz: subjectSlug },
+          { slug: { equals: rawSubject, mode: 'insensitive' } },
+          { slugAz: { equals: rawSubject, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true },
     });
     if (!subject) return NextResponse.json({ error: 'Subject not found' }, { status: 404 });
 
     const topic = await prisma.topic.findFirst({
-      where: { subjectId: subject.id, slug: topicSlug, deletedAt: null },
+      where: {
+        subjectId: subject.id,
+        deletedAt: null,
+        OR: [
+          { slug: topicSlug },
+          { slugAz: topicSlug },
+          { slug: { equals: rawTopic, mode: 'insensitive' } },
+          { slugAz: { equals: rawTopic, mode: 'insensitive' } },
+        ],
+      },
       select: { id: true },
     });
     if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
