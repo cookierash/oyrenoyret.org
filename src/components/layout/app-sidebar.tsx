@@ -9,6 +9,7 @@ import { Logo } from '@/src/components/ui/logo';
 import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { Button } from '@/components/ui/button';
+import { USER_ROLES } from '@/src/config/constants';
 
 interface AppSidebarProps {
   user: {
@@ -34,7 +35,9 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const [logoutPending, setLogoutPending] = useState(false);
   const lastBalanceFetchRef = useRef(0);
   const fetchInFlightRef = useRef(false);
-  const isStaff = user.role === 'ADMIN' || user.role === 'TEACHER';
+  const normalizedRole = typeof user.role === 'string' ? user.role.toUpperCase() : '';
+  const isStaff = normalizedRole === USER_ROLES.ADMIN || normalizedRole === USER_ROLES.TEACHER;
+  const homeHref = isStaff ? '/admin' : '/dashboard';
   const isSettingsRoute = pathname === '/settings' || pathname.startsWith('/settings/');
   const settingsNavSections = [
     {
@@ -171,7 +174,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
           <div className="relative flex w-full items-center justify-start">
             <Button size="sm" variant="ghost" asChild>
               <Link
-                href="/dashboard"
+                href={homeHref}
                 onClick={() => onClose?.()}
                 className="inline-flex items-center gap-1"
                 aria-label={t('settings.nav.backHome')}
