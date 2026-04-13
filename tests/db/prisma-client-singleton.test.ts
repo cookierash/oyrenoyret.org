@@ -7,6 +7,8 @@ function lcFirst(value: string) {
 describe('src/db/client prisma singleton', () => {
   it('reinitializes a stale cached Prisma client when model delegates changed', async () => {
     vi.resetModules();
+    const prevDatabaseUrl = process.env.DATABASE_URL;
+    process.env.DATABASE_URL = 'postgres://test';
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -75,10 +77,13 @@ describe('src/db/client prisma singleton', () => {
     const { prisma } = await import('@/src/db/client');
 
     expect(prisma).not.toBe(staleClient);
-    expect(globalAny.prisma).toBe(prisma);
+    // The exported `prisma` is a Proxy; initialization happens on first property access.
+    void (prisma as any).userReport?.findMany?.();
+    expect(globalAny.prisma).not.toBe(staleClient);
+    expect(globalAny.prisma).not.toBe(prisma);
     expect(typeof (prisma as any).userReport?.findMany).toBe('function');
 
     warnSpy.mockRestore();
+    process.env.DATABASE_URL = prevDatabaseUrl;
   });
 });
-

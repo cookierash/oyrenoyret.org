@@ -311,6 +311,12 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error fetching materials:', error);
     const message = error instanceof Error ? error.message : '';
+    if (/DATABASE_URL is not set/i.test(message)) {
+      return NextResponse.json(
+        { error: 'Server misconfigured', code: 'DB_MISCONFIGURED' },
+        { status: 500 }
+      );
+    }
     const looksLikeMissingMigration =
       (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2022') ||
       /column .* does not exist/i.test(message);
