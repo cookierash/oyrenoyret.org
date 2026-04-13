@@ -19,6 +19,189 @@ import { Prisma } from '@prisma/client';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+async function findPublishedMaterialsPublic(options: {
+  subjectId: string;
+  topicId: string;
+  take?: number;
+  skip?: number;
+}): Promise<any[]> {
+  const { subjectId, topicId, take, skip } = options;
+  const orderBy = { publishedAt: 'desc' } as const;
+
+  const selectCore = {
+    id: true,
+    title: true,
+    content: true,
+    materialType: true,
+    publishedAt: true,
+    user: {
+      select: {
+        firstName: true,
+        lastName: true,
+      },
+    },
+  } as const;
+
+  const selectWithRatings = {
+    ...selectCore,
+    ratingAvg: true,
+    ratingCount: true,
+  } as const;
+
+  const whereWithModeration = {
+    subjectId,
+    topicId,
+    status: 'PUBLISHED' as const,
+    deletedAt: null,
+    removedAt: null,
+  };
+
+  const whereWithoutModeration = {
+    subjectId,
+    topicId,
+    status: 'PUBLISHED' as const,
+    deletedAt: null,
+  };
+
+  try {
+    return (await prisma.material.findMany({
+      where: whereWithModeration,
+      orderBy,
+      ...(take ? { take } : {}),
+      ...(skip ? { skip } : {}),
+      select: selectWithRatings as any,
+    })) as any[];
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
+
+  try {
+    return (await prisma.material.findMany({
+      where: whereWithoutModeration,
+      orderBy,
+      ...(take ? { take } : {}),
+      ...(skip ? { skip } : {}),
+      select: selectWithRatings as any,
+    })) as any[];
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
+
+  return (await prisma.material.findMany({
+    where: whereWithoutModeration,
+    orderBy,
+    ...(take ? { take } : {}),
+    ...(skip ? { skip } : {}),
+    select: selectCore as any,
+  })) as any[];
+}
+
+async function findPublishedMaterialsWithAccess(options: {
+  subjectId: string;
+  topicId: string;
+  take?: number;
+  skip?: number;
+}): Promise<any[]> {
+  const { subjectId, topicId, take, skip } = options;
+  const orderBy = { publishedAt: 'desc' } as const;
+
+  const selectCore = {
+    id: true,
+    userId: true,
+    title: true,
+    content: true,
+    materialType: true,
+    publishedAt: true,
+    user: {
+      select: {
+        firstName: true,
+        lastName: true,
+      },
+    },
+  } as const;
+
+  const selectWithRatings = {
+    ...selectCore,
+    difficulty: true,
+    questionCount: true,
+    ratingAvg: true,
+    ratingCount: true,
+  } as const;
+
+  const selectWithCounts = {
+    ...selectWithRatings,
+    _count: {
+      select: { accesses: true },
+    },
+  } as const;
+
+  const selectCoreWithCounts = {
+    ...selectCore,
+    _count: {
+      select: { accesses: true },
+    },
+  } as const;
+
+  const whereWithModeration = {
+    subjectId,
+    topicId,
+    status: 'PUBLISHED' as const,
+    deletedAt: null,
+    removedAt: null,
+  };
+
+  const whereWithoutModeration = {
+    subjectId,
+    topicId,
+    status: 'PUBLISHED' as const,
+    deletedAt: null,
+  };
+
+  try {
+    return (await prisma.material.findMany({
+      where: whereWithModeration,
+      orderBy,
+      ...(take ? { take } : {}),
+      ...(skip ? { skip } : {}),
+      select: selectWithCounts as any,
+    })) as any[];
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
+
+  try {
+    return (await prisma.material.findMany({
+      where: whereWithoutModeration,
+      orderBy,
+      ...(take ? { take } : {}),
+      ...(skip ? { skip } : {}),
+      select: selectWithCounts as any,
+    })) as any[];
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
+
+  try {
+    return (await prisma.material.findMany({
+      where: whereWithoutModeration,
+      orderBy,
+      ...(take ? { take } : {}),
+      ...(skip ? { skip } : {}),
+      select: selectCoreWithCounts as any,
+    })) as any[];
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
+
+  return (await prisma.material.findMany({
+    where: whereWithoutModeration,
+    orderBy,
+    ...(take ? { take } : {}),
+    ...(skip ? { skip } : {}),
+    select: selectCore as any,
+  })) as any[];
+}
+
 export async function GET(request: Request) {
   try {
     const identifier = getRateLimitIdentifier(request);
@@ -54,65 +237,7 @@ export async function GET(request: Request) {
     }
 
     if (!includeAccess) {
-      let materials: any[] = [];
-      try {
-        materials = await prisma.material.findMany({
-          where: {
-            subjectId,
-            topicId,
-            status: 'PUBLISHED',
-            deletedAt: null,
-            removedAt: null,
-          },
-          orderBy: { publishedAt: 'desc' },
-          ...(take ? { take } : {}),
-          ...(skip ? { skip } : {}),
-          select: {
-            id: true,
-            title: true,
-            content: true,
-            materialType: true,
-            publishedAt: true,
-            ratingAvg: true,
-            ratingCount: true,
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        });
-      } catch (error) {
-        if (!isDbSchemaMismatch(error)) throw error;
-        // Safe rollout fallback: DB may not have moderation columns yet.
-        materials = await prisma.material.findMany({
-          where: {
-            subjectId,
-            topicId,
-            status: 'PUBLISHED',
-            deletedAt: null,
-          },
-          orderBy: { publishedAt: 'desc' },
-          ...(take ? { take } : {}),
-          ...(skip ? { skip } : {}),
-          select: {
-            id: true,
-            title: true,
-            content: true,
-            materialType: true,
-            publishedAt: true,
-            ratingAvg: true,
-            ratingCount: true,
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
-            },
-          },
-        });
-      }
+      const materials = await findPublishedMaterialsPublic({ subjectId, topicId, take, skip });
 
       return NextResponse.json(
         materials.map((m) => ({
@@ -121,84 +246,15 @@ export async function GET(request: Request) {
           content: m.content,
           materialType: m.materialType,
           publishedAt: m.publishedAt,
-          ratingAvg: m.ratingAvg,
-          ratingCount: m.ratingCount,
+          ratingAvg: typeof m.ratingAvg === 'number' ? m.ratingAvg : 0,
+          ratingCount: typeof m.ratingCount === 'number' ? m.ratingCount : 0,
           authorName: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || 'Student',
         })),
         { headers: getPublicCacheHeaders() }
       );
     }
 
-    let materials: any[] = [];
-    try {
-      materials = await prisma.material.findMany({
-        where: {
-          subjectId,
-          topicId,
-          status: 'PUBLISHED',
-          deletedAt: null,
-          removedAt: null,
-        },
-        orderBy: { publishedAt: 'desc' },
-        ...(take ? { take } : {}),
-        ...(skip ? { skip } : {}),
-        select: {
-          id: true,
-          userId: true,
-          title: true,
-          content: true,
-          materialType: true,
-          difficulty: true,
-          questionCount: true,
-          publishedAt: true,
-          ratingAvg: true,
-          ratingCount: true,
-          user: {
-            select: {
-              firstName: true,
-              lastName: true,
-            },
-          },
-          _count: {
-            select: { accesses: true },
-          },
-        },
-      });
-    } catch (error) {
-      if (!isDbSchemaMismatch(error)) throw error;
-      materials = await prisma.material.findMany({
-        where: {
-          subjectId,
-          topicId,
-          status: 'PUBLISHED',
-          deletedAt: null,
-        },
-        orderBy: { publishedAt: 'desc' },
-        ...(take ? { take } : {}),
-        ...(skip ? { skip } : {}),
-        select: {
-          id: true,
-          userId: true,
-          title: true,
-          content: true,
-          materialType: true,
-          difficulty: true,
-          questionCount: true,
-          publishedAt: true,
-          ratingAvg: true,
-          ratingCount: true,
-          user: {
-            select: {
-              firstName: true,
-              lastName: true,
-            },
-          },
-          _count: {
-            select: { accesses: true },
-          },
-        },
-      });
-    }
+    const materials = await findPublishedMaterialsWithAccess({ subjectId, topicId, take, skip });
 
     const userId = await getCurrentSession();
     const materialIds = materials.map((m) => m.id);
@@ -216,7 +272,7 @@ export async function GET(request: Request) {
     const mappedMaterials = materials.map((m) => {
       const questionCount =
         m.materialType === 'PRACTICE_TEST'
-          ? (m.questionCount || getPracticeTestQuestionCount(m.content))
+          ? (typeof m.questionCount === 'number' ? m.questionCount : getPracticeTestQuestionCount(m.content))
           : 0;
       const wordCount = m.materialType === 'TEXTUAL' ? getTextWordCount(m.content) : 0;
       return {
@@ -224,12 +280,12 @@ export async function GET(request: Request) {
         userId: m.userId,
         title: m.title,
         materialType: m.materialType,
-        difficulty: m.difficulty,
+        difficulty: m.difficulty ?? null,
         publishedAt: m.publishedAt,
-        ratingAvg: m.ratingAvg,
-        ratingCount: m.ratingCount,
+        ratingAvg: typeof m.ratingAvg === 'number' ? m.ratingAvg : 0,
+        ratingCount: typeof m.ratingCount === 'number' ? m.ratingCount : 0,
         user: m.user,
-        _count: m._count,
+        _count: m._count ?? { accesses: 0 },
         estimatedCost: roundCredits(
           calcMaterialUnlockCost({
             materialType: m.materialType,
