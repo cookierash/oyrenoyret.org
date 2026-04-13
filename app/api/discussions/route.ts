@@ -18,13 +18,6 @@ export async function GET(request: Request) {
     const { sanitizeInput } = await import('@/src/security/validation');
     const { Prisma } = await import('@prisma/client');
 
-    const identifier = getRateLimitIdentifier(request);
-    const rateLimit = await checkRateLimit(`discussions:list:${identifier}`, RATE_LIMITS.GENERAL);
-    if (!rateLimit.allowed) {
-      const { status, body, headers } = buildRateLimitResponse(rateLimit);
-      return NextResponse.json(body, { status, headers });
-    }
-
     const { searchParams } = new URL(request.url);
     const subjectId = searchParams.get('subjectId');
     const topicId = searchParams.get('topicId');
@@ -35,6 +28,14 @@ export async function GET(request: Request) {
     const skipParam = Number(searchParams.get('skip') ?? 0);
     const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 100) : 50;
     const skip = Number.isFinite(skipParam) && skipParam > 0 ? skipParam : 0;
+
+    const sessionUserId = await getCurrentSession().catch(() => null);
+    const identifier = getRateLimitIdentifier(request, sessionUserId);
+    const rateLimit = await checkRateLimit(`discussions:list:${identifier}`, RATE_LIMITS.GENERAL);
+    if (!rateLimit.allowed) {
+      const { status, body, headers } = buildRateLimitResponse(rateLimit);
+      return NextResponse.json(body, { status, headers });
+    }
 
     const subjectIds = subjectsParam
       ? subjectsParam.split(',').map((s) => s.trim()).filter(Boolean)
@@ -203,7 +204,7 @@ export async function GET(request: Request) {
       return acc;
     }, {});
 
-    const currentUserId = includeVotes ? await getCurrentSession() : null;
+    const currentUserId = includeVotes ? sessionUserId : null;
     const currentUserVotes =
       includeVotes && currentUserId && discussionIds.length
         ? await prisma.discussionVote.findMany({
