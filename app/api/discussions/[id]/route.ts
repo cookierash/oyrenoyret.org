@@ -107,7 +107,7 @@ export async function GET(
       },
     });
 
-    if (!discussion || discussion.archivedAt) {
+    if (!discussion) {
       return NextResponse.json({ error: 'Discussion not found' }, { status: 404 });
     }
     if (discussion.removedAt && !(isAdminUser || (currentUserId && discussion.user.id === currentUserId))) {

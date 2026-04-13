@@ -1536,6 +1536,8 @@ export const EN_MESSAGES = {
     detail: {
       back: 'Back to discussions',
       notFound: 'Discussion not found.',
+      archivedTitle: 'Archived',
+      archivedDescription: 'This discussion is read-only. New replies and votes are disabled.',
       replyAction: 'Reply',
       deletePost: 'Delete post',
       deleteReply: 'Delete',

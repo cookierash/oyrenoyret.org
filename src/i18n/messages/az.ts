@@ -1542,6 +1542,8 @@ export const AZ_MESSAGES = {
     detail: {
       back: 'Müzakirələrə qayıt',
       notFound: 'Müzakirə tapılmadı.',
+      archivedTitle: 'Arxivləndi',
+      archivedDescription: 'Bu müzakirə yalnız oxuma üçündür. Yeni cavab və səsvermə deaktivdir.',
       replyAction: 'Cavab yaz',
       deletePost: 'Yazını sil',
       deleteReply: 'Sil',

@@ -110,7 +110,7 @@ export default function DiscussionDetailPage() {
   const [deleteDiscussionOpen, setDeleteDiscussionOpen] = useState(false);
   const [deleteReplyId, setDeleteReplyId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const canInteract = canWrite && !discussion?.removedAt;
+  const canInteract = canWrite && !discussion?.removedAt && !discussion?.archivedAt;
 
   const fetchDiscussion = useCallback(async () => {
     try {
@@ -405,6 +405,12 @@ export default function DiscussionDetailPage() {
                 {discussion.title}
               </h1>
               <DiscussionRichText content={discussion.content} />
+              {discussion.archivedAt ? (
+                <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  <div className="font-medium text-foreground/80">{copy.archivedTitle}</div>
+                  <div className="mt-1">{copy.archivedDescription}</div>
+                </div>
+              ) : null}
               {discussion.removedAt ? (
                 <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-foreground">
                   <div className="font-medium">Removed by moderators</div>

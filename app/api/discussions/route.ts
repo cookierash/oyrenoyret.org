@@ -1,7 +1,7 @@
 /**
  * Discussions API
  *
- * GET: List discussions (excludes archived)
+ * GET: List discussions (includes archived; archived are read-only)
  * POST: Create new discussion (requires auth)
  */
 
@@ -55,6 +55,7 @@ export async function GET(request: Request) {
       subjectId: string | null;
       topicId: string | null;
       lastActivityAt: Date;
+      archivedAt: Date | null;
       createdAt: Date;
       authorId: string;
       authorFirstName: string | null;
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
       if (query) {
         type Row = DiscussionBase & { rank: number };
         const vectorExpr = Prisma.sql`to_tsvector('simple', concat_ws(' ', d.title, d.content))`;
-        const baseWhere = Prisma.sql`d."archivedAt" IS NULL AND d."removedAt" IS NULL`;
+        const baseWhere = Prisma.sql`d."removedAt" IS NULL`;
         const subjectFilter =
           combinedSubjectIds.length > 0
             ? Prisma.sql` AND d."subjectId" IN (${Prisma.join(combinedSubjectIds)})`
@@ -87,6 +88,7 @@ export async function GET(request: Request) {
               d."subjectId" as "subjectId",
               d."topicId" as "topicId",
               d."lastActivityAt" as "lastActivityAt",
+              d."archivedAt" as "archivedAt",
               d."createdAt" as "createdAt",
               u.id as "authorId",
               u."firstName" as "authorFirstName",
@@ -117,7 +119,6 @@ export async function GET(request: Request) {
 
       const rows = await prisma.discussion.findMany({
         where: {
-          archivedAt: null,
           removedAt: null,
           ...(combinedSubjectIds.length > 0 ? { subjectId: { in: combinedSubjectIds } } : {}),
           ...(topicId && { topicId }),
@@ -132,6 +133,7 @@ export async function GET(request: Request) {
           subjectId: true,
           topicId: true,
           lastActivityAt: true,
+          archivedAt: true,
           createdAt: true,
           user: {
             select: {
@@ -152,6 +154,7 @@ export async function GET(request: Request) {
         subjectId: row.subjectId,
         topicId: row.topicId,
         lastActivityAt: row.lastActivityAt,
+        archivedAt: row.archivedAt,
         createdAt: row.createdAt,
         authorId: row.user.id,
         authorFirstName: row.user.firstName,
@@ -224,6 +227,7 @@ export async function GET(request: Request) {
       topicId: d.topicId,
       lastActivityAt: d.lastActivityAt,
       createdAt: d.createdAt,
+      archivedAt: d.archivedAt,
       authorId: d.authorId,
       authorAvatarVariant: d.authorAvatarVariant,
       authorName:
