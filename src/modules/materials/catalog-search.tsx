@@ -32,7 +32,7 @@ interface CatalogSearchProps {
   baseSubjectIds?: string[];
   baseTopicIds?: string[];
   tagMode?: 'subject' | 'topic';
-  tagOptions?: { id: string; name: string }[];
+  tagOptions?: { id: string; name: string; tag?: string; aliases?: readonly string[] }[];
 }
 
 export function CatalogSearch({
@@ -52,15 +52,16 @@ export function CatalogSearch({
   const [focused, setFocused] = useState(false);
   const blurTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const { subjects: localizedSubjects, subjectNameMap, topicNameMap } = useCurriculum();
+  const { subjects: localizedSubjects, subjectNameMap, topicNameMap, subjectHrefMap, topicHrefMap } =
+    useCurriculum();
   const tagSource = useMemo(
     () =>
       tagMode === 'topic'
         ? (tagOptions ?? []).map((option) => ({
             id: option.id,
             name: option.name,
-            tag: slugifyTag(option.name),
-            aliases: [],
+            tag: option.tag ?? slugifyTag(option.name),
+            aliases: option.aliases ?? [],
           }))
         : localizedSubjects.map((subject) => ({
             id: subject.id,
@@ -194,38 +195,128 @@ export function CatalogSearch({
   const helperText = isTopicMode ? copy.helperTopic : copy.helperSubject;
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <div className="flex w-full items-stretch">
-          <Input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-              }
-            }}
-            onFocus={() => {
-              if (blurTimer.current) clearTimeout(blurTimer.current);
-              setFocused(true);
-            }}
-            onBlur={() => {
-              blurTimer.current = setTimeout(() => setFocused(false), 150);
-            }}
-            className="rounded-r-none"
-            placeholder={placeholder}
-            aria-label={copy.searchLabel}
-          />
-          <button
-            type="button"
-            className="inline-flex items-center gap-1 rounded-r-md border border-l-0 border-input bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
-            aria-label={copy.searchButtonLabel}
-          >
-            <SearchIcon className="h-4 w-4" />
-            {copy.searchButton}
-          </button>
+    <div className="w-full space-y-2">
+      <div>
+        <div className="relative">
+          <div className="flex w-full items-stretch">
+            <Input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                }
+              }}
+              onFocus={() => {
+                if (blurTimer.current) clearTimeout(blurTimer.current);
+                setFocused(true);
+              }}
+              onBlur={() => {
+                blurTimer.current = setTimeout(() => setFocused(false), 150);
+              }}
+              className="rounded-r-none"
+              placeholder={placeholder}
+              aria-label={copy.searchLabel}
+            />
+            <button
+              type="button"
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-r-md border border-l-0 border-input bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
+              aria-label={copy.searchButtonLabel}
+            >
+              <SearchIcon className="h-4 w-4" />
+              {copy.searchButton}
+            </button>
+          </div>
+
+          {showTagSuggestions ? (
+            <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-md border border-border bg-background shadow-sm">
+              <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                {tagMode === 'topic' ? copy.tagHeaderTopic : copy.tagHeaderSubject}
+              </div>
+              <div className="max-h-56 overflow-y-auto py-1">
+                {tagSuggestions.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60"
+                    onPointerDown={(e) => {
+                      if (e.pointerType === 'mouse') e.preventDefault();
+                    }}
+                    onClick={() => applyTag(tag.id)}
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium">#{tag.tag}</div>
+                      <div className="text-xs text-muted-foreground">{tag.name}</div>
+                    </div>
+                    {selectedTags.includes(tag.id) ? (
+                      <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {copy.added}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {showMenu ? (
+            <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-xl animate-in fade-in zoom-in-95 duration-100">
+              <div className="max-h-80 overflow-y-auto">
+                {loading ? (
+                  <div className="space-y-3 p-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <Skeleton className="h-9 w-9 rounded-md" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-3.5 w-3/5" />
+                          <Skeleton className="h-3 w-2/5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : results.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                    {copy.noResults}
+                  </div>
+                ) : (
+                  <ul className="py-2">
+                    {results.map((item) => (
+                      <li key={item.id}>
+                        <Link
+                          href={`/catalog/${
+                            subjectHrefMap.get(item.subjectId) ?? item.subjectId
+                          }/${
+                            topicHrefMap.get(`${item.subjectId}:${item.topicId}`) ?? item.topicId
+                          }/${item.id}`}
+                          className="group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30"
+                        >
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                              {item.title}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="truncate">
+                                {subjectNameMap.get(item.subjectId) ?? item.subjectName} · {topicNameMap.get(`${item.subjectId}:${item.topicId}`) ?? item.topicName}
+                              </span>
+                              <span className="h-1 w-1 rounded-full bg-border" />
+                              <span>{item.materialType === 'PRACTICE_TEST' ? copy.practiceTest : copy.notes}</span>
+                              <span className="h-1 w-1 rounded-full bg-border" />
+                              <span className="truncate">
+                                {copy.by} {item.authorName === 'Student' || !item.authorName ? authorFallback : item.authorName}
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
+
         {selectedTags.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {selectedTags.map((tagId) => {
@@ -247,87 +338,6 @@ export function CatalogSearch({
                 </span>
               );
             })}
-          </div>
-        ) : null}
-
-        {showTagSuggestions ? (
-          <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-md border border-border bg-background shadow-sm">
-            <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
-              {tagMode === 'topic' ? copy.tagHeaderTopic : copy.tagHeaderSubject}
-            </div>
-            <div className="max-h-56 overflow-y-auto py-1">
-              {tagSuggestions.map((tag) => (
-                <button
-                  key={tag.id}
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => applyTag(tag.id)}
-                >
-                  <div className="min-w-0">
-                    <div className="font-medium">#{tag.tag}</div>
-                    <div className="text-xs text-muted-foreground">{tag.name}</div>
-                  </div>
-                  {selectedTags.includes(tag.id) ? (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      {copy.added}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {showMenu ? (
-          <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-xl animate-in fade-in zoom-in-95 duration-100">
-            <div className="max-h-80 overflow-y-auto">
-              {loading ? (
-                <div className="space-y-3 p-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <Skeleton className="h-9 w-9 rounded-md" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-3.5 w-3/5" />
-                        <Skeleton className="h-3 w-2/5" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : results.length === 0 ? (
-                <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                  {copy.noResults}
-                </div>
-              ) : (
-                <ul className="py-2">
-                  {results.map((item) => (
-                    <li key={item.id}>
-                      <Link
-                        href={`/catalog/${item.subjectId}/${item.topicId}/${item.id}`}
-                        className="group flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-muted/30"
-                      >
-                      <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
-                            {item.title}
-                          </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                            <span className="truncate">
-                              {subjectNameMap.get(item.subjectId) ?? item.subjectName} · {topicNameMap.get(`${item.subjectId}:${item.topicId}`) ?? item.topicName}
-                            </span>
-                            <span className="h-1 w-1 rounded-full bg-border" />
-                            <span>{item.materialType === 'PRACTICE_TEST' ? copy.practiceTest : copy.notes}</span>
-                            <span className="h-1 w-1 rounded-full bg-border" />
-                            <span className="truncate">
-                              {copy.by} {item.authorName === 'Student' || !item.authorName ? authorFallback : item.authorName}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
           </div>
         ) : null}
       </div>

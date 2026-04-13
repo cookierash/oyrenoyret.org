@@ -12,6 +12,8 @@ import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+export const runtime = 'nodejs';
+
 export async function GET(request: Request) {
   const userId = await getCurrentSession();
   if (!userId) {
@@ -112,4 +114,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

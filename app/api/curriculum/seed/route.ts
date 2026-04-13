@@ -27,6 +27,16 @@ import {
 type SubjectMessages = Record<string, { name?: string; description?: string; tag?: string } | undefined>;
 type TopicMessages = Record<string, Record<string, string> | undefined>;
 
+function isPrismaUniqueConstraintError(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    typeof (error as any).code === 'string' &&
+    (error as any).code === 'P2002'
+  );
+}
+
 export async function POST(request: Request) {
   try {
     const userId = await getCurrentSession();
@@ -51,8 +61,8 @@ export async function POST(request: Request) {
       return NextResponse.json(body, { status, headers });
     }
 
-    const existingCount = await prisma.subject.count();
-    if (existingCount > 0) {
+    const existingActiveCount = await prisma.subject.count({ where: { deletedAt: null } });
+    if (existingActiveCount > 0) {
       return NextResponse.json({ seeded: false, reason: 'already_initialized' });
     }
 
@@ -124,6 +134,15 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ seeded: true, subjects: seeded.subjectCount, topics: seeded.topicCount });
   } catch (error) {
+    if (isPrismaUniqueConstraintError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            'Curriculum is partially initialized. Delete/rename existing (possibly soft-deleted) subjects/topics that still reserve default slugs, then retry seeding.',
+        },
+        { status: 409 },
+      );
+    }
     if (isDbSchemaMismatch(error)) {
       return NextResponse.json(
         { error: 'Curriculum tables are not available. Apply database migrations first.' },
@@ -134,4 +153,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

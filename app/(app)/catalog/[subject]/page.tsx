@@ -37,6 +37,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
   let dbSubject: {
     id: string;
     slug: string;
+    slugAz: string;
     nameEn: string;
     nameAz: string;
     descriptionEn: string | null;
@@ -45,10 +46,11 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
   let subjectSchemaMismatch = false;
   try {
     dbSubject = await prisma.subject.findFirst({
-      where: { slug: subjectId, deletedAt: null },
+      where: { OR: [{ slug: subjectId }, { slugAz: subjectId }], deletedAt: null },
       select: {
         id: true,
         slug: true,
+        slugAz: true,
         nameEn: true,
         nameAz: true,
         descriptionEn: true,
@@ -73,6 +75,11 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     if (total > 0) notFound();
   }
   const subjectSlug = dbSubject ? dbSubject.slug : (fallbackSubject as { id: string }).id;
+  const subjectHrefSlug = dbSubject
+    ? locale === 'az'
+      ? dbSubject.slugAz
+      : dbSubject.slug
+    : subjectSlug;
 
   const localizedSubject = dbSubject
     ? {
@@ -83,7 +90,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     : (getLocalizedSubject(messages, (fallbackSubject as { id: string }).id) ??
       (fallbackSubject as { id: string; name: string; description: string }));
 
-  let topics: Array<{ id: string; name: string }> = [];
+  let topics: Array<{ id: string; name: string; hrefSlug: string; aliases: readonly string[] }> = [];
   let topicsSchemaMismatch = false;
   if (dbSubject) {
     try {
@@ -91,11 +98,13 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
         await prisma.topic.findMany({
           where: { subjectId: dbSubject.id, deletedAt: null },
           orderBy: { slug: 'asc' },
-          select: { slug: true, nameEn: true, nameAz: true },
+          select: { slug: true, slugAz: true, nameEn: true, nameAz: true },
         })
       ).map((topic) => ({
         id: topic.slug,
         name: locale === 'az' ? topic.nameAz : topic.nameEn,
+        hrefSlug: locale === 'az' ? topic.slugAz : topic.slug,
+        aliases: Array.from(new Set([topic.slug, topic.slugAz])),
       }));
     } catch (error) {
       if (!isDbSchemaMismatch(error)) throw error;
@@ -111,6 +120,8 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
     topics = getLocalizedTopics(messages, fallbackSubject.id).map((topic) => ({
       id: topic.id,
       name: topic.name,
+      hrefSlug: topic.id,
+      aliases: [topic.id],
     }));
   }
 
@@ -150,7 +161,12 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
         <section className="relative">
           <CatalogSearch
             tagMode="topic"
-            tagOptions={topics.map((item) => ({ id: item.id, name: item.name }))}
+            tagOptions={topics.map((item) => ({
+              id: item.id,
+              name: item.name,
+              tag: item.hrefSlug,
+              aliases: item.aliases,
+            }))}
             baseSubjectIds={[subjectSlug]}
           />
         </section>
@@ -167,7 +183,7 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
               {topics.map((topic) => (
                 <li key={topic.id} className="min-w-0">
                   <Link
-                    href={`/catalog/${subjectId}/${topic.id}`}
+                    href={`/catalog/${subjectHrefSlug}/${topic.hrefSlug}`}
                     className="group card-frame bg-card flex min-w-0 items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 hover:bg-muted/30"
                   >
                     <div
@@ -184,9 +200,9 @@ export default async function SubjectPage({ params }: SubjectPageProps) {
                           {topic.name}
                         </span>
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className="min-w-0 text-[10px] text-muted-foreground truncate">
-                            {topicCountMap.get(topic.id) ?? 0} {copy.materials}
-                          </span>
+                            <span className="min-w-0 text-[10px] text-muted-foreground truncate">
+                              {topicCountMap.get(topic.id) ?? 0} {copy.materials}
+                            </span>
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
                         </div>
                       </div>

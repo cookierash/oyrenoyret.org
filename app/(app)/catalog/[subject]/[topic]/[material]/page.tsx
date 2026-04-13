@@ -36,7 +36,12 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
   const authorFallback = messages.materials.authorFallback;
   const curriculum = await resolveCurriculumNames({ messages, locale, subjectId, topicId });
   if (!curriculum) notFound();
-  const { subjectName, topicName } = curriculum;
+  const {
+    subjectName,
+    topicName,
+    subjectId: canonicalSubjectId,
+    topicId: canonicalTopicId,
+  } = curriculum;
 
   const userId = await getCurrentSession();
   const viewer = userId
@@ -49,8 +54,8 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
     material = await prisma.material.findFirst({
       where: {
         id: materialId,
-        subjectId,
-        topicId,
+        subjectId: canonicalSubjectId,
+        topicId: canonicalTopicId,
         status: 'PUBLISHED',
       },
       select: {
@@ -82,8 +87,8 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
     material = await prisma.material.findFirst({
       where: {
         id: materialId,
-        subjectId,
-        topicId,
+        subjectId: canonicalSubjectId,
+        topicId: canonicalTopicId,
         status: 'PUBLISHED',
       },
       select: {
@@ -155,7 +160,7 @@ export default async function MaterialPage({ params }: MaterialPageProps) {
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary-primary" asChild>
-              <Link href={hasAccess ? '/library' : '/catalog'}>
+              <Link href={hasAccess ? '/my-library' : '/catalog'}>
                 {hasAccess ? libraryCopy.backToLibrary : catalogCopy.backToCatalog}
               </Link>
             </Button>

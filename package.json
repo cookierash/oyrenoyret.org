@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev --webpack",
     "dev:turbo": "next dev",
+    "dev:webpack": "next dev --webpack",
     "prebuild": "prisma generate",
     "build": "next build --webpack",
     "vercel-build": "node scripts/vercel-build.mjs",

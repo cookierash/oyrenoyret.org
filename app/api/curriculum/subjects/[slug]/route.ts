@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import crypto from 'crypto';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
@@ -25,6 +26,11 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value,
   );
+}
+
+function buildDeletedSlug(base: string) {
+  const suffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  return normalizeSlug(`${base}-deleted-${suffix}`);
 }
 
 export async function PATCH(
@@ -172,7 +178,9 @@ export async function PATCH(
 
     revalidatePath('/catalog');
     revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}`);
     revalidatePath(`/catalog/${updated.slug}`);
+    revalidatePath(`/catalog/${updated.slugAz}`);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -233,19 +241,27 @@ export async function DELETE(
               { slugAz: { equals: rawSlug, mode: 'insensitive' } },
             ],
           },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found', subject: rawSlug }, { status: 404 });
     }
 
     await prisma.$transaction([
-      prisma.subject.update({ where: { id: subject.id }, data: { deletedAt: new Date() } }),
+      prisma.subject.update({
+        where: { id: subject.id },
+        data: {
+          deletedAt: new Date(),
+          slug: buildDeletedSlug(subject.slug),
+          slugAz: buildDeletedSlug(subject.slugAz),
+        },
+      }),
       prisma.topic.updateMany({ where: { subjectId: subject.id }, data: { deletedAt: new Date() } }),
     ]);
 
     revalidatePath('/catalog');
     revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -9,6 +9,7 @@ import { cn } from '@/src/lib/utils';
 import { StarRating } from '@/src/components/ui/star-rating';
 import { sanitizeRichTextHtml } from '@/src/security/validation';
 import { splitObjectives } from '@/src/modules/materials/utils';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 type MaterialLite = {
   id: string;
@@ -74,6 +75,12 @@ function getPracticePreview(content: string) {
   } catch {
     return [];
   }
+}
+
+function safeExtractErrorMessage(raw: unknown): string | null {
+  const obj = raw as { error?: unknown } | null;
+  const error = obj && typeof obj === 'object' ? obj.error : null;
+  return typeof error === 'string' && error.trim() ? error.trim() : null;
 }
 
 function WhiteboardCanvas({
@@ -253,6 +260,8 @@ export function GuidedGroupSessionRoomClient({
   initialMyFacilitatorFeedback: { rating: number; comment: string | null } | null;
   initialLearnerFeedback: Record<string, { sentiment: 'GOOD' | 'BAD'; note: string | null }>;
 }) {
+  const { messages } = useI18n();
+  const toastCopy = messages.app?.guidedGroupSessions?.sessionRoom?.toasts;
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeMaterial, setActiveMaterial] = useState<MaterialLite | null>(initialActiveMaterial);
   const [strokes, setStrokes] = useState<WhiteboardStroke[]>(() =>
@@ -352,13 +361,17 @@ export function GuidedGroupSessionRoomClient({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(typeof data?.error === 'string' ? data.error : 'Failed to update material.');
+        toast.error(
+          safeExtractErrorMessage(data) ??
+            toastCopy?.materialUpdateFailed ??
+            'Failed to update material.',
+        );
         return;
       }
       await refreshState();
-      toast.success('Material updated.');
+      toast.success(toastCopy?.materialUpdated ?? 'Material updated.');
     } catch {
-      toast.error('Failed to update material.');
+      toast.error(toastCopy?.materialUpdateFailed ?? 'Failed to update material.');
     } finally {
       setBusy(false);
     }
@@ -367,7 +380,7 @@ export function GuidedGroupSessionRoomClient({
   const submitRating = async () => {
     if (savingRating) return;
     if (myRating < 1 || myRating > 5) {
-      toast.error('Please select a star rating.');
+      toast.error(toastCopy?.starRatingRequired ?? 'Please select a star rating.');
       return;
     }
     setSavingRating(true);
@@ -382,12 +395,12 @@ export function GuidedGroupSessionRoomClient({
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(typeof data?.error === 'string' ? data.error : 'Failed to save rating.');
+        toast.error(safeExtractErrorMessage(data) ?? toastCopy?.ratingSaveFailed ?? 'Failed to save rating.');
         return;
       }
-      toast.success('Thanks for the feedback!');
+      toast.success(toastCopy?.feedbackThanks ?? 'Thanks for the feedback!');
     } catch {
-      toast.error('Failed to save rating.');
+      toast.error(toastCopy?.ratingSaveFailed ?? 'Failed to save rating.');
     } finally {
       setSavingRating(false);
     }
@@ -415,12 +428,16 @@ export function GuidedGroupSessionRoomClient({
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(typeof data?.error === 'string' ? data.error : 'Failed to save learner feedback.');
+        toast.error(
+          safeExtractErrorMessage(data) ??
+            toastCopy?.learnerFeedbackSaveFailed ??
+            'Failed to save learner feedback.',
+        );
         return;
       }
-      toast.success('Saved.');
+      toast.success(toastCopy?.saved ?? 'Saved.');
     } catch {
-      toast.error('Failed to save learner feedback.');
+      toast.error(toastCopy?.learnerFeedbackSaveFailed ?? 'Failed to save learner feedback.');
     } finally {
       setSavingLearnerId(null);
     }

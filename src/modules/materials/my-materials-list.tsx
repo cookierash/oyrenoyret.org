@@ -53,7 +53,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
     [writeRestriction, messages.auth.errors.emailNotVerified],
   );
   const localeCode = getLocaleCode(locale);
-  const { subjectNameMap, topicNameMap } = useCurriculum();
+  const { subjectNameMap, topicNameMap, subjectHrefMap, topicHrefMap } = useCurriculum();
   const dateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat(localeCode, {
@@ -461,7 +461,13 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
                         )}
                         {m.status === 'PUBLISHED' && (
                           <Button variant="ghost" size="sm" asChild>
-                            <Link href={`/catalog/${m.subjectId}/${m.topicId}`}>
+                            <Link
+                              href={`/catalog/${
+                                subjectHrefMap.get(m.subjectId) ?? m.subjectId
+                              }/${
+                                topicHrefMap.get(`${m.subjectId}:${m.topicId}`) ?? m.topicId
+                              }`}
+                            >
                               {copy.actions.viewCatalog}
                             </Link>
                           </Button>

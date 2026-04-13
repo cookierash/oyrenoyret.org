@@ -12,8 +12,11 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { isStaff } from '@/src/lib/permissions';
 import { sanitizeInput } from '@/src/security/validation';
-import { RATE_LIMITS } from '@/src/config/constants';
+import { RATE_LIMITS, SUBJECTS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
+import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
+import { EN_MESSAGES } from '@/src/i18n/messages/en';
+import { AZ_MESSAGES } from '@/src/i18n/messages/az';
 import {
   buildRateLimitResponse,
   checkRateLimit,
@@ -21,6 +24,25 @@ import {
 } from '@/src/security/rateLimiter';
 import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
+
+type SubjectMessages = Record<string, { name?: string; description?: string } | undefined>;
+type TopicMessages = Record<string, Record<string, string> | undefined>;
+
+function getFallbackSubject(slug: string, locale: 'en' | 'az') {
+  const source = locale === 'az' ? AZ_MESSAGES : EN_MESSAGES;
+  const subjects = source.subjects as SubjectMessages;
+  const copy = subjects[slug];
+  return {
+    name: copy?.name ?? slug,
+    description: copy?.description ?? '',
+  };
+}
+
+function getFallbackTopicName(subjectSlug: string, topicSlug: string, locale: 'en' | 'az') {
+  const source = locale === 'az' ? AZ_MESSAGES : EN_MESSAGES;
+  const topics = source.topics as TopicMessages;
+  return topics?.[subjectSlug]?.[topicSlug] ?? topicSlug;
+}
 
 export async function GET(request: Request) {
   try {
@@ -62,7 +84,33 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ subjects }, { headers: getPrivateNoStoreHeaders() });
+    if (subjects.length > 0) {
+      return NextResponse.json({ source: 'db', subjects }, { headers: getPrivateNoStoreHeaders() });
+    }
+
+    const fallback = SUBJECTS.map((subject) => {
+      const en = getFallbackSubject(subject.id, 'en');
+      const az = getFallbackSubject(subject.id, 'az');
+      const topics = (CURRICULUM_TOPICS as Record<string, Array<{ id: string }>>)[subject.id] ?? [];
+      return {
+        id: subject.id,
+        slug: subject.id,
+        slugAz: subject.id,
+        nameEn: en.name,
+        nameAz: az.name,
+        descriptionEn: en.description,
+        descriptionAz: az.description,
+        topics: topics.map((topic) => ({
+          id: topic.id,
+          slug: topic.id,
+          slugAz: topic.id,
+          nameEn: getFallbackTopicName(subject.id, topic.id, 'en'),
+          nameAz: getFallbackTopicName(subject.id, topic.id, 'az'),
+        })),
+      };
+    });
+
+    return NextResponse.json({ source: 'fallback', subjects: fallback }, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
     if (isDbSchemaMismatch(error)) {
       return NextResponse.json(
@@ -118,7 +166,6 @@ export async function POST(request: Request) {
 
     const existing = await prisma.subject.findFirst({
       where: {
-        deletedAt: null,
         OR: [{ slug }, { slugAz }, { slug: slugAz }, { slugAz: slug }],
       },
       select: { id: true },
@@ -149,6 +196,7 @@ export async function POST(request: Request) {
 
     revalidatePath('/catalog');
     revalidatePath(`/catalog/${created.slug}`);
+    revalidatePath(`/catalog/${created.slugAz}`);
 
     return NextResponse.json(created);
   } catch (error) {

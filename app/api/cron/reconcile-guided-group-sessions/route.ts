@@ -94,6 +94,23 @@ export async function GET(request: Request) {
             select: { userId: true },
           });
 
+          const hasAnyRegistrations = enrollments.length > 0;
+          const facilitatorNotice = hasAnyRegistrations
+            ? {
+                userId: session.facilitatorId,
+                type: 'GUIDED_GROUP_SESSION_AUTO_CANCELLED' as const,
+                title: 'Guided group session auto-cancelled',
+                body: `"${session.title}" was auto-cancelled because fewer than 2 learners were approved by the start time.`,
+                linkUrl: '/my-library/guided-group-sessions',
+              }
+            : {
+                userId: session.facilitatorId,
+                type: 'GUIDED_GROUP_SESSION_AUTO_CANCELLED' as const,
+                title: 'Guided group session removed',
+                body: `"${session.title}" was removed because no learners registered by the start time.`,
+                linkUrl: '/my-library/guided-group-sessions',
+              };
+
           await prisma.$transaction(async (tx) => {
             await tx.guidedGroupSession.update({
               where: { id: session.id },
@@ -101,7 +118,7 @@ export async function GET(request: Request) {
                 status: 'AUTO_CANCELLED',
                 cancelledAt: now,
                 endedAt: now,
-                cancelReason: 'auto_cancel_min_learners',
+                cancelReason: hasAnyRegistrations ? 'auto_cancel_min_learners' : 'auto_cancel_no_registrations',
               },
               select: { id: true },
             });
@@ -112,19 +129,13 @@ export async function GET(request: Request) {
             });
 
             const notices = [
-              {
-                userId: session.facilitatorId,
-                type: 'GUIDED_GROUP_SESSION_AUTO_CANCELLED' as const,
-                title: 'Guided group session auto-cancelled',
-                body: `"${session.title}" was auto-cancelled because fewer than 2 learners were approved by the start time.`,
-                linkUrl: '/library/guided-group-sessions',
-              },
+              facilitatorNotice,
               ...enrollments.map((e) => ({
                 userId: e.userId,
                 type: 'GUIDED_GROUP_SESSION_AUTO_CANCELLED' as const,
                 title: 'Guided group session auto-cancelled',
                 body: `"${session.title}" was auto-cancelled because fewer than 2 learners were approved by the start time.`,
-                linkUrl: '/library/guided-group-sessions',
+                linkUrl: '/my-library/guided-group-sessions',
               })),
             ];
 
@@ -168,14 +179,14 @@ export async function GET(request: Request) {
               type: 'GUIDED_GROUP_SESSION_NO_SHOW' as const,
               title: 'Guided group session no-show',
               body: `You did not start "${session.title}". A 1-credit no-show penalty applies.`,
-              linkUrl: '/library/guided-group-sessions',
+              linkUrl: '/my-library/guided-group-sessions',
             },
             ...enrollments.map((e) => ({
               userId: e.userId,
               type: 'GUIDED_GROUP_SESSION_NO_SHOW' as const,
               title: 'Guided group session no-show',
               body: `"${session.title}" did not start because the facilitator did not show up.`,
-              linkUrl: '/library/guided-group-sessions',
+              linkUrl: '/my-library/guided-group-sessions',
             })),
           ];
           await tx.moderationNotice.createMany({ data: notices });

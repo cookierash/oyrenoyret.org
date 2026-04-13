@@ -13,6 +13,8 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+export const runtime = 'nodejs';
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },

@@ -17,6 +17,7 @@ export default async function LearnMorePage() {
 
   const values = copy.values;
   const pillars = copy.pillars;
+  const steps = copy.steps;
   return (
     <div className="landing-light relative min-h-screen overflow-hidden bg-background text-foreground">
       <LandingThemeLock />
@@ -28,7 +29,7 @@ export default async function LearnMorePage() {
       <main className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pb-24 pt-24 sm:px-6 lg:px-8 lg:pt-32">
         <section className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
           <div className="space-y-6">
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-border/60 bg-background/80 px-3 py-1 text-xs uppercase text-muted-foreground">
               {copy.pill}
             </span>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-5xl">
@@ -50,7 +51,7 @@ export default async function LearnMorePage() {
             <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-primary/15 via-transparent to-muted/40" />
             <div className="relative space-y-6 rounded-3xl border border-border/70 bg-background/90 p-6 shadow-[0_30px_70px_-45px_rgba(15,23,42,0.6)]">
               <div className="space-y-3">
-                <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">
+                <p className="text-xs uppercase text-muted-foreground">
                   <BrandText>{copy.focusLabel}</BrandText>
                 </p>
                 <h2 className="text-xl font-medium text-foreground">
@@ -125,22 +126,11 @@ export default async function LearnMorePage() {
             </div>
           </div>
           <div className="grid gap-4">
-            {[
-              {
-                title: 'Choose the focus',
-                description: 'Pick the subject and goal together before each session.',
-              },
-              {
-                title: 'Practice with guardrails',
-                description: 'Students get examples, hints, and checkpoints along the way.',
-              },
-              {
-                title: 'Reflect and adjust',
-                description: 'Review results as a family and set the next small target.',
-              },
-            ].map((step) => (
+            {steps.map((step) => (
               <div key={step.title} className="rounded-2xl border border-border/70 bg-background/80 p-5">
-                <h3 className="text-base font-medium text-foreground">{step.title}</h3>
+                <h3 className="text-base font-medium text-foreground">
+                  <BrandText>{step.title}</BrandText>
+                </h3>
                 <p className="mt-2 text-sm text-muted-foreground">
                   <BrandText>{step.description}</BrandText>
                 </p>

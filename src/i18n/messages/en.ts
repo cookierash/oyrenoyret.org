@@ -30,13 +30,14 @@ export const EN_MESSAGES = {
     platform: 'Platform',
     dashboard: 'Dashboard',
     catalog: 'Catalog',
-    library: 'Library',
+    library: 'My library',
     liveActivities: 'Interactive sessions',
     discussions: 'Discussions',
     learning: 'Learning',
     studio: 'Studio',
     myMaterials: 'My materials',
     notifications: 'Notifications',
+    recentActivities: 'Notifications',
     academicRecord: 'Academic record',
     settings: 'Settings',
     account: 'Account',
@@ -358,11 +359,12 @@ export const EN_MESSAGES = {
     studio: 'oyrenoyret studio',
     leaderboard: 'Leaderboard',
     catalog: 'Catalog',
-    library: 'Library',
+    library: 'My library',
     guidedGroupSessions: 'Guided group sessions',
     liveActivities: 'Interactive sessions',
     discussions: 'Discussions',
     notifications: 'Notifications',
+    recentActivities: 'Notifications',
     academicRecord: 'Academic record',
     adminDashboard: 'Dashboard',
     adminHome: 'Admin',
@@ -381,7 +383,7 @@ export const EN_MESSAGES = {
     studio: 'Studio',
     leaderboard: 'Leaderboard',
     catalog: 'Catalog',
-    library: 'Library',
+    library: 'My library',
     guidedGroupSessions: 'Guided group sessions',
     liveActivities: 'Interactive sessions',
     admin: 'Admin',
@@ -395,6 +397,7 @@ export const EN_MESSAGES = {
     events: 'Events',
     discussions: 'Discussions',
     notifications: 'Notifications',
+    recentActivities: 'Notifications',
     academicRecord: 'Academic record',
     settings: 'Settings',
     preview: 'Preview',
@@ -504,6 +507,41 @@ export const EN_MESSAGES = {
     open: 'Open',
     sprints: 'Sprints',
     announcements: 'Announcements',
+    moderationPanel: {
+      toasts: {
+        reasonRequired: 'Reason is required.',
+        updateFailed: 'Failed to update user.',
+        updated: 'Updated.',
+      },
+    },
+    removeContent: {
+      toasts: {
+        reasonRequired: 'Reason is required.',
+        removeFailed: 'Failed to remove content.',
+        removed: 'Removed.',
+      },
+    },
+    curriculumPanel: {
+      toasts: {
+        seedRequired: 'Seed defaults (or create subjects) to enable editing.',
+        subjectNotFoundHint: 'Subject not found in the database. Seed defaults or create the subject first.',
+        createSubjectFailed: 'Failed to create subject.',
+        subjectCreated: 'Subject created.',
+        saveSubjectFailed: 'Failed to save subject.',
+        subjectSaved: 'Subject saved.',
+        deleteSubjectFailed: 'Failed to delete subject.',
+        subjectDeleted: 'Subject deleted.',
+        createTopicFailed: 'Failed to create topic.',
+        topicCreated: 'Topic created.',
+        saveTopicFailed: 'Failed to save topic.',
+        topicSaved: 'Topic saved.',
+        deleteTopicFailed: 'Failed to delete topic.',
+        topicDeleted: 'Topic deleted.',
+        initFailed: 'Failed to initialize curriculum.',
+        initSeeded: 'Curriculum initialized.',
+        initAlready: 'Curriculum already initialized.',
+      },
+    },
   },
   landing: {
     headline: 'Knowledge builds upon itself',
@@ -519,61 +557,61 @@ export const EN_MESSAGES = {
     pill: 'Learn more',
     title: 'A calmer way to build real understanding.',
     subtitle:
-      'oyrenoyret.org is a learning companion built for families who want structure without pressure. We help students layer new concepts with clarity, so each lesson builds on the last.',
+      "oyrenoyret.org is a learning companion built for families who want structure without pressure. It began as an educational social initiative developed for ADA University’s Haji Zeynalabdin Taghiyev Awards, and it is growing into a place where understanding is built step by step.",
     ctaPrimary: 'Get started for free',
     ctaSecondary: 'Talk to us',
-    focusLabel: 'Our focus',
-    focusTitle: 'Guided practice that feels approachable.',
+    focusLabel: 'What is oyrenoyret?',
+    focusTitle: 'A social education initiative for steady progress.',
     focusBody:
-      'We blend structured lessons with gentle coaching so students can revisit tough topics, master essentials, and keep moving forward with confidence.',
+      'We bring together guided practice, clear learning paths, and parent-friendly visibility so students can learn consistently and confidently.',
     values: [
       {
-        title: 'Layered learning',
+        title: 'Built for families',
         description:
-          'We help students stack concepts in the right order, so every new skill feels like a natural next step.',
+          'Parents help choose the focus and pace, while students get a simple, supportive flow to follow.',
       },
       {
-        title: 'Parent-guided pathways',
+        title: 'Structured, not overwhelming',
         description:
-          'Families choose the pace and focus areas, while our platform keeps every practice session aligned.',
+          'Learning is organized into small steps with examples and checkpoints, so practice stays calm and clear.',
       },
       {
-        title: 'Confidence through practice',
+        title: 'A social project with impact',
         description:
-          'We build momentum with short, focused exercises and gentle feedback that keeps students engaged.',
+          'We focus on real outcomes: better understanding, visible progress, and a safer learning experience for students.',
       },
     ],
-    pillarsTitle: 'Built for clarity, accountability, and care.',
+    pillarsTitle: 'Our mission',
     pillarsSubtitle:
-      'Everything on oyrenoyret.org is designed to keep learning focused and families in control.',
-    pillarsBadge: 'Parent-first learning',
+      'Make learning clearer, safer, and more consistent—while keeping families and educators in control.',
+    pillarsBadge: 'What we commit to',
     pillars: [
       {
-        title: 'Clear paths, not chaos',
+        title: 'Clarity over confusion',
         description:
-          'Curated learning maps keep students on track and reduce the overwhelm of endless resources.',
+          'Turn big topics into an understandable sequence so students know what to do next.',
       },
       {
-        title: 'Visible progress',
+        title: 'Consistency that fits real life',
         description:
-          'Parents and teachers can see milestones, review practice history, and celebrate wins together.',
+          'Encourage short, repeatable practice that adds up—without burnout or pressure.',
       },
       {
-        title: 'Supportive coaching',
+        title: 'Accountability with kindness',
         description:
-          'Guided prompts, examples, and helpful nudges keep students focused on understanding, not guessing.',
+          'Make progress visible and feedback supportive so students stay motivated to improve.',
       },
       {
-        title: 'Safe by design',
+        title: 'Safety and trust',
         description:
-          'We prioritize privacy, moderation, and parent oversight so learning stays secure and age-appropriate.',
+          'Prioritize privacy, moderation, and parent oversight so learning stays secure and age-appropriate.',
       },
     ],
-    rhythmTitle: 'A learning rhythm that respects real life.',
+    rhythmTitle: 'Our methodology',
     rhythmSubtitle:
-      'We know families juggle school, activities, and downtime. That is why our platform is built for short, focused sessions that add up over time.',
+      'We use a simple loop: choose a goal, practice with guidance, review what happened, then adjust the next step.',
     rhythmNote:
-      'Parents set the learning path. Students follow guided prompts. Everyone can see progress in one place.',
+      'Small, frequent sessions beat long, rare ones—especially when learning is guided and progress is visible.',
     steps: [
       {
         title: 'Choose the focus',
@@ -811,8 +849,12 @@ export const EN_MESSAGES = {
         '- Hardened auth and session security (including token hashing).\n' +
         '- Expanded admin areas for curriculum, interactive sessions, reports, and messages.\n' +
         '- Added avatar variants and richer public user cards.\n' +
+        '- Improved guided group sessions: upcoming-only listing, facilitator notifications when no one registers, and a streamlined 2-step scheduling flow.\n' +
+        '- Added guided group sessions slug search (#subject / #topic) aligned with discussions & catalog conventions.\n' +
+        '- Updated Contact Support links to redirect to /contact, and made contact form name/subject required.\n' +
         'Fix:\n' +
-        '- General stability and UI polish across the app.',
+        '- General stability and UI polish across the app.\n' +
+        '- Defaulted dev server to webpack to avoid Turbopack runtime errors.',
     },
     contact: {
       title: 'Contact',
@@ -822,9 +864,9 @@ export const EN_MESSAGES = {
       noticeInstagram: ' or reach us on Instagram at ',
       formTitle: 'Send a message',
       formSubtitle: 'Messages sent here appear in our admin dashboard.',
-      nameLabel: 'Name (optional)',
+      nameLabel: 'Name',
       emailLabel: 'Email',
-      subjectLabel: 'Subject (optional)',
+      subjectLabel: 'Subject',
       messageLabel: 'Message',
       formSend: 'Send message',
       formSending: 'Sending...',
@@ -1541,6 +1583,7 @@ export const EN_MESSAGES = {
       titleRequired: 'Title and content are required',
       contentTooLong: 'Content can include up to {{count}} characters.',
       created: 'Discussion created',
+      createdWithCost: 'Discussion created (-{{count}} credit)',
       createFailed: 'Failed to create',
       dialogTitle: 'Create new discussion',
       dialogDescription: 'Share a question or topic for others to discuss.',
@@ -1558,7 +1601,7 @@ export const EN_MESSAGES = {
       loadFailed: 'Failed to load discussions.',
       errorCode: 'Error code',
       noFound: 'No discussions found.',
-      noFoundHint: 'Try a different keyword or remove the subject filter.',
+      noFoundHint: 'Try a different keyword or remove the #tags.',
       clear: 'Clear search',
       noDiscussions: 'No discussions yet.',
       noDiscussionsHint: 'Be the first to start a discussion from the button above.',
@@ -1570,13 +1613,13 @@ export const EN_MESSAGES = {
       title: 'Discussions',
       description: 'Ask questions, share knowledge.',
       newPost: 'New post',
-      placeholder: 'Search discussions or use #subject (e.g., #mathematics)',
+      placeholder: 'Search discussions or use #subject / #topic (e.g., #mathematics #algebra)',
       search: 'Search',
       searchLabel: 'Search discussions',
       remove: 'Remove {{name}}',
-      subjects: 'Subjects',
+      subjects: 'Tags',
       added: 'Added',
-      helper: 'Filter by subject with #subject, like #physics or #azerbaijani.',
+      helper: 'Filter by subject/topic with #tags, like #physics or #algebra.',
       onlineNow: '{{count}} more users online now',
     },
     relativeTime: {
@@ -1620,6 +1663,7 @@ export const EN_MESSAGES = {
       failedAccept: 'Failed to accept',
       markedBest: 'Marked as best answer',
       failedReply: 'Failed to reply',
+      removedByModerators: 'This post was removed by moderators.',
     },
     replyDetail: {
       back: 'Back',
@@ -1650,6 +1694,8 @@ export const EN_MESSAGES = {
       failedLoadReplies: 'Failed to load replies',
       failedVote: 'Failed to vote',
       failedPostReply: 'Failed to post reply',
+      removedReplyByModerators: 'This reply was removed by moderators.',
+      removedThreadByModerators: 'This thread was removed by moderators.',
     },
   },
   record: {
@@ -1723,6 +1769,17 @@ export const EN_MESSAGES = {
         toastSubmitFailed: 'Failed to submit application.',
         toastSubmitted: 'Application submitted.',
       },
+      sessionRoom: {
+        toasts: {
+          materialUpdated: 'Material updated.',
+          materialUpdateFailed: 'Failed to update material.',
+          starRatingRequired: 'Please select a star rating.',
+          feedbackThanks: 'Thanks for the feedback!',
+          ratingSaveFailed: 'Failed to save rating.',
+          saved: 'Saved.',
+          learnerFeedbackSaveFailed: 'Failed to save learner feedback.',
+        },
+      },
     },
     notifications: {
       title: 'Notifications',
@@ -1779,9 +1836,9 @@ export const EN_MESSAGES = {
       publicIdLabel: 'Public ID:',
     },
     library: {
-      title: 'Library',
+      title: 'My library',
       description: 'All materials you have purchased.',
-      backToLibrary: 'Back to library',
+      backToLibrary: 'Back to my library',
       searchPlaceholder: 'Search materials...',
       searchLabel: 'Search materials by title or subject',
       sortBy: 'Sort by',
@@ -1928,6 +1985,29 @@ export const EN_MESSAGES = {
       discussion: 'replied to your discussion',
     },
     noContent: '(No content)',
+    moderation: {
+      fallbackTitle: 'Moderator update',
+      contactSupport: 'Contact support',
+      facilitator: {
+        approvedSubjectsLabel: 'Approved subjects',
+        approvedFallback: 'Your application was approved.',
+      },
+      titles: {
+        ACCOUNT_SUSPENDED: 'Account suspended',
+        ACCOUNT_UNSUSPENDED: 'Account unsuspended',
+        ACCOUNT_BANNED: 'Account banned',
+        ACCOUNT_UNBANNED: 'Account unbanned',
+        CONTENT_REMOVED: 'Content removed',
+        FACILITATOR_APPLICATION_CHANGES_REQUESTED: 'Facilitator application: changes requested',
+        FACILITATOR_APPLICATION_REJECTED: 'Facilitator application rejected',
+        FACILITATOR_APPLICATION_APPROVED: 'Facilitator application approved',
+        GUIDED_GROUP_SESSION_CANCELLED: 'Group session cancelled',
+        GUIDED_GROUP_SESSION_AUTO_CANCELLED: 'Group session auto-cancelled',
+        GUIDED_GROUP_SESSION_NO_SHOW: 'Group session no-show',
+        GUIDED_GROUP_SESSION_ENROLLMENT_APPROVED: 'Group session enrollment approved',
+        GUIDED_GROUP_SESSION_ENROLLMENT_REJECTED: 'Group session enrollment rejected',
+      },
+    },
     sprint: {
       cancelledTitle: 'Registration cancelled',
       pendingTitle: 'Complete your sprint registration',
@@ -2054,16 +2134,16 @@ export const EN_MESSAGES = {
   },
   liveActivities: {
     board: {
-      myEventsTitle: 'Sessions',
+      myEventsTitle: 'My sessions',
       myEventsSubtitle: 'Confirmed registrations for your upcoming sessions.',
       enrolledCount: '{{count}} enrolled',
-      allEventsTitle: 'Sessions',
+      allEventsTitle: 'All sessions',
       allEventsSubtitle: 'Interactive sessions you can join in the next 10–15 minutes.',
       noLiveScheduled: 'No interactive sessions scheduled.',
-      noConfirmedEvents: 'No confirmed events yet.',
+      noConfirmedEvents: 'No confirmed sessions yet.',
       noEventsHint: 'Check back soon or watch the announcements sidebar.',
-      noConfirmedHint: 'Register in All events to see it here.',
-      allEnrolled: 'You are enrolled in all current events.',
+      noConfirmedHint: 'Register in All sessions to see it here.',
+      allEnrolled: 'You are enrolled in all current sessions.',
       allEnrolledHint: 'We will post new sessions soon.',
       statusEnrolled: 'Enrolled',
       statusVerification: 'Verification needed',

@@ -65,6 +65,66 @@ type CombinedMessageItem =
   | SprintEnrollmentItem
   | ModerationNoticeItem;
 
+type FacilitatorApplicationNoticePayloadV1 = {
+  v: 1;
+  kind: 'facilitator_application';
+  status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+  approvedSubjectIds?: string[];
+  message?: string | null;
+};
+
+function parseFacilitatorApplicationNoticePayload(
+  body: string,
+): FacilitatorApplicationNoticePayloadV1 | null {
+  const trimmed = String(body ?? '').trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const obj = parsed as Record<string, unknown>;
+    if (obj.v !== 1) return null;
+    if (obj.kind !== 'facilitator_application') return null;
+    if (
+      obj.status !== 'APPROVED' &&
+      obj.status !== 'REJECTED' &&
+      obj.status !== 'CHANGES_REQUESTED'
+    ) {
+      return null;
+    }
+    const approvedSubjectIdsRaw = obj.approvedSubjectIds;
+    const approvedSubjectIds = Array.isArray(approvedSubjectIdsRaw)
+      ? approvedSubjectIdsRaw.filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      : undefined;
+    const message = typeof obj.message === 'string' ? obj.message : obj.message === null ? null : undefined;
+    return {
+      v: 1,
+      kind: 'facilitator_application',
+      status: obj.status,
+      ...(approvedSubjectIds?.length ? { approvedSubjectIds } : {}),
+      ...(message !== undefined ? { message } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseLegacyFacilitatorApprovedBody(body: string): { subjectIds: string[]; message: string } | null {
+  const trimmed = String(body ?? '').trim();
+  if (!trimmed) return null;
+  if (trimmed === 'Approved.' || trimmed === 'Approved') {
+    return { subjectIds: [], message: '' };
+  }
+  const match = trimmed.match(/^Approved subjects:\s*([^\n]+)(?:\n\n([\s\S]*))?$/i);
+  if (!match) return null;
+  const subjectsRaw = String(match[1] ?? '');
+  const subjectIds = subjectsRaw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const message = String(match[2] ?? '').trim();
+  return { subjectIds, message };
+}
+
 function SprintEnrollmentRow({
   item,
   onRefresh,
@@ -451,10 +511,40 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                   <ul className="divide-y divide-border">
                     {group.items.map((item) => {
                       if (item.type === 'moderation') {
-                        const preview = String(item.body || '')
-                          .replace(/\s+/g, ' ')
-                          .trim()
-                          .slice(0, 220);
+                        const moderationCopy = (copy as any).moderation as any;
+                        const noticeTitles = moderationCopy?.titles as Record<string, string> | undefined;
+                        const localizedTitle =
+                          noticeTitles?.[item.noticeType] ||
+                          String(item.title || '').trim() ||
+                          moderationCopy?.fallbackTitle ||
+                          'Moderator update';
+
+                        let bodyText = String(item.body || '');
+                        if (item.noticeType === 'FACILITATOR_APPLICATION_APPROVED') {
+                          const payload = parseFacilitatorApplicationNoticePayload(item.body || '');
+                          const legacy = payload ? null : parseLegacyFacilitatorApprovedBody(item.body || '');
+                          const subjectIds =
+                            payload?.approvedSubjectIds ??
+                            legacy?.subjectIds ??
+                            [];
+                          const message =
+                            (payload?.message ?? '').trim() ||
+                            legacy?.message ||
+                            '';
+                          const header = subjectIds.length
+                            ? `${moderationCopy?.facilitator?.approvedSubjectsLabel ?? 'Approved subjects'}: ${subjectIds.join(', ')}`
+                            : moderationCopy?.facilitator?.approvedFallback ?? '';
+                          bodyText = [header, message].filter(Boolean).join('\n\n');
+                        } else if (
+                          item.noticeType === 'FACILITATOR_APPLICATION_REJECTED' ||
+                          item.noticeType === 'FACILITATOR_APPLICATION_CHANGES_REQUESTED'
+                        ) {
+                          const payload = parseFacilitatorApplicationNoticePayload(item.body || '');
+                          bodyText = (payload?.message ?? '') || String(item.body || '');
+                        }
+
+                        const displayBody = bodyText.trim();
+
                         return (
                           <li key={`moderation-${item.id}`}>
                             <div className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-muted/20">
@@ -463,21 +553,19 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                               </div>
                               <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-foreground truncate">
-                                  {item.title || 'Moderator update'}
+                                  {localizedTitle}
                                 </p>
-                                <p className="text-xs text-muted-foreground/80 mt-1 line-clamp-2">
-                                  {preview || copy.noContent}
+                                <p className="text-xs text-muted-foreground/80 mt-1 whitespace-pre-line break-words">
+                                  {displayBody || copy.noContent}
                                 </p>
-                                {item.linkUrl ? (
-                                  <div className="mt-1">
-                                    <Link
-                                      href={item.linkUrl}
-                                      className="text-[11px] text-primary hover:underline underline-offset-2"
-                                    >
-                                      Contact support
-                                    </Link>
-                                  </div>
-                                ) : null}
+                                <div className="mt-1">
+                                  <Link
+                                    href="/contact"
+                                    className="text-[11px] text-primary hover:underline underline-offset-2"
+                                  >
+                                    {moderationCopy?.contactSupport ?? 'Contact support'}
+                                  </Link>
+                                </div>
                               </div>
                               <div className="shrink-0 text-[11px] text-muted-foreground">
                                 {timeFormatter.format(new Date(item.createdAt))}

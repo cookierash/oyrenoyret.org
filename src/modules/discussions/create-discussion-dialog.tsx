@@ -76,7 +76,11 @@ export function CreateDiscussionDialog({
       if (typeof created.balanceAfter === 'number') {
         (await import('@/src/lib/credits-events')).dispatchCreditsUpdated(created.balanceAfter);
       }
-      toast.success(copy.created);
+      if (typeof created.creditsSpent === 'number' && created.creditsSpent > 0) {
+        toast.success(t('discussions.createDialog.createdWithCost', { count: created.creditsSpent }));
+      } else {
+        toast.success(copy.created);
+      }
       onOpenChange(false);
       setTitle('');
       setContent('');

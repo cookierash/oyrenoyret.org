@@ -1,12 +1,13 @@
 /**
  * Curriculum Topic Admin API
  *
- * PATCH: Update/rename topic (staff only)
- * DELETE: Soft delete topic (staff only)
+ * PATCH: Update/rename topic under subject (staff only)
+ * DELETE: Soft delete topic under subject (staff only)
  */
 
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
+import crypto from 'crypto';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
@@ -27,18 +28,27 @@ function isUuid(value: string) {
   );
 }
 
+function buildDeletedSlug(base: string) {
+  const suffix = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  return normalizeSlug(`${base}-deleted-${suffix}`);
+}
+
 export async function PATCH(
   request: Request,
-  { params }: { params: Promise<{ slug: string; topic: string }> }
+  { params }: { params: Promise<{ slug: string; topic: string }> },
 ) {
   try {
     const { slug: rawSubject, topic: rawTopic } = await params;
-    const subjectIsId = isUuid(rawSubject);
-    const topicIsId = isUuid(rawTopic);
-    const subjectSlug = subjectIsId ? '' : normalizeSlug(rawSubject);
-    const topicSlug = topicIsId ? '' : normalizeSlug(rawTopic);
-    if ((!subjectIsId && !isValidSlug(subjectSlug)) || (!topicIsId && !isValidSlug(topicSlug))) {
-      return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
+    const subjectLooksLikeId = isUuid(rawSubject);
+    const subjectSlug = subjectLooksLikeId ? '' : normalizeSlug(rawSubject);
+    if (!subjectLooksLikeId && !isValidSlug(subjectSlug)) {
+      return NextResponse.json({ error: 'Invalid subject slug' }, { status: 400 });
+    }
+
+    const topicLooksLikeId = isUuid(rawTopic);
+    const topicSlug = topicLooksLikeId ? '' : normalizeSlug(rawTopic);
+    if (!topicLooksLikeId && !isValidSlug(topicSlug)) {
+      return NextResponse.json({ error: 'Invalid topic slug' }, { status: 400 });
     }
 
     const userId = await getCurrentSession();
@@ -64,7 +74,7 @@ export async function PATCH(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: subjectIsId
+      where: subjectLooksLikeId
         ? { id: rawSubject, deletedAt: null }
         : {
             deletedAt: null,
@@ -75,28 +85,32 @@ export async function PATCH(
               { slugAz: { equals: rawSubject, mode: 'insensitive' } },
             ],
           },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found', subject: rawSubject }, { status: 404 });
     }
 
     const topic = await prisma.topic.findFirst({
-      where: topicIsId
-        ? { id: rawTopic, subjectId: subject.id, deletedAt: null }
-        : {
-            subjectId: subject.id,
-            deletedAt: null,
-            OR: [
-              { slug: topicSlug },
-              { slugAz: topicSlug },
-              { slug: { equals: rawTopic, mode: 'insensitive' } },
-              { slugAz: { equals: rawTopic, mode: 'insensitive' } },
-            ],
-          },
+      where: {
+        subjectId: subject.id,
+        deletedAt: null,
+        ...(topicLooksLikeId
+          ? { id: rawTopic }
+          : {
+              OR: [
+                { slug: topicSlug },
+                { slugAz: topicSlug },
+                { slug: { equals: rawTopic, mode: 'insensitive' } },
+                { slugAz: { equals: rawTopic, mode: 'insensitive' } },
+              ],
+            }),
+      },
       select: { id: true, slug: true, slugAz: true },
     });
-    if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+    if (!topic) {
+      return NextResponse.json({ error: 'Topic not found', topic: rawTopic }, { status: 404 });
+    }
 
     const body = await request.json().catch(() => ({}));
     const nextSlug = body?.slug ? normalizeSlug(body.slug) : null;
@@ -115,7 +129,6 @@ export async function PATCH(
       const existing = await prisma.topic.findFirst({
         where: {
           subjectId: subject.id,
-          deletedAt: null,
           id: { not: topic.id },
           OR: [{ slug: nextSlug }, { slugAz: nextSlug }],
         },
@@ -130,7 +143,6 @@ export async function PATCH(
       const existing = await prisma.topic.findFirst({
         where: {
           subjectId: subject.id,
-          deletedAt: null,
           id: { not: topic.id },
           OR: [{ slug: nextSlugAz }, { slugAz: nextSlugAz }],
         },
@@ -163,6 +175,10 @@ export async function PATCH(
             where: { subjectId: subject.slug, topicId: topic.slug },
             data: { topicId: nextSlug },
           }),
+          tx.guidedGroupSession.updateMany({
+            where: { subjectId: subject.slug, topicId: topic.slug },
+            data: { topicId: nextSlug },
+          }),
         ]);
       }
 
@@ -171,8 +187,11 @@ export async function PATCH(
 
     revalidatePath('/catalog');
     revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}`);
     revalidatePath(`/catalog/${subject.slug}/${topic.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}/${topic.slugAz}`);
     revalidatePath(`/catalog/${subject.slug}/${updated.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}/${updated.slugAz}`);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -189,16 +208,20 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: Promise<{ slug: string; topic: string }> }
+  { params }: { params: Promise<{ slug: string; topic: string }> },
 ) {
   try {
     const { slug: rawSubject, topic: rawTopic } = await params;
-    const subjectIsId = isUuid(rawSubject);
-    const topicIsId = isUuid(rawTopic);
-    const subjectSlug = subjectIsId ? '' : normalizeSlug(rawSubject);
-    const topicSlug = topicIsId ? '' : normalizeSlug(rawTopic);
-    if ((!subjectIsId && !isValidSlug(subjectSlug)) || (!topicIsId && !isValidSlug(topicSlug))) {
-      return NextResponse.json({ error: 'Invalid slug' }, { status: 400 });
+    const subjectLooksLikeId = isUuid(rawSubject);
+    const subjectSlug = subjectLooksLikeId ? '' : normalizeSlug(rawSubject);
+    if (!subjectLooksLikeId && !isValidSlug(subjectSlug)) {
+      return NextResponse.json({ error: 'Invalid subject slug' }, { status: 400 });
+    }
+
+    const topicLooksLikeId = isUuid(rawTopic);
+    const topicSlug = topicLooksLikeId ? '' : normalizeSlug(rawTopic);
+    if (!topicLooksLikeId && !isValidSlug(topicSlug)) {
+      return NextResponse.json({ error: 'Invalid topic slug' }, { status: 400 });
     }
 
     const userId = await getCurrentSession();
@@ -224,7 +247,7 @@ export async function DELETE(
     }
 
     const subject = await prisma.subject.findFirst({
-      where: subjectIsId
+      where: subjectLooksLikeId
         ? { id: rawSubject, deletedAt: null }
         : {
             deletedAt: null,
@@ -235,34 +258,48 @@ export async function DELETE(
               { slugAz: { equals: rawSubject, mode: 'insensitive' } },
             ],
           },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found', subject: rawSubject }, { status: 404 });
     }
 
     const topic = await prisma.topic.findFirst({
-      where: topicIsId
-        ? { id: rawTopic, subjectId: subject.id, deletedAt: null }
-        : {
-            subjectId: subject.id,
-            deletedAt: null,
-            OR: [
-              { slug: topicSlug },
-              { slugAz: topicSlug },
-              { slug: { equals: rawTopic, mode: 'insensitive' } },
-              { slugAz: { equals: rawTopic, mode: 'insensitive' } },
-            ],
-          },
-      select: { id: true, slug: true },
+      where: {
+        subjectId: subject.id,
+        deletedAt: null,
+        ...(topicLooksLikeId
+          ? { id: rawTopic }
+          : {
+              OR: [
+                { slug: topicSlug },
+                { slugAz: topicSlug },
+                { slug: { equals: rawTopic, mode: 'insensitive' } },
+                { slugAz: { equals: rawTopic, mode: 'insensitive' } },
+              ],
+            }),
+      },
+      select: { id: true, slug: true, slugAz: true },
     });
-    if (!topic) return NextResponse.json({ error: 'Topic not found' }, { status: 404 });
+    if (!topic) {
+      return NextResponse.json({ error: 'Topic not found', topic: rawTopic }, { status: 404 });
+    }
 
-    await prisma.topic.update({ where: { id: topic.id }, data: { deletedAt: new Date() } });
+    await prisma.topic.update({
+      where: { id: topic.id },
+      data: {
+        deletedAt: new Date(),
+        slug: buildDeletedSlug(topic.slug),
+        slugAz: buildDeletedSlug(topic.slugAz),
+      },
+      select: { id: true },
+    });
 
     revalidatePath('/catalog');
     revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}`);
     revalidatePath(`/catalog/${subject.slug}/${topic.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}/${topic.slugAz}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

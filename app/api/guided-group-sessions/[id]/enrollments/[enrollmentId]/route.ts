@@ -14,6 +14,8 @@ import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-acc
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { calcGroupSessionParticipantCost, getBalance } from '@/src/modules/credits';
 
+export const runtime = 'nodejs';
+
 const bodySchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
 });
@@ -136,7 +138,7 @@ export async function PATCH(
             next === 'APPROVED'
               ? `You have been approved to join "${enrollment.session.title}".`
               : `Your request to join "${enrollment.session.title}" was rejected.`,
-          linkUrl: '/library/guided-group-sessions',
+          linkUrl: '/my-library/guided-group-sessions',
         },
       });
     } catch (error) {

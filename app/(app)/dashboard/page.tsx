@@ -167,15 +167,40 @@ export default async function DashboardPage() {
   const { locale, messages, t } = await getI18n();
   const copy = messages.app.dashboard;
   let dbSubjects: Array<{ slug: string; nameEn: string; nameAz: string }> = [];
+  let subjectHrefMap = new Map<string, string>();
+  let topicHrefMap = new Map<string, string>();
   try {
     dbSubjects = await prisma.subject.findMany({
       where: { deletedAt: null },
       select: { slug: true, nameEn: true, nameAz: true },
       orderBy: { slug: 'asc' },
     });
+    const slugRows = await prisma.subject.findMany({
+      where: { deletedAt: null },
+      select: {
+        slug: true,
+        slugAz: true,
+        topics: { where: { deletedAt: null }, select: { slug: true, slugAz: true } },
+      },
+    });
+    subjectHrefMap = new Map(
+      slugRows.map((s) => [s.slug, locale === 'az' ? s.slugAz : s.slug]),
+    );
+    const topicPairs: Array<[string, string]> = [];
+    slugRows.forEach((s) => {
+      (s.topics ?? []).forEach((topic) => {
+        topicPairs.push([
+          `${s.slug}:${topic.slug}`,
+          locale === 'az' ? topic.slugAz : topic.slug,
+        ]);
+      });
+    });
+    topicHrefMap = new Map(topicPairs);
   } catch (error) {
     if (!isDbSchemaMismatch(error)) throw error;
     dbSubjects = [];
+    subjectHrefMap = new Map();
+    topicHrefMap = new Map();
   }
   const subjectNameMap = new Map(
     (dbSubjects.length
@@ -464,7 +489,7 @@ export default async function DashboardPage() {
               <h2 className="text-sm font-medium">{copy.recentMaterials}</h2>
             </div>
             <Link
-              href="/library"
+              href="/my-library"
               className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               {copy.allMaterials}
@@ -489,7 +514,11 @@ export default async function DashboardPage() {
               {recentPurchases.map(({ material, createdAt }) => (
                 <Link
                   key={material.id}
-                  href={`/catalog/${material.subjectId}/${material.topicId}/${material.id}`}
+                  href={`/catalog/${
+                    subjectHrefMap.get(material.subjectId) ?? material.subjectId
+                  }/${
+                    topicHrefMap.get(`${material.subjectId}:${material.topicId}`) ?? material.topicId
+                  }/${material.id}`}
                   className="group card-frame bg-card p-3 transition-all duration-200 flex flex-col gap-2"
                 >
                   <div className="flex items-start justify-between gap-2">

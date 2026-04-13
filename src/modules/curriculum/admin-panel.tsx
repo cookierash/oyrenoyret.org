@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { cn } from '@/src/lib/utils';
 import { isValidSlug, normalizeSlug } from '@/src/modules/curriculum/slug';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 type CurriculumTopic = {
   id: string;
@@ -47,9 +48,12 @@ async function parseJson(res: Response) {
 }
 
 export function CurriculumAdminPanel() {
+  const { messages } = useI18n();
+  const toastCopy = messages.admin?.curriculumPanel?.toasts;
   const [subjects, setSubjects] = useState<CurriculumSubject[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
+  const [curriculumSource, setCurriculumSource] = useState<'db' | 'fallback'>('db');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [selectedTopicId, setSelectedTopicId] = useState<string>('');
   const [subjectsQuery, setSubjectsQuery] = useState('');
@@ -109,6 +113,7 @@ export function CurriculumAdminPanel() {
       const res = await fetch('/api/curriculum/subjects', { cache: 'no-store' });
       const data = await parseJson(res);
       if (!res.ok) throw new Error(extractErrorMessage(data) ?? 'Failed to load');
+      setCurriculumSource(data?.source === 'fallback' ? 'fallback' : 'db');
       const list = Array.isArray(data?.subjects) ? (data.subjects as CurriculumSubject[]) : [];
       setSubjects(list);
       if (!selectedSubjectId && list.length > 0) {
@@ -160,10 +165,15 @@ export function CurriculumAdminPanel() {
       });
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to create subject.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(
+            toastCopy?.createSubjectFailed ?? 'Failed to create subject.',
+            extractErrorMessage(data),
+          ),
+        );
         return;
       }
-      toast.success('Subject created.');
+      toast.success(toastCopy?.subjectCreated ?? 'Subject created.');
       setNewSubject({
         slug: '',
         slugAz: '',
@@ -177,12 +187,21 @@ export function CurriculumAdminPanel() {
         setSelectedSubjectId(data.id);
       }
     } catch (error) {
-      toast.error(formatErrorToast('Failed to create subject.', error instanceof Error ? error.message : null));
+      toast.error(
+        formatErrorToast(
+          toastCopy?.createSubjectFailed ?? 'Failed to create subject.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
   const saveSubject = async () => {
     if (!selectedSubject) return;
+    if (curriculumSource !== 'db') {
+      toast.error(toastCopy?.seedRequired ?? 'Seed defaults (or create subjects) to enable editing.');
+      return;
+    }
     try {
       const res = await fetch(`/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}`, {
         method: 'PATCH',
@@ -195,10 +214,15 @@ export function CurriculumAdminPanel() {
       });
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to save subject.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(
+            toastCopy?.saveSubjectFailed ?? 'Failed to save subject.',
+            extractErrorMessage(data),
+          ),
+        );
         return;
       }
-      toast.success('Subject saved.');
+      toast.success(toastCopy?.subjectSaved ?? 'Subject saved.');
       await load();
       if (data && typeof data === 'object') {
         setSubjectEdit({
@@ -211,32 +235,55 @@ export function CurriculumAdminPanel() {
         });
       }
     } catch (error) {
-      toast.error(formatErrorToast('Failed to save subject.', error instanceof Error ? error.message : null));
+      toast.error(
+        formatErrorToast(
+          toastCopy?.saveSubjectFailed ?? 'Failed to save subject.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
   const deleteSubject = async () => {
     if (!selectedSubject) return;
+    if (curriculumSource !== 'db') {
+      toast.error(toastCopy?.seedRequired ?? 'Seed defaults (or create subjects) to enable editing.');
+      return;
+    }
     try {
       const res = await fetch(`/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}`, {
         method: 'DELETE',
       });
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to delete subject.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(
+            toastCopy?.deleteSubjectFailed ?? 'Failed to delete subject.',
+            extractErrorMessage(data),
+          ),
+        );
         return;
       }
-      toast.success('Subject deleted.');
+      toast.success(toastCopy?.subjectDeleted ?? 'Subject deleted.');
       setSelectedSubjectId('');
       setDeleteSubjectOpen(false);
       await load();
     } catch (error) {
-      toast.error(formatErrorToast('Failed to delete subject.', error instanceof Error ? error.message : null));
+      toast.error(
+        formatErrorToast(
+          toastCopy?.deleteSubjectFailed ?? 'Failed to delete subject.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
   const createTopic = async () => {
     if (!selectedSubject) return;
+    if (curriculumSource !== 'db') {
+      toast.error(toastCopy?.seedRequired ?? 'Seed defaults (or create subjects) to enable editing.');
+      return;
+    }
     try {
       const res = await fetch(
         `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}/topics`,
@@ -250,24 +297,35 @@ export function CurriculumAdminPanel() {
       if (!res.ok) {
         const message = extractErrorMessage(data);
         const hint = message && /subject not found/i.test(message)
-          ? 'Subject not found in the database. Seed defaults or create the subject first.'
+          ? (toastCopy?.subjectNotFoundHint ?? 'Subject not found in the database. Seed defaults or create the subject first.')
           : message;
-        toast.error(formatErrorToast('Failed to create topic.', hint));
+        toast.error(
+          formatErrorToast(toastCopy?.createTopicFailed ?? 'Failed to create topic.', hint),
+        );
         return;
       }
-      toast.success('Topic created.');
+      toast.success(toastCopy?.topicCreated ?? 'Topic created.');
       setNewTopic({ slug: '', slugAz: '', nameEn: '', nameAz: '' });
       await load();
       if (typeof data?.id === 'string' && data.id) {
         setSelectedTopicId(data.id);
       }
     } catch (error) {
-      toast.error(formatErrorToast('Failed to create topic.', error instanceof Error ? error.message : null));
+      toast.error(
+        formatErrorToast(
+          toastCopy?.createTopicFailed ?? 'Failed to create topic.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
   const saveTopic = async () => {
     if (!selectedSubject || !selectedTopic) return;
+    if (curriculumSource !== 'db') {
+      toast.error(toastCopy?.seedRequired ?? 'Seed defaults (or create subjects) to enable editing.');
+      return;
+    }
     try {
       const res = await fetch(
         `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}/topics/${encodeURIComponent(selectedTopic.id)}`,
@@ -279,10 +337,15 @@ export function CurriculumAdminPanel() {
       );
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to save topic.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(
+            toastCopy?.saveTopicFailed ?? 'Failed to save topic.',
+            extractErrorMessage(data),
+          ),
+        );
         return;
       }
-      toast.success('Topic saved.');
+      toast.success(toastCopy?.topicSaved ?? 'Topic saved.');
       await load();
       if (data && typeof data === 'object') {
         setTopicEdit({
@@ -293,12 +356,21 @@ export function CurriculumAdminPanel() {
         });
       }
     } catch (error) {
-      toast.error(formatErrorToast('Failed to save topic.', error instanceof Error ? error.message : null));
+      toast.error(
+        formatErrorToast(
+          toastCopy?.saveTopicFailed ?? 'Failed to save topic.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
   const deleteTopic = async () => {
     if (!selectedSubject || !selectedTopic) return;
+    if (curriculumSource !== 'db') {
+      toast.error(toastCopy?.seedRequired ?? 'Seed defaults (or create subjects) to enable editing.');
+      return;
+    }
     try {
       const res = await fetch(
         `/api/curriculum/subjects/${encodeURIComponent(selectedSubject.id)}/topics/${encodeURIComponent(selectedTopic.id)}`,
@@ -306,15 +378,25 @@ export function CurriculumAdminPanel() {
       );
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to delete topic.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(
+            toastCopy?.deleteTopicFailed ?? 'Failed to delete topic.',
+            extractErrorMessage(data),
+          ),
+        );
         return;
       }
-      toast.success('Topic deleted.');
+      toast.success(toastCopy?.topicDeleted ?? 'Topic deleted.');
       setSelectedTopicId('');
       setDeleteTopicOpen(false);
       await load();
     } catch (error) {
-      toast.error(formatErrorToast('Failed to delete topic.', error instanceof Error ? error.message : null));
+      toast.error(
+        formatErrorToast(
+          toastCopy?.deleteTopicFailed ?? 'Failed to delete topic.',
+          error instanceof Error ? error.message : null,
+        ),
+      );
     }
   };
 
@@ -324,14 +406,22 @@ export function CurriculumAdminPanel() {
       const res = await fetch('/api/curriculum/seed', { method: 'POST' });
       const data = await parseJson(res);
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to initialize curriculum.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(
+            toastCopy?.initFailed ?? 'Failed to initialize curriculum.',
+            extractErrorMessage(data),
+          ),
+        );
         return;
       }
-      toast.success(data?.seeded ? 'Curriculum initialized.' : 'Curriculum already initialized.');
+      toast.success(data?.seeded ? (toastCopy?.initSeeded ?? 'Curriculum initialized.') : (toastCopy?.initAlready ?? 'Curriculum already initialized.'));
       await load();
     } catch (error) {
       toast.error(
-        formatErrorToast('Failed to initialize curriculum.', error instanceof Error ? error.message : null),
+        formatErrorToast(
+          toastCopy?.initFailed ?? 'Failed to initialize curriculum.',
+          error instanceof Error ? error.message : null,
+        ),
       );
     } finally {
       setSeeding(false);
@@ -372,6 +462,7 @@ export function CurriculumAdminPanel() {
     Boolean(newSubject.nameEn.trim()) &&
     Boolean(newSubject.nameAz.trim());
   const canSaveSubject =
+    curriculumSource === 'db' &&
     Boolean(selectedSubject) &&
     isValidSlug(subjectEditSlugPreview) &&
     isValidSlug(subjectEditSlugAzPreview) &&
@@ -379,12 +470,14 @@ export function CurriculumAdminPanel() {
     Boolean(subjectEdit.nameAz.trim());
 
   const canCreateTopic =
+    curriculumSource === 'db' &&
     Boolean(selectedSubject) &&
     isValidSlug(topicSlugPreview) &&
     isValidSlug(topicSlugAzPreview) &&
     Boolean(newTopic.nameEn.trim()) &&
     Boolean(newTopic.nameAz.trim());
   const canSaveTopic =
+    curriculumSource === 'db' &&
     Boolean(selectedSubject) &&
     Boolean(selectedTopic) &&
     isValidSlug(topicEditSlugPreview) &&
@@ -400,7 +493,7 @@ export function CurriculumAdminPanel() {
           <TabsTrigger value="topics">Topics</TabsTrigger>
         </TabsList>
         <div className="flex items-center gap-2">
-          {subjects.length === 0 ? (
+          {curriculumSource === 'fallback' || subjects.length === 0 ? (
             <Button size="sm" variant="secondary-primary" onClick={seedDefaults} disabled={seeding}>
               {seeding ? 'Seeding…' : 'Seed defaults'}
             </Button>
@@ -410,6 +503,12 @@ export function CurriculumAdminPanel() {
           </Button>
         </div>
       </div>
+
+      {curriculumSource === 'fallback' ? (
+        <div className="rounded-md border border-border bg-muted/30 px-4 py-2 text-sm text-muted-foreground">
+          Showing built-in curriculum defaults. Seed defaults to copy them into the database and enable editing.
+        </div>
+      ) : null}
 
       <TabsContent value="subjects" className="mt-0">
         <section className="card-frame bg-card overflow-hidden">

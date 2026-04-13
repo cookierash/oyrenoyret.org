@@ -11,6 +11,13 @@ import { NextResponse } from 'next/server';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
+import {
+  inferContentTypeFromKey,
+  inferFilenameFromKey,
+  sanitizeContentDispositionFilename,
+} from '@/src/lib/mime';
+
+export const runtime = 'nodejs';
 
 export async function GET(request: Request) {
   try {
@@ -42,7 +49,12 @@ export async function GET(request: Request) {
     const client = createR2Client(cfg);
     const data = await client.send(new GetObjectCommand({ Bucket: cfg.bucket, Key: keyRaw }));
 
-    const contentType = String(data.ContentType ?? 'application/octet-stream');
+    const inferredType = inferContentTypeFromKey(keyRaw);
+    const contentTypeRaw = String(data.ContentType ?? '');
+    const contentType =
+      contentTypeRaw && contentTypeRaw !== 'application/octet-stream'
+        ? contentTypeRaw
+        : inferredType ?? 'application/octet-stream';
     const cacheControl = String(data.CacheControl ?? 'private, max-age=31536000, immutable');
 
     const body = data.Body as unknown;
@@ -55,10 +67,15 @@ export async function GET(request: Request) {
 
     if (!stream) return NextResponse.json({ error: 'Unable to read file' }, { status: 500 });
 
+    const filename =
+      sanitizeContentDispositionFilename(inferFilenameFromKey(keyRaw) ?? 'file') || 'file';
     return new Response(stream as any, {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': cacheControl,
+        ...(contentType.startsWith('image/')
+          ? { 'Content-Disposition': `inline; filename="${filename}"` }
+          : {}),
       },
     });
   } catch (error: any) {
@@ -68,4 +85,3 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

@@ -9,7 +9,7 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Input } from '@/components/ui/input';
-import { PiMagnifyingGlass as Search, PiX as X } from 'react-icons/pi';
+import { PiMagnifyingGlass as Search } from 'react-icons/pi';
 import { CreateDiscussionDialog } from '@/src/modules/discussions/create-discussion-dialog';
 import { DiscussionList } from '@/src/modules/discussions/discussion-list';
 import { useI18n } from '@/src/i18n/i18n-provider';
@@ -29,22 +29,30 @@ export default function DiscussionsPage() {
   const copy = messages.discussions.page;
   const { canWrite } = useCurrentUser();
   const { subjects } = useCurriculum();
-  const subjectTagIndex = useMemo(
-    () =>
-      buildTagIndex(
-        subjects.map((subject) => ({
-          id: subject.id,
-          name: subject.name,
-          tag: subject.tag,
-          aliases: subject.aliases,
-        })),
-      ),
-    [subjects],
-  );
-  const subjectTagLookup = useMemo(
-    () => new Map(subjectTagIndex.map((entry) => [entry.id, entry])),
-    [subjectTagIndex],
-  );
+  const tagIndex = useMemo(() => {
+    const options: Array<{ id: string; name: string; tag: string; aliases?: readonly string[] }> = [];
+
+    subjects.forEach((subject) => {
+      options.push({
+        id: `subject:${subject.id}`,
+        name: subject.name,
+        tag: subject.tag,
+        aliases: subject.aliases,
+      });
+    });
+
+    subjects.forEach((subject) => {
+      subject.topics.forEach((topic) => {
+        options.push({
+          id: `topic:${topic.id}`,
+          name: topic.name,
+          tag: topic.id,
+        });
+      });
+    });
+
+    return buildTagIndex(options);
+  }, [subjects]);
 
   useEffect(() => {
     return;
@@ -92,15 +100,10 @@ export default function DiscussionsPage() {
     return matches.length ? matches[matches.length - 1] : null;
   }, [searchQuery]);
   const tagQuery = tagMatch?.[1] ? normalizeTagToken(tagMatch[1]) : '';
-  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-  const activeSubjects = useMemo(
-    () => subjects.filter((subject) => selectedSubjects.includes(subject.id)),
-    [subjects, selectedSubjects],
-  );
 
   const subjectSuggestions = useMemo(() => {
     if (!tagMatch) return [];
-    return subjectTagIndex
+    return tagIndex
       .filter((entry) => {
         if (!tagQuery) return true;
         return (
@@ -109,40 +112,34 @@ export default function DiscussionsPage() {
         );
       })
       .slice(0, 8)
-      .map((entry) => ({ id: entry.id, name: entry.name, tag: entry.tag }));
-  }, [tagMatch, tagQuery, subjectTagIndex]);
+      .map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        tag: entry.tag,
+        type: entry.id.startsWith('topic:') ? 'topic' : 'subject',
+      }));
+  }, [tagIndex, tagMatch, tagQuery]);
 
   const showSuggestions = Boolean(tagMatch) && subjectSuggestions.length > 0;
 
-  const applySubjectTag = (subjectId: string) => {
-    if (selectedSubjects.includes(subjectId)) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-      return;
-    }
-    setSelectedSubjects((prev) => [...prev, subjectId]);
+  const applyTag = (tag: string) => {
     if (tagMatch?.index != null) {
       const token = tagMatch[0] ?? '';
       const before = searchQuery.slice(0, tagMatch.index);
       const after = searchQuery.slice(tagMatch.index + token.length);
-      const next = `${before}${after}`.replace(/\s{2,}/g, ' ').trimStart();
+      const needsLeadingSpace = token.startsWith(' ');
+      const insertion = `${needsLeadingSpace ? ' ' : ''}#${tag} `;
+      const next = `${before}${insertion}${after}`.replace(/\s{2,}/g, ' ').trimStart();
       setSearchQuery(next);
+    } else {
+      setSearchQuery((prev) => `${prev.trimEnd()} #${tag} `.trimStart());
     }
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
-  const removeSubjectTag = (subjectId: string) => {
-    setSelectedSubjects((prev) => prev.filter((id) => id !== subjectId));
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const submitSearch = () => {
     if (searchTimer.current) clearTimeout(searchTimer.current);
     setSubmittedQuery(searchQuery.trim());
-  };
-  const clearSearch = () => {
-    setSearchQuery('');
-    setSubmittedQuery('');
-    setSelectedSubjects([]);
   };
 
   return (
@@ -194,26 +191,6 @@ export default function DiscussionsPage() {
                 {copy.search}
               </button>
             </div>
-            {activeSubjects.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {activeSubjects.map((subject) => (
-                  <span
-                    key={subject.id}
-                    className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/60 px-2 py-1 text-xs font-medium text-foreground"
-                  >
-                    #{subjectTagLookup.get(subject.id)?.tag ?? subject.id}
-                    <button
-                      type="button"
-                      className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
-                      onClick={() => removeSubjectTag(subject.id)}
-                      aria-label={t('discussions.page.remove', { name: subject.name })}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : null}
             {showSuggestions ? (
               <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-md border border-border bg-background shadow-sm">
                 <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
@@ -226,17 +203,12 @@ export default function DiscussionsPage() {
                       type="button"
                       className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60"
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => applySubjectTag(subject.id)}
+                      onClick={() => applyTag(subject.tag)}
                     >
                       <div className="min-w-0">
                         <div className="font-medium">#{subject.tag}</div>
                         <div className="text-xs text-muted-foreground">{subject.name}</div>
                       </div>
-                      {selectedSubjects.includes(subject.id) ? (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                          {copy.added}
-                        </span>
-                      ) : null}
                     </button>
                   ))}
                 </div>
@@ -250,8 +222,6 @@ export default function DiscussionsPage() {
         <DiscussionList
           refreshKey={refreshKey}
           query={submittedQuery}
-          subjectIds={selectedSubjects}
-          onClearSearch={clearSearch}
         />
       </main>
 

@@ -9,11 +9,12 @@ import Underline from '@tiptap/extension-underline';
 import Highlight from '@tiptap/extension-highlight';
 import SubscriptExtension from '@tiptap/extension-subscript';
 import SuperscriptExtension from '@tiptap/extension-superscript';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectItem } from '@/components/ui/select';
 import { PiTextB as Bold, PiTextItalic as Italic, PiTextUnderline as UnderlineIcon, PiTextStrikethrough as Strikethrough, PiTextSubscript as SubscriptIcon, PiTextSuperscript as SuperscriptIcon, PiCode as Code, PiCodeBlock as Code2, PiQuotes as Quote, PiMinus as Minus, PiListBullets as List, PiListNumbers as ListOrdered, PiArrowCounterClockwise as Undo, PiArrowClockwise as Redo, PiHighlighter as Highlighter, PiPalette as Palette, PiEraser as Eraser } from 'react-icons/pi';
 import { useI18n } from '@/src/i18n/i18n-provider';
+import { useAnchoredOverlayStyle } from '@/src/lib/anchored-overlay';
 
 const TEXT_COLORS = [
   { key: 'default', value: '' },
@@ -133,9 +134,31 @@ export function DocumentEditor({
   const highlightLabels = messages.editor.highlights;
   const resolvedPlaceholder = placeholder ?? messages.studio.editor.placeholders.document;
   const [showColors, setShowColors] = useState<'text' | 'highlight' | null>(null);
+  const textColorTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const textColorMenuRef = useRef<HTMLDivElement | null>(null);
+  const highlightTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const highlightMenuRef = useRef<HTMLDivElement | null>(null);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [, setToolbarTick] = useState(0);
+  const textColorMenuStyle = useAnchoredOverlayStyle({
+    open: showColors === 'text',
+    triggerRef: textColorTriggerRef,
+    overlayRef: textColorMenuRef,
+    align: 'start',
+    sideOffset: 6,
+    collisionPadding: 8,
+    zIndex: 1000,
+  });
+  const highlightMenuStyle = useAnchoredOverlayStyle({
+    open: showColors === 'highlight',
+    triggerRef: highlightTriggerRef,
+    overlayRef: highlightMenuRef,
+    align: 'start',
+    sideOffset: 6,
+    collisionPadding: 8,
+    zIndex: 1000,
+  });
   const isMac = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
     return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -294,9 +317,16 @@ export function DocumentEditor({
         <div className="sticky top-0 z-20 -mx-2 mb-3 border-b border-border/60 bg-background px-2 py-2">
           <div
             className="flex flex-wrap items-center gap-1"
-            onMouseDown={(e) => e.preventDefault()}
+            onPointerDown={(e) => {
+              if (e.pointerType === 'mouse') e.preventDefault();
+            }}
           >
-            <div className="min-w-[150px]" onMouseDown={(e) => e.stopPropagation()}>
+            <div
+              className="min-w-[150px]"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+              }}
+            >
               <Select
                 value={styleValue}
                 onChange={(e) => setStyle(e.target.value)}
@@ -440,6 +470,7 @@ export function DocumentEditor({
             <span className="w-px h-5 bg-border mx-1" />
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <Button
+                ref={textColorTriggerRef}
                 type="button"
                 variant="ghost"
                 size="icon"
@@ -454,13 +485,17 @@ export function DocumentEditor({
                 <div className="h-0.5 w-3 rounded-full" style={{ backgroundColor: editor.getAttributes('textStyle').color || 'currentColor' }} />
               </Button>
               {showColors === 'text' && (
-                <div className="absolute left-0 top-full mt-1.5 p-2 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div
+                  ref={textColorMenuRef}
+                  style={textColorMenuStyle}
+                  className="animate-in fade-in zoom-in-95 overflow-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-lg duration-100"
+                >
                   <div className="grid grid-cols-4 gap-1.5 min-w-[120px]">
                     {TEXT_COLORS.map((c) => (
                       <button
                         key={c.key}
                         type="button"
-                        className="h-7 w-7 rounded-sm border border-border transition-transform hover:scale-110 active:scale-95 flex items-center justify-center p-0.5"
+                        className="flex h-7 w-7 touch-manipulation items-center justify-center rounded-sm border border-border p-0.5 transition-transform hover:scale-110 active:scale-95"
                         style={c.value ? { backgroundColor: c.value } : undefined}
                         onClick={() => setColor(c.value)}
                         title={colorLabels[c.key]}
@@ -474,6 +509,7 @@ export function DocumentEditor({
             </div>
             <div className="relative" onClick={(e) => e.stopPropagation()}>
               <Button
+                ref={highlightTriggerRef}
                 type="button"
                 variant="ghost"
                 size="icon"
@@ -490,13 +526,17 @@ export function DocumentEditor({
                 <div className="h-0.5 w-3 rounded-full" style={{ backgroundColor: editor.getAttributes('highlight').color || 'transparent', border: !editor.getAttributes('highlight').color ? '1px solid currentColor' : 'none' }} />
               </Button>
               {showColors === 'highlight' && (
-                <div className="absolute left-0 top-full mt-1.5 p-2 rounded-lg border border-border bg-popover text-popover-foreground shadow-lg z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div
+                  ref={highlightMenuRef}
+                  style={highlightMenuStyle}
+                  className="animate-in fade-in zoom-in-95 overflow-auto rounded-lg border border-border bg-popover p-2 text-popover-foreground shadow-lg duration-100"
+                >
                   <div className="grid grid-cols-5 gap-1.5 min-w-[150px]">
                     {HIGHLIGHT_COLORS.map((c) => (
                       <button
                         key={c.key}
                         type="button"
-                        className="h-7 w-7 rounded-sm border border-border transition-transform hover:scale-110 active:scale-95 flex items-center justify-center p-0.5"
+                        className="flex h-7 w-7 touch-manipulation items-center justify-center rounded-sm border border-border p-0.5 transition-transform hover:scale-110 active:scale-95"
                         style={c.value ? { backgroundColor: c.value } : undefined}
                         onClick={() => setHighlight(c.value)}
                         title={highlightLabels[c.key]}

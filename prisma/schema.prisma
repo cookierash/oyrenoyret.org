@@ -168,6 +168,7 @@ model User {
   parentFirstName  String?
   parentLastName   String?
   tutorialCompletedAt DateTime? // When the onboarding tutorial is completed
+  notificationsReadAt DateTime @default(now()) // Used to compute unread notifications badge
   
   // Credits (gamified economy)
   credits          Float             @default(15)

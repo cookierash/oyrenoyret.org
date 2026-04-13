@@ -17,6 +17,8 @@ import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-acc
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { SESSION_DURATIONS } from '@/src/config/credits';
 
+export const runtime = 'nodejs';
+
 const subjectIdSchema = z
   .string()
   .trim()
@@ -56,6 +58,7 @@ export async function GET(request: Request) {
 
     const userId = await getCurrentSession();
     const now = new Date();
+    const nowMs = now.getTime();
     const recentWindowStart = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
     let sessions: any[] = [];
@@ -63,8 +66,10 @@ export async function GET(request: Request) {
       sessions = await prisma.guidedGroupSession.findMany({
         where: {
           deletedAt: null,
-          status: { in: ['SCHEDULED', 'LIVE'] },
-          scheduledAt: { gte: recentWindowStart },
+          OR: [
+            { status: 'SCHEDULED', scheduledAt: { gt: now } },
+            { status: 'LIVE', scheduledAt: { gte: recentWindowStart } },
+          ],
         },
         orderBy: { scheduledAt: 'asc' },
         take,
@@ -90,6 +95,17 @@ export async function GET(request: Request) {
       if (!isDbSchemaMismatch(error)) throw error;
       sessions = [];
     }
+
+    sessions = sessions.filter((s) => {
+      const startMs = s?.scheduledAt instanceof Date ? s.scheduledAt.getTime() : NaN;
+      const durationMinutes = typeof s?.durationMinutes === 'number' ? s.durationMinutes : 0;
+      if (!Number.isFinite(startMs)) return false;
+      const endMs = startMs + durationMinutes * 60_000;
+
+      if (s.status === 'SCHEDULED') return startMs > nowMs;
+      if (s.status === 'LIVE') return nowMs < endMs;
+      return false;
+    });
 
     const sessionIds = sessions.map((s) => s.id);
     const [enrollments, approvedCounts] = await Promise.all([

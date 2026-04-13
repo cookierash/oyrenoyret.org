@@ -19,13 +19,15 @@ export function LiveActivitiesRightSidebar({ className }: LiveActivitiesRightSid
       )}
     >
       <div className="flex-1 overflow-y-auto">
-        <section className="flex h-14 items-center gap-2 px-4">
-          <Megaphone className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-medium text-foreground">
-            {t('sidebar.announcements')}
-          </h2>
-        </section>
-        <div className="h-px w-full bg-border/70" />
+        <div className="sticky top-0 z-10 bg-background">
+          <section className="flex h-14 items-center gap-2 px-4">
+            <Megaphone className="h-4 w-4 text-muted-foreground" />
+            <h2 className="text-sm font-medium text-foreground">
+              {t('sidebar.announcements')}
+            </h2>
+          </section>
+          <div className="h-px w-full bg-border/70" />
+        </div>
         <section className="p-4">
           <LiveAnnouncementsList limit={8} />
         </section>

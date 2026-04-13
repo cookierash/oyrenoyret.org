@@ -29,15 +29,11 @@ interface Discussion {
 interface DiscussionListProps {
   refreshKey?: number;
   query?: string;
-  subjectIds?: string[];
-  onClearSearch?: () => void;
 }
 
 export function DiscussionList({
   refreshKey = 0,
   query = '',
-  subjectIds = [],
-  onClearSearch,
 }: DiscussionListProps) {
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,27 +41,52 @@ export function DiscussionList({
   const { locale, messages } = useI18n();
   const copy = messages.discussions.list;
   const { subjects } = useCurriculum();
-  const subjectTagIndex = useMemo(
-    () =>
-      buildTagIndex(
-        subjects.map((subject) => ({
-          id: subject.id,
-          name: subject.name,
-          tag: subject.tag,
-          aliases: subject.aliases,
-        })),
-      ),
-    [subjects],
-  );
-  const subjectTagMap = useMemo(() => createTagMap(subjectTagIndex), [subjectTagIndex]);
+  const tagIndex = useMemo(() => {
+    const options: Array<{ id: string; name: string; tag: string; aliases?: readonly string[] }> = [];
+
+    subjects.forEach((subject) => {
+      options.push({
+        id: `subject:${subject.id}`,
+        name: subject.name,
+        tag: subject.tag,
+        aliases: subject.aliases,
+      });
+    });
+
+    subjects.forEach((subject) => {
+      subject.topics.forEach((topic) => {
+        options.push({
+          id: `topic:${topic.id}`,
+          name: topic.name,
+          tag: topic.tag,
+          aliases: topic.aliases,
+        });
+      });
+    });
+
+    return buildTagIndex(options);
+  }, [subjects]);
+  const tagMap = useMemo(() => createTagMap(tagIndex), [tagIndex]);
 
   useEffect(() => {
     setLoading(true);
     setLoadError(null);
-    const { tagIds: tagSubjectIds, textQuery } = parseTaggedQuery(query, subjectTagMap);
-    const combinedSubjects = Array.from(new Set([...subjectIds, ...tagSubjectIds]));
+    const { tagIds, textQuery } = parseTaggedQuery(query, tagMap);
+    const subjectIds = tagIds
+      .filter((id) => id.startsWith('subject:'))
+      .map((id) => id.slice('subject:'.length))
+      .filter(Boolean);
+
+    const topicIds = tagIds
+      .filter((id) => id.startsWith('topic:'))
+      .map((id) => id.slice('topic:'.length))
+      .filter(Boolean);
+
+    const topicId = topicIds.length ? topicIds[topicIds.length - 1] : null;
+
     const params = new URLSearchParams();
-    if (combinedSubjects.length > 0) params.set('subjects', combinedSubjects.join(','));
+    if (subjectIds.length > 0) params.set('subjects', subjectIds.join(','));
+    if (topicId) params.set('topicId', topicId);
     if (textQuery) params.set('q', textQuery.toLowerCase());
     params.set('take', '50');
 
@@ -91,7 +112,7 @@ export function DiscussionList({
         setLoading(false);
       }
     })();
-  }, [refreshKey, query, subjectIds, subjectTagMap]);
+  }, [refreshKey, query, tagMap]);
 
   if (loading) {
     return (
@@ -129,7 +150,8 @@ export function DiscussionList({
   }
 
   if (discussions.length === 0) {
-    const hasQuery = Boolean(query.trim()) || subjectIds.length > 0;
+    const { tagIds, textQuery } = parseTaggedQuery(query, tagMap);
+    const hasQuery = Boolean(textQuery.trim()) || tagIds.length > 0;
     return (
       <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
         <MessageSquare className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
@@ -139,15 +161,6 @@ export function DiscussionList({
             <p className="text-xs text-muted-foreground/60 mt-1">
               {copy.noFoundHint}
             </p>
-            {onClearSearch ? (
-              <button
-                type="button"
-                onClick={onClearSearch}
-                className="mt-3 inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
-              >
-                {copy.clear}
-              </button>
-            ) : null}
           </>
         ) : (
           <>

@@ -10,14 +10,9 @@ import { notFound } from 'next/navigation';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Button } from '@/components/ui/button';
-import { SUBJECTS } from '@/src/config/constants';
-import { CURRICULUM_TOPICS } from '@/src/config/curriculum';
 import { TopicMaterialsClient } from '@/src/modules/materials/topic-materials-client';
-import { prisma } from '@/src/db/client';
-import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { getI18n } from '@/src/i18n/server';
-import { getLocalizedSubject } from '@/src/i18n/subject-utils';
-import { getLocalizedTopics } from '@/src/i18n/topic-utils';
+import { resolveCurriculumNames } from '@/src/modules/curriculum/resolve-curriculum-names';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -31,81 +26,15 @@ export default async function TopicPage({ params }: TopicPageProps) {
   const { locale, messages, t } = await getI18n();
   const copy = messages.app.catalog;
 
-  let dbSubject: {
-    id: string;
-    slug: string;
-    nameEn: string;
-    nameAz: string;
-    descriptionEn: string | null;
-    descriptionAz: string | null;
-  } | null = null;
-  let subjectSchemaMismatch = false;
-  try {
-    dbSubject = await prisma.subject.findFirst({
-      where: { slug: subjectId, deletedAt: null },
-      select: {
-        id: true,
-        slug: true,
-        nameEn: true,
-        nameAz: true,
-        descriptionEn: true,
-        descriptionAz: true,
-      },
-    });
-  } catch (error) {
-    if (!isDbSchemaMismatch(error)) throw error;
-    subjectSchemaMismatch = true;
-  }
-  const fallbackSubject = SUBJECTS.find((s) => s.id === subjectId) ?? null;
-  if (!dbSubject && !fallbackSubject) notFound();
-  if (!dbSubject && !subjectSchemaMismatch) {
-    let total = 0;
-    try {
-      total = await prisma.subject.count();
-    } catch (error) {
-      if (!isDbSchemaMismatch(error)) throw error;
-      total = 0;
-    }
-    if (total > 0) notFound();
-  }
-
-  const fallbackLocalizedSubject = fallbackSubject
-    ? getLocalizedSubject(messages, fallbackSubject.id) ?? fallbackSubject
-    : null;
-  const subjectName = dbSubject
-    ? locale === 'az'
-      ? dbSubject.nameAz
-      : dbSubject.nameEn
-    : (fallbackLocalizedSubject?.name ?? subjectId);
-
-  let topic:
-    | { slug: string; nameEn: string; nameAz: string }
-    | { name: string }
-    | null = null;
-  let topicSchemaMismatch = false;
-  if (dbSubject) {
-    try {
-      topic = await prisma.topic.findFirst({
-        where: { subjectId: dbSubject.id, slug: topicId, deletedAt: null },
-        select: { slug: true, nameEn: true, nameAz: true },
-      });
-    } catch (error) {
-      if (!isDbSchemaMismatch(error)) throw error;
-      topic = null;
-      topicSchemaMismatch = true;
-    }
-  }
-  if (!topic && fallbackSubject && (!dbSubject || subjectSchemaMismatch || topicSchemaMismatch)) {
-    topic = getLocalizedTopics(messages, fallbackSubject.id).find((t) => t.id === topicId) ?? null;
-  }
-
-  if (!topic) notFound();
-  const topicName =
-    dbSubject && 'nameEn' in topic
-      ? locale === 'az'
-        ? topic.nameAz
-        : topic.nameEn
-      : (topic as { name: string }).name;
+  const curriculum = await resolveCurriculumNames({ messages, locale, subjectId, topicId });
+  if (!curriculum) notFound();
+  const {
+    subjectName,
+    topicName,
+    subjectId: canonicalSubjectId,
+    topicId: canonicalTopicId,
+    subjectHrefSlug,
+  } = curriculum;
 
   return (
     <DashboardShell>
@@ -118,7 +47,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
               <Link href="/studio">{copy.createMaterial}</Link>
             </Button>
             <Button size="sm" variant="secondary-primary" asChild>
-              <Link href={`/catalog/${subjectId}`}>
+              <Link href={`/catalog/${subjectHrefSlug}`}>
                 {t('app.catalog.backToSubject', { subject: subjectName })}
               </Link>
             </Button>
@@ -128,7 +57,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
 
       <main className="space-y-4 pt-2">
         <section>
-          <TopicMaterialsClient subjectId={subjectId} topicId={topicId} />
+          <TopicMaterialsClient subjectId={canonicalSubjectId} topicId={canonicalTopicId} />
         </section>
       </main>
     </DashboardShell>
@@ -136,12 +65,5 @@ export default async function TopicPage({ params }: TopicPageProps) {
 }
 
 export function generateStaticParams() {
-  const params: { subject: string; topic: string }[] = [];
-  for (const subject of SUBJECTS) {
-    const topics = CURRICULUM_TOPICS[subject.id as keyof typeof CURRICULUM_TOPICS];
-    for (const topic of topics ?? []) {
-      params.push({ subject: subject.id, topic: topic.id });
-    }
-  }
-  return params;
+  return [];
 }

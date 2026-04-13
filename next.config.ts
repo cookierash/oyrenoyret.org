@@ -51,6 +51,16 @@ const nextConfig: NextConfig = {
     // Reduces client bundle size for icon-heavy pages.
     optimizePackageImports: ['react-icons'],
   },
+  // Explicitly declare Turbopack config to avoid Next 16 dev warnings/errors when a `webpack` config exists.
+  turbopack: {},
+  webpack: (config, { dev }) => {
+    // In some environments, webpack's persistent filesystem cache can throw ENOENT
+    // (missing pack files / manifests) and break dev routing. Disable it in dev.
+    if (dev) {
+      config.cache = false;
+    }
+    return config;
+  },
   // Security headers
   async headers() {
     const isDev = process.env.NODE_ENV !== 'production';

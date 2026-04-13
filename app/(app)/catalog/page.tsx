@@ -28,6 +28,7 @@ export default async function CatalogPage() {
   let dbSubjects: Array<{
     id: string;
     slug: string;
+    slugAz: string;
     nameEn: string;
     nameAz: string;
     descriptionEn: string | null;
@@ -43,6 +44,7 @@ export default async function CatalogPage() {
       select: {
         id: true,
         slug: true,
+        slugAz: true,
         nameEn: true,
         nameAz: true,
         descriptionEn: true,
@@ -76,6 +78,7 @@ export default async function CatalogPage() {
     !useFallback
       ? dbSubjects.map((subject) => ({
           id: subject.slug,
+          hrefSlug: locale === 'az' ? subject.slugAz : subject.slug,
           name: locale === 'az' ? subject.nameAz : subject.nameEn,
           description:
             (locale === 'az' ? subject.descriptionAz : subject.descriptionEn) ?? '',
@@ -83,6 +86,7 @@ export default async function CatalogPage() {
         }))
       : getLocalizedSubjects(messages).map((subject) => ({
           id: subject.id,
+          hrefSlug: subject.id,
           name: subject.name,
           description: subject.description,
           topicCount:
@@ -135,7 +139,7 @@ export default async function CatalogPage() {
               return (
                 <Link
                   key={subjectId}
-                  href={`/catalog/${subjectId}`}
+                  href={`/catalog/${subject.hrefSlug}`}
                   className="group card-frame bg-card flex min-w-0 items-center gap-3 px-3 py-2.5 transition-all duration-200 hover:bg-muted/30"
                 >
                   <div

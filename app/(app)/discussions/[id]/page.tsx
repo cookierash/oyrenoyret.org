@@ -142,7 +142,7 @@ export default function DiscussionDetailPage() {
       return;
     }
     if (discussion?.removedAt) {
-      toast.error('This post was removed by moderators.');
+      toast.error(copy.removedByModerators);
       return;
     }
     if (!discussion || voteLoading) return;
@@ -257,7 +257,7 @@ export default function DiscussionDetailPage() {
       return;
     }
     if (discussion?.removedAt) {
-      toast.error('This post was removed by moderators.');
+      toast.error(copy.removedByModerators);
       return;
     }
     if (!discussionRichTextHasContent(content)) return;
@@ -301,7 +301,7 @@ export default function DiscussionDetailPage() {
       return;
     }
     if (discussion?.removedAt) {
-      toast.error('This post was removed by moderators.');
+      toast.error(copy.removedByModerators);
       return;
     }
     setDialogParentId(parentReplyId ?? null);

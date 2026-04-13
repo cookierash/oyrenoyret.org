@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -22,18 +22,28 @@ import { useSettings } from '@/src/components/settings/settings-provider';
 import { getLocaleCode } from '@/src/i18n';
 import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
 import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
+import { buildTagIndex, createTagMap, normalizeTagToken, parseTaggedQuery, TAG_MATCH_REGEX } from '@/src/lib/tagging';
 
 type CurriculumTopic = {
   slug: string;
+  slugAz?: string;
   nameEn: string;
   nameAz: string;
 };
 
 type CurriculumSubject = {
   slug: string;
+  slugAz?: string;
   nameEn: string;
   nameAz: string;
   topics: CurriculumTopic[];
+};
+
+type GuidedGroupSessionTagSuggestion = {
+  id: string;
+  tag: string;
+  name: string;
+  kind: 'subject' | 'topic';
 };
 
 type FacilitatorApplication = {
@@ -72,22 +82,6 @@ type GuidedGroupSessionRow = {
   approvedCount: number;
 };
 
-function parseSubjectFromBrowseQuery(
-  rawQuery: string,
-  subjects: CurriculumSubject[],
-): { subjectId: string; textQuery: string } {
-  const trimmed = rawQuery.trim();
-  if (!trimmed) return { subjectId: '', textQuery: '' };
-  if (!trimmed.startsWith('#')) return { subjectId: '', textQuery: trimmed };
-
-  const [token, ...rest] = trimmed.split(/\s+/);
-  const slug = token.slice(1).trim().toLowerCase();
-  if (!slug) return { subjectId: '', textQuery: trimmed };
-  if (!subjects.some((s) => s.slug === slug)) return { subjectId: '', textQuery: trimmed };
-
-  return { subjectId: slug, textQuery: rest.join(' ').trim() };
-}
-
 export function GuidedGroupSessionsClient({
   profile,
 }: {
@@ -108,6 +102,12 @@ export function GuidedGroupSessionsClient({
   const { user, canWrite, writeRestriction } = useCurrentUser();
   const router = useRouter();
 
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const guideStudentLabel = locale === 'az' ? 'Bələdçi şagird' : 'Facilitator';
   const scheduleLabel = locale === 'az' ? 'Sessiya planla' : 'Schedule a session';
   const applyLabel = locale === 'az' ? 'Bələdçi şagird ol' : 'Become a facilitator';
@@ -121,6 +121,8 @@ export function GuidedGroupSessionsClient({
 
   const [applicationDialogOpen, setApplicationDialogOpen] = useState(false);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleStep, setScheduleStep] = useState<1 | 2>(1);
+  const [scheduleObjectiveError, setScheduleObjectiveError] = useState<string | null>(null);
 
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
 
@@ -140,15 +142,10 @@ export function GuidedGroupSessionsClient({
   const [creatingSession, setCreatingSession] = useState(false);
 
   const [browseQuery, setBrowseQuery] = useState('');
-  const [browseTopicId, setBrowseTopicId] = useState('');
-  const parsedBrowse = useMemo(
-    () => parseSubjectFromBrowseQuery(browseQuery, subjects),
-    [browseQuery, subjects],
-  );
-  const browseSubjectId = parsedBrowse.subjectId;
-  const browseTextQuery = parsedBrowse.textQuery;
-
-  const [sessionSubjectSearch, setSessionSubjectSearch] = useState('');
+  const [selectedBrowseTags, setSelectedBrowseTags] = useState<string[]>([]);
+  const [browseFocused, setBrowseFocused] = useState(false);
+  const browseInputRef = useRef<HTMLInputElement>(null);
+  const browseBlurTimer = useRef<NodeJS.Timeout | null>(null);
 
   const localeCode = getLocaleCode(locale);
   const hour12 = timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -193,41 +190,127 @@ export function GuidedGroupSessionsClient({
     return map;
   }, [subjects, locale]);
 
-  const availableTopics = useMemo(() => {
+  const tagIndex = useMemo(() => {
+    const isAz = locale === 'az';
+    const options: Array<{ id: string; name: string; tag: string; aliases?: readonly string[] }> = [];
+
+    subjects.forEach((subject) => {
+      options.push({
+        id: `subject:${subject.slug}`,
+        name: isAz ? subject.nameAz : subject.nameEn,
+        tag: isAz ? (subject.slugAz ?? subject.slug) : subject.slug,
+        aliases: Array.from(new Set([subject.slug, subject.slugAz].filter((v): v is string => Boolean(v)))),
+      });
+    });
+
+    subjects.forEach((subject) => {
+      (subject.topics ?? []).forEach((topic) => {
+        options.push({
+          id: `topic:${topic.slug}`,
+          name: isAz ? topic.nameAz : topic.nameEn,
+          tag: isAz ? (topic.slugAz ?? topic.slug) : topic.slug,
+          aliases: Array.from(new Set([topic.slug, topic.slugAz].filter((v): v is string => Boolean(v)))),
+        });
+      });
+    });
+
+    return buildTagIndex(options);
+  }, [locale, subjects]);
+
+  const tagMap = useMemo(() => createTagMap(tagIndex), [tagIndex]);
+
+  const tagLookup = useMemo(() => new Map(tagIndex.map((entry) => [entry.id, entry])), [tagIndex]);
+
+  const tagMatch = useMemo(() => {
+    const matches = Array.from(browseQuery.matchAll(TAG_MATCH_REGEX));
+    return matches.length ? matches[matches.length - 1] : null;
+  }, [browseQuery]);
+  const tagQuery = tagMatch?.[1] ? normalizeTagToken(tagMatch[1]) : '';
+
+  const tagSuggestions: GuidedGroupSessionTagSuggestion[] = useMemo(() => {
+    if (!tagMatch) return [];
+    return tagIndex
+      .filter((entry) => {
+        if (!tagQuery) return true;
+        return (
+          entry.tokens.some((token) => token.includes(tagQuery)) ||
+          normalizeTagToken(entry.name).includes(tagQuery)
+        );
+      })
+      .slice(0, 8)
+      .map((entry) => ({
+        id: entry.id,
+        tag: entry.tag,
+        name: entry.name,
+        kind: entry.id.startsWith('topic:') ? 'topic' : 'subject',
+      }));
+  }, [tagIndex, tagMatch, tagQuery]);
+
+  const showTagSuggestions = browseFocused && Boolean(tagMatch) && tagSuggestions.length > 0;
+
+  const applyTagSuggestion = (suggestion: GuidedGroupSessionTagSuggestion) => {
+    if (tagMatch?.index == null) return;
+    const token = tagMatch[0] ?? '';
+    setSelectedBrowseTags((prev) => {
+      if (suggestion.id.startsWith('topic:')) {
+        const withoutTopics = prev.filter((id) => !id.startsWith('topic:'));
+        return withoutTopics.includes(suggestion.id) ? withoutTopics : [...withoutTopics, suggestion.id];
+      }
+      return prev.includes(suggestion.id) ? prev : [...prev, suggestion.id];
+    });
+    const before = browseQuery.slice(0, tagMatch.index);
+    const after = browseQuery.slice(tagMatch.index + token.length);
+    const next = `${before}${after}`.replace(/\s{2,}/g, ' ').trimStart();
+    setBrowseQuery(next);
+    if (browseBlurTimer.current) clearTimeout(browseBlurTimer.current);
+    requestAnimationFrame(() => browseInputRef.current?.focus());
+  };
+
+  const removeBrowseTag = (tagId: string) => {
+    setSelectedBrowseTags((prev) => prev.filter((id) => id !== tagId));
+    if (browseBlurTimer.current) clearTimeout(browseBlurTimer.current);
+    requestAnimationFrame(() => browseInputRef.current?.focus());
+  };
+
+  const parsedBrowseQuery = useMemo(() => parseTaggedQuery(browseQuery, tagMap), [browseQuery, tagMap]);
+
+  const effectiveBrowseTagIds = useMemo(() => {
+    return Array.from(new Set([...selectedBrowseTags, ...parsedBrowseQuery.tagIds]));
+  }, [parsedBrowseQuery.tagIds, selectedBrowseTags]);
+
+  const subjectIds = useMemo(
+    () =>
+      effectiveBrowseTagIds
+        .filter((id) => id.startsWith('subject:'))
+        .map((id) => id.slice('subject:'.length))
+        .filter(Boolean),
+    [effectiveBrowseTagIds],
+  );
+
+  const topicId = useMemo(() => {
+    const topicIds = effectiveBrowseTagIds
+      .filter((id) => id.startsWith('topic:'))
+      .map((id) => id.slice('topic:'.length))
+      .filter(Boolean);
+    return topicIds.length ? topicIds[topicIds.length - 1] : '';
+  }, [effectiveBrowseTagIds]);
+
+  const scheduleSubjects = useMemo(() => {
+    return subjects.filter((s) => verifiedSubjectSet.has(s.slug));
+  }, [subjects, verifiedSubjectSet]);
+
+  const scheduleTopics = useMemo(() => {
     const subject = subjects.find((s) => s.slug === sessionSubjectId);
     return subject?.topics ?? [];
   }, [subjects, sessionSubjectId]);
-
-  const browseTopics = useMemo(() => {
-    if (!browseSubjectId) return [];
-    const subject = subjects.find((s) => s.slug === browseSubjectId);
-    return subject?.topics ?? [];
-  }, [browseSubjectId, subjects]);
-
-  useEffect(() => {
-    if (!browseSubjectId) {
-      setBrowseTopicId('');
-      return;
-    }
-    if (browseTopicId && !browseTopics.some((t) => t.slug === browseTopicId)) {
-      setBrowseTopicId('');
-    }
-  }, [browseSubjectId, browseTopicId, browseTopics]);
 
   useEffect(() => {
     if (!scheduleDialogOpen) return;
     if (sessionSubjectId && subjects.some((s) => s.slug === sessionSubjectId)) return;
     const firstVerified = verifiedSubjectIds.find((id) => subjects.some((s) => s.slug === id)) ?? '';
     setSessionSubjectId(firstVerified);
-    setSessionSubjectSearch(firstVerified);
+    setSessionTopicId('');
   }, [scheduleDialogOpen, sessionSubjectId, subjects, verifiedSubjectIds]);
-
-  useEffect(() => {
-    if (!scheduleDialogOpen) return;
-    if (sessionSubjectId && sessionSubjectSearch !== sessionSubjectId) {
-      setSessionSubjectSearch(sessionSubjectId);
-    }
-  }, [scheduleDialogOpen, sessionSubjectId, sessionSubjectSearch]);
 
   useEffect(() => {
     if (!sessionSubjectId) {
@@ -236,27 +319,31 @@ export function GuidedGroupSessionsClient({
     }
     const subject = subjects.find((s) => s.slug === sessionSubjectId);
     const topicSlugs = new Set((subject?.topics ?? []).map((t) => t.slug));
-    const first = subject?.topics?.[0]?.slug ?? '';
-    if (!first) {
-      setSessionTopicId('');
-      return;
-    }
-    if (!sessionTopicId || !topicSlugs.has(sessionTopicId)) {
-      setSessionTopicId(first);
-    }
+    if (!sessionTopicId || !topicSlugs.has(sessionTopicId)) setSessionTopicId('');
   }, [sessionSubjectId, sessionTopicId, subjects]);
 
-  const filteredSessions = useMemo(() => {
-    const query = browseTextQuery.trim().toLowerCase();
-    const q = query.length > 0 ? query : null;
+  const visibleSessions = useMemo(() => {
     return sessions.filter((s) => {
-      if (browseSubjectId && s.subjectId !== browseSubjectId) return false;
-      if (browseTopicId && s.topicId !== browseTopicId) return false;
+      const startMs = new Date(s.scheduledAt).getTime();
+      const endMs = startMs + (s.durationMinutes ?? 0) * 60_000;
+
+      if (s.status === 'SCHEDULED') return startMs > nowMs;
+      if (s.status === 'LIVE') return nowMs < endMs;
+      return false;
+    });
+  }, [sessions, nowMs]);
+
+  const filteredSessions = useMemo(() => {
+    const query = (showTagSuggestions ? '' : parsedBrowseQuery.textQuery).trim().toLowerCase();
+    const q = query.length > 0 ? query : null;
+    return visibleSessions.filter((s) => {
+      if (subjectIds.length > 0 && !subjectIds.includes(s.subjectId)) return false;
+      if (topicId && s.topicId !== topicId) return false;
       if (!q) return true;
-      const haystack = `${s.title} ${s.facilitator?.name ?? ''}`.toLowerCase();
+      const haystack = `${s.title} ${s.facilitator?.name ?? ''} ${s.subjectId} ${s.topicId}`.toLowerCase();
       return haystack.includes(q);
     });
-  }, [sessions, browseTextQuery, browseSubjectId, browseTopicId]);
+  }, [parsedBrowseQuery.textQuery, showTagSuggestions, subjectIds, topicId, visibleSessions]);
 
   const liveNowSessions = useMemo(() => {
     return [...filteredSessions]
@@ -304,9 +391,10 @@ export function GuidedGroupSessionsClient({
       const curriculumData = (await curriculumRes.json().catch(() => ({}))) as {
         subjects?: Array<{
           slug?: string;
+          slugAz?: string;
           nameEn?: string;
           nameAz?: string;
-          topics?: Array<{ slug?: string; nameEn?: string; nameAz?: string }>;
+          topics?: Array<{ slug?: string; slugAz?: string; nameEn?: string; nameAz?: string }>;
         }>;
       };
       const appData = (await appRes.json().catch(() => ({}))) as ApplicationPayload;
@@ -317,6 +405,7 @@ export function GuidedGroupSessionsClient({
             .filter((s) => s && typeof s.slug === 'string')
             .map((s) => ({
               slug: String(s.slug),
+              slugAz: typeof s.slugAz === 'string' ? String(s.slugAz) : String(s.slug),
               nameEn: String(s.nameEn ?? s.slug),
               nameAz: String(s.nameAz ?? s.slug),
               topics: Array.isArray(s.topics)
@@ -324,6 +413,7 @@ export function GuidedGroupSessionsClient({
                     .filter((t) => t && typeof t.slug === 'string')
                     .map((t) => ({
                       slug: String(t.slug),
+                      slugAz: typeof t.slugAz === 'string' ? String(t.slugAz) : String(t.slug),
                       nameEn: String(t.nameEn ?? t.slug),
                       nameAz: String(t.nameAz ?? t.slug),
                     }))
@@ -367,7 +457,52 @@ export function GuidedGroupSessionsClient({
       toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
       return;
     }
+    setScheduleStep(1);
+    setScheduleObjectiveError(null);
     setScheduleDialogOpen(true);
+  };
+
+  const closeScheduleDialog = () => {
+    setScheduleDialogOpen(false);
+    setScheduleStep(1);
+    setScheduleObjectiveError(null);
+  };
+
+  const goToScheduleObjectivesStep = () => {
+    if (creatingSession) return;
+    const title = sessionTitle.trim();
+    if (title.length < 3) {
+      toast.error(locale === 'az' ? 'Sessiya adı tələb olunur.' : 'Session name is required.');
+      return;
+    }
+    if (!sessionSubjectId) {
+      toast.error(locale === 'az' ? 'Fənn seçin.' : 'Select a subject.');
+      return;
+    }
+    if (!verifiedSubjectSet.has(sessionSubjectId)) {
+      toast.error(
+        locale === 'az'
+          ? 'Bu fənn üçün bələdçi şagird kimi təsdiqlənməmisiniz.'
+          : 'You are not verified to facilitate this subject.',
+      );
+      setApplicationDialogOpen(true);
+      return;
+    }
+    if (!sessionTopicId) {
+      toast.error(locale === 'az' ? 'Mövzu tapılmadı.' : 'No topic available for this subject.');
+      return;
+    }
+    if (!sessionScheduledAt) {
+      toast.error(locale === 'az' ? 'Tarix və vaxt seçin.' : 'Select a date and time.');
+      return;
+    }
+    const scheduled = new Date(sessionScheduledAt);
+    if (Number.isNaN(scheduled.getTime())) {
+      toast.error(locale === 'az' ? 'Yanlış tarix.' : 'Invalid date.');
+      return;
+    }
+    setScheduleObjectiveError(null);
+    setScheduleStep(2);
   };
 
   const toggleSubject = (subjectId: string) => {
@@ -435,22 +570,22 @@ export function GuidedGroupSessionsClient({
     }
   };
 
-  const createSession = async () => {
-    if (creatingSession) return;
+  const createSession = async (): Promise<boolean> => {
+    if (creatingSession) return false;
     if (!canWrite) {
       toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
-      return;
+      return false;
     }
 
     const title = sessionTitle.trim();
     if (title.length < 3) {
       toast.error(locale === 'az' ? 'Sessiya adı tələb olunur.' : 'Session name is required.');
-      return;
+      return false;
     }
 
     if (!sessionSubjectId) {
       toast.error(locale === 'az' ? 'Fənn seçin.' : 'Select a subject.');
-      return;
+      return false;
     }
 
     if (!verifiedSubjectSet.has(sessionSubjectId)) {
@@ -460,31 +595,31 @@ export function GuidedGroupSessionsClient({
           : 'You are not verified to facilitate this subject.',
       );
       setApplicationDialogOpen(true);
-      return;
+      return false;
     }
 
     if (!sessionTopicId) {
       toast.error(locale === 'az' ? 'Mövzu seçin.' : 'Select a topic.');
-      return;
+      return false;
     }
 
     if (!sessionScheduledAt) {
       toast.error(locale === 'az' ? 'Tarix və vaxt seçin.' : 'Select a date and time.');
-      return;
+      return false;
     }
 
     const scheduled = new Date(sessionScheduledAt);
     if (Number.isNaN(scheduled.getTime())) {
       toast.error(locale === 'az' ? 'Yanlış tarix.' : 'Invalid date.');
-      return;
+      return false;
     }
 
     const objectiveLines = objectiveSlots
       .map((value) => value.trim())
       .filter(Boolean);
     if (objectiveLines.length < 2) {
-      toast.error(locale === 'az' ? 'Ən azı 2 məqsəd əlavə edin.' : 'Add at least 2 objectives.');
-      return;
+      setScheduleObjectiveError(locale === 'az' ? 'Ən azı 2 məqsəd əlavə edin.' : 'Add at least 2 objectives.');
+      return false;
     }
 
     setCreatingSession(true);
@@ -505,15 +640,18 @@ export function GuidedGroupSessionsClient({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(typeof data?.error === 'string' && data.error ? data.error : (locale === 'az' ? 'Sessiyanı planlamaq mümkün olmadı.' : 'Failed to schedule session.'));
-        return;
+        return false;
       }
       toast.success(locale === 'az' ? 'Sessiya planlandı.' : 'Session scheduled.');
       setSessionTitle('');
       setSessionScheduledAt('');
       setObjectiveSlots(['', '', '', '', '']);
+      setScheduleObjectiveError(null);
       await load();
+      return true;
     } catch {
       toast.error(locale === 'az' ? 'Sessiyanı planlamaq mümkün olmadı.' : 'Failed to schedule session.');
+      return false;
     } finally {
       setCreatingSession(false);
     }
@@ -583,7 +721,6 @@ export function GuidedGroupSessionsClient({
       <ul className="divide-y divide-border rounded-lg border border-border">
         {items.map((session) => {
           const when = new Date(session.scheduledAt);
-          const nowMs = Date.now();
           const startMs = when.getTime();
           const subjectLabel = subjectNameById.get(session.subjectId) ?? session.subjectId;
           const topicLabel = topicNameByKey.get(`${session.subjectId}:${session.topicId}`) ?? session.topicId;
@@ -635,7 +772,7 @@ export function GuidedGroupSessionsClient({
                     disabled={isBusy || isOwnSession || (!canRequest && !canJoinLive)}
                     onClick={() => {
                       if (canJoinLive) {
-                        router.push(`/library/guided-group-sessions/${session.id}`);
+                        router.push(`/my-library/guided-group-sessions/${session.id}`);
                         return;
                       }
                       if (canRequest) {
@@ -710,20 +847,79 @@ export function GuidedGroupSessionsClient({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-[220px] flex-1">
-            <Input
-              value={browseQuery}
-              onChange={(e) => setBrowseQuery(e.target.value)}
-              placeholder={
-                locale === 'az'
-                  ? 'Sessiya axtar… (fənn üçün: #fənn-slug)'
-                  : 'Search sessions… (subject: #subject-slug)'
-              }
-              disabled={loading}
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+	          <div className="min-w-[220px] flex-1 space-y-2">
+              <div className="relative">
+	              <Input
+                  ref={browseInputRef}
+	                value={browseQuery}
+	                onChange={(e) => setBrowseQuery(e.target.value)}
+                  onFocus={() => {
+                    if (browseBlurTimer.current) clearTimeout(browseBlurTimer.current);
+                    setBrowseFocused(true);
+                  }}
+                  onBlur={() => {
+                    browseBlurTimer.current = setTimeout(() => setBrowseFocused(false), 150);
+                  }}
+	                placeholder={
+	                  locale === 'az'
+	                    ? 'Sessiya axtar… və ya #fənn / #mövzu (məs. #riyaziyyat #cəbr)'
+	                    : 'Search sessions… or use #subject / #topic (e.g., #mathematics #algebra)'
+	                }
+	                disabled={loading}
+	              />
+	              {showTagSuggestions ? (
+	                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-card p-2 shadow-sm">
+	                  <div className="grid gap-1">
+	                    {tagSuggestions.map((s) => (
+	                      <button
+	                        key={`${s.kind}:${s.id}:${s.tag}`}
+	                        type="button"
+	                        onClick={() => applyTagSuggestion(s)}
+	                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted/40"
+	                        disabled={loading}
+	                      >
+	                        <span className="truncate">
+	                          #{s.tag} <span className="text-muted-foreground">· {s.name}</span>
+	                        </span>
+	                        <span className="ml-3 shrink-0 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
+	                          {s.kind === 'subject'
+	                            ? locale === 'az'
+	                              ? 'fənn'
+	                              : 'subject'
+	                            : locale === 'az'
+	                              ? 'mövzu'
+	                              : 'topic'}
+	                        </span>
+	                      </button>
+	                    ))}
+	                  </div>
+	                </div>
+	              ) : null}
+              </div>
+              {selectedBrowseTags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedBrowseTags.map((tagId) => {
+                    const entry = tagLookup.get(tagId);
+                    const label = entry ? `#${entry.tag}` : tagId;
+                    return (
+                      <button
+                        key={`browse-tag-${tagId}`}
+                        type="button"
+                        onClick={() => removeBrowseTag(tagId)}
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-foreground hover:bg-muted/40"
+                        disabled={loading}
+                        title={entry?.name ?? undefined}
+                      >
+                        <span className="truncate max-w-[180px]">{label}</span>
+                        <span className="text-muted-foreground">×</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+	          </div>
+          <div className="flex flex-wrap items-center gap-2 self-start">
             <Button size="sm" variant="secondary-primary" disabled={loading} onClick={openSchedule}>
               {scheduleLabel}
             </Button>
@@ -737,38 +933,6 @@ export function GuidedGroupSessionsClient({
             </Button>
             <Button size="sm" variant="outline" onClick={load} disabled={loading}>
               {locale === 'az' ? 'Yenilə' : 'Refresh'}
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-2 sm:grid-cols-3">
-          <div className="sm:col-span-2">
-            <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Mövzu' : 'Topic'}</label>
-            <Select
-              value={browseTopicId}
-              onChange={(e) => setBrowseTopicId(e.target.value)}
-              disabled={loading || !browseSubjectId || browseTopics.length === 0}
-            >
-              <SelectItem value="">{locale === 'az' ? 'Bütün mövzular' : 'All topics'}</SelectItem>
-              {browseTopics.map((t) => (
-                <SelectItem key={`browse-topic-${t.slug}`} value={t.slug}>
-                  {topicNameByKey.get(`${browseSubjectId}:${t.slug}`) ?? t.slug}
-                </SelectItem>
-              ))}
-            </Select>
-          </div>
-          <div className="flex items-end">
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setBrowseQuery('');
-                setBrowseTopicId('');
-              }}
-              disabled={loading || (!browseQuery && !browseSubjectId && !browseTopicId)}
-            >
-              {locale === 'az' ? 'Sıfırla' : 'Reset'}
             </Button>
           </div>
         </div>
@@ -955,7 +1119,7 @@ export function GuidedGroupSessionsClient({
               {isPendingApplication ? (
                 <span className="text-xs text-muted-foreground">
                   {copy.facilitatorApplication?.pendingHint ??
-                    'Your application is under review. You will get an update in Recent activities.'}
+                    'Your application is under review. You will get an update in Notifications.'}
                 </span>
               ) : null}
             </div>
@@ -967,7 +1131,16 @@ export function GuidedGroupSessionsClient({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen}>
+      <AlertDialog
+        open={scheduleDialogOpen}
+        onOpenChange={(open) => {
+          setScheduleDialogOpen(open);
+          if (!open) {
+            setScheduleStep(1);
+            setScheduleObjectiveError(null);
+          }
+        }}
+      >
         <AlertDialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle>{scheduleLabel}</AlertDialogTitle>
@@ -979,171 +1152,197 @@ export function GuidedGroupSessionsClient({
           </AlertDialogHeader>
 
           <div className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className="text-xs font-medium text-muted-foreground">
-                  {locale === 'az' ? 'Sessiya adı' : 'Session name'}
-                </label>
-                <Input
-                  value={sessionTitle}
-                  onChange={(e) => setSessionTitle(e.target.value)}
-                  placeholder={locale === 'az' ? 'məs. Cəbr məşqi' : 'e.g. Algebra practice'}
-                  disabled={loading || creatingSession}
-                />
-              </div>
+            {scheduleStep === 1 ? (
+              <>
+                <div className="text-xs text-muted-foreground">
+                  {locale === 'az' ? 'Addım 1 / 2' : 'Step 1 / 2'}
+                </div>
 
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">
-                  {locale === 'az' ? 'Tarix və vaxt' : 'Date & time'}
-                </label>
-                <Input
-                  type="datetime-local"
-                  value={sessionScheduledAt}
-                  onChange={(e) => setSessionScheduledAt(e.target.value)}
-                  disabled={loading || creatingSession}
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Müddət' : 'Duration'}</label>
-                <Select value={String(sessionDuration)} onChange={(e) => setSessionDuration(Number(e.target.value))} disabled={loading || creatingSession}>
-                  <SelectItem value="30">30</SelectItem>
-                  <SelectItem value="45">45</SelectItem>
-                  <SelectItem value="60">60</SelectItem>
-                </Select>
-              </div>
-
-	              <div>
-	                <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Fənn' : 'Subject'}</label>
-	                <Input
-	                  value={sessionSubjectSearch}
-	                  onChange={(e) => {
-	                    const next = e.target.value.trim().toLowerCase();
-	                    setSessionSubjectSearch(next);
-	                    if (subjects.some((s) => s.slug === next)) {
-	                      setSessionSubjectId(next);
-	                    } else if (!next) {
-	                      setSessionSubjectId('');
-	                    }
-	                  }}
-	                  placeholder={locale === 'az' ? 'məs. mathematics' : 'e.g. mathematics'}
-	                  disabled={loading || creatingSession}
-	                />
-	                <div className="mt-2 grid gap-1">
-	                  {(sessionSubjectSearch ? subjects : subjects.slice(0, 8))
-	                    .filter((s) => {
-	                      if (!sessionSubjectSearch) return true;
-	                      const needle = sessionSubjectSearch.toLowerCase();
-	                      return (
-	                        s.slug.toLowerCase().includes(needle) ||
-	                        (subjectNameById.get(s.slug) ?? s.slug).toLowerCase().includes(needle)
-	                      );
-	                    })
-	                    .slice(0, 8)
-	                    .map((s) => {
-	                      const isVerified = verifiedSubjectSet.has(s.slug);
-	                      const label = subjectNameById.get(s.slug) ?? s.slug;
-	                      return (
-	                        <button
-	                          key={`schedule-subject-${s.slug}`}
-	                          type="button"
-	                          disabled={loading || creatingSession || !isVerified}
-	                          onClick={() => {
-	                            setSessionSubjectId(s.slug);
-	                            setSessionSubjectSearch(s.slug);
-	                          }}
-	                          className={cn(
-	                            'flex items-center justify-between rounded-md border px-3 py-2 text-left text-xs transition-colors',
-	                            isVerified
-	                              ? 'border-border bg-card hover:bg-muted/30'
-	                              : 'border-border/60 bg-muted/10 opacity-60',
-	                          )}
-	                        >
-	                          <span className="truncate">{label}</span>
-	                          <span className="ml-3 shrink-0 text-[11px] text-muted-foreground">{s.slug}</span>
-	                        </button>
-	                      );
-	                    })}
-	                </div>
-	                {!isVerifiedGuideStudent ? (
-	                  <p className="mt-2 text-xs text-muted-foreground">
-	                    {locale === 'az'
-	                      ? 'Sessiya planlamaq üçün ən azı bir fənn üzrə təsdiqlənməlisiniz.'
-                      : 'To schedule, you must be verified for at least one subject.'}
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Mövzu' : 'Topic'}</label>
-                <Select
-                  value={sessionTopicId}
-                  onChange={(e) => setSessionTopicId(e.target.value)}
-                  disabled={loading || creatingSession || availableTopics.length === 0}
-                >
-                  {availableTopics.map((t) => (
-                    <SelectItem key={t.slug} value={t.slug}>
-                      {topicNameByKey.get(`${sessionSubjectId}:${t.slug}`) ?? t.slug}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Şagird sayı' : 'Learners'}</label>
-                <Select value={String(sessionCapacity)} onChange={(e) => setSessionCapacity(Number(e.target.value))} disabled={loading || creatingSession}>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">{locale === 'az' ? 'Məqsədlər' : 'Objectives'}</p>
-              <div className="grid gap-2">
-                {objectiveSlots.map((slot, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    <span className="w-5 text-xs text-muted-foreground">{idx + 1}.</span>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {locale === 'az' ? 'Sessiya adı' : 'Session name'}
+                    </label>
                     <Input
+                      value={sessionTitle}
+                      onChange={(e) => setSessionTitle(e.target.value)}
+                      placeholder={locale === 'az' ? 'məs. Cəbr məşqi' : 'e.g. Algebra practice'}
+                      disabled={loading || creatingSession}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {locale === 'az' ? 'Tarix və vaxt' : 'Date & time'}
+                    </label>
+                    <Input
+                      type="datetime-local"
+                      value={sessionScheduledAt}
+                      onChange={(e) => setSessionScheduledAt(e.target.value)}
+                      disabled={loading || creatingSession}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {locale === 'az' ? 'Müddət' : 'Duration'}
+                    </label>
+                    <Select
+                      value={String(sessionDuration)}
+                      onChange={(e) => setSessionDuration(Number(e.target.value))}
+                      disabled={loading || creatingSession}
+                    >
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="45">45</SelectItem>
+                      <SelectItem value="60">60</SelectItem>
+                    </Select>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {locale === 'az' ? 'Fənn' : 'Subject'}
+                    </label>
+                    <Select
+                      value={sessionSubjectId}
+                      onChange={(e) => setSessionSubjectId(e.target.value)}
+                      disabled={loading || creatingSession || scheduleSubjects.length === 0}
+                    >
+                      <SelectItem value="">{locale === 'az' ? 'Fənn seçin' : 'Select a subject'}</SelectItem>
+                      {scheduleSubjects.map((s) => (
+                        <SelectItem key={`schedule-subject-${s.slug}`} value={s.slug}>
+                          {subjectNameById.get(s.slug) ?? (locale === 'az' ? s.nameAz : s.nameEn) ?? s.slug}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    {!isVerifiedGuideStudent ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        {locale === 'az'
+                          ? 'Sessiya planlamaq üçün ən azı bir fənn üzrə təsdiqlənməlisiniz.'
+                          : 'To schedule, you must be verified for at least one subject.'}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {locale === 'az' ? 'Mövzu' : 'Topic'}
+                    </label>
+                    <Select
+                      value={sessionTopicId}
+                      onChange={(e) => setSessionTopicId(e.target.value)}
+                      disabled={loading || creatingSession || !sessionSubjectId || scheduleTopics.length === 0}
+                    >
+                      <SelectItem value="">{locale === 'az' ? 'Mövzu seçin' : 'Select a topic'}</SelectItem>
+                      {scheduleTopics.map((t) => (
+                        <SelectItem key={`schedule-topic-${t.slug}`} value={t.slug}>
+                          {topicNameByKey.get(`${sessionSubjectId}:${t.slug}`) ??
+                            (locale === 'az' ? t.nameAz : t.nameEn) ??
+                            t.slug}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {locale === 'az' ? 'Şagird sayı' : 'Learners'}
+                    </label>
+                    <Select
+                      value={String(sessionCapacity)}
+                      onChange={(e) => setSessionCapacity(Number(e.target.value))}
+                      disabled={loading || creatingSession}
+                    >
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="4">4</SelectItem>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={closeScheduleDialog}
+                    disabled={creatingSession}
+                  >
+                    {locale === 'az' ? 'Bağla' : 'Close'}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={goToScheduleObjectivesStep}
+                    disabled={loading || creatingSession}
+                  >
+                    {locale === 'az' ? 'Növbəti' : 'Next'}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-xs text-muted-foreground">
+                  {locale === 'az' ? 'Addım 2 / 2' : 'Step 2 / 2'}
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {locale === 'az' ? 'Məqsədlər' : 'Objectives'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'az'
+                      ? `Sessiya üçün ən azı 2 məqsəd əlavə edin.`
+                      : 'Add at least 2 objectives for the session.'}
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {objectiveSlots.map((slot, idx) => (
+                    <Input
+                      key={idx}
                       value={slot}
                       onChange={(e) => {
                         const next = [...objectiveSlots];
                         next[idx] = e.target.value;
                         setObjectiveSlots(next);
+                        if (scheduleObjectiveError) setScheduleObjectiveError(null);
                       }}
                       placeholder={locale === 'az' ? `Məqsəd ${idx + 1}` : `Objective ${idx + 1}`}
+                      className="h-9 text-sm"
+                      autoFocus={idx === 0}
                       disabled={loading || creatingSession}
                     />
+                  ))}
+                  {scheduleObjectiveError ? (
+                    <p className="text-xs text-destructive">{scheduleObjectiveError}</p>
+                  ) : null}
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setScheduleObjectiveError(null);
+                        setScheduleStep(1);
+                      }}
+                      disabled={creatingSession}
+                    >
+                      {locale === 'az' ? 'Geri' : 'Back'}
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={async () => {
+                        const ok = await createSession();
+                        if (ok) closeScheduleDialog();
+                      }}
+                      disabled={loading || creatingSession}
+                    >
+                      {creatingSession ? (locale === 'az' ? 'Planlanır…' : 'Scheduling…') : scheduleLabel}
+                    </Button>
                   </div>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted-foreground">{locale === 'az' ? 'Ən azı 2 məqsəd əlavə edin.' : 'Add at least 2 objectives.'}</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="secondary-primary"
-                onClick={async () => {
-                  await createSession();
-                  setScheduleDialogOpen(false);
-                }}
-                disabled={
-                  loading ||
-                  creatingSession ||
-                  !sessionSubjectId ||
-                  !verifiedSubjectSet.has(sessionSubjectId)
-                }
-              >
-                {creatingSession ? (locale === 'az' ? 'Planlanır…' : 'Scheduling…') : scheduleLabel}
-              </Button>
-            </div>
+                </div>
+              </>
+            )}
           </div>
-
-          <AlertDialogFooter>
-            <AlertDialogCancel>{locale === 'az' ? 'Bağla' : 'Close'}</AlertDialogCancel>
-          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 

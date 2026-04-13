@@ -9,6 +9,7 @@ import { Logo } from '@/src/components/ui/logo';
 import { ProfileAvatar } from '@/src/components/layout/profile-avatar';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { cn } from '@/src/lib/utils';
+import { useAnchoredOverlayStyle } from '@/src/lib/anchored-overlay';
 
 interface CurrentUser {
   id: string;
@@ -26,6 +27,17 @@ interface HoverDropdownProps {
 function HoverDropdown({ label, items }: HoverDropdownProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuStyle = useAnchoredOverlayStyle({
+    open,
+    triggerRef,
+    overlayRef: menuRef,
+    align: 'center',
+    sideOffset: 10,
+    collisionPadding: 12,
+    zIndex: 100,
+  });
 
   useEffect(() => {
     if (!open) {
@@ -57,9 +69,10 @@ function HoverDropdown({ label, items }: HoverDropdownProps) {
       onMouseLeave={() => setOpen(false)}
     >
       <button
+        ref={triggerRef}
         type="button"
         className={cn(
-          'flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors',
+          'flex touch-manipulation items-center gap-1 rounded-md px-2 py-1.5 text-xs text-foreground transition-colors',
           open ? 'bg-muted/70' : 'hover:bg-muted/70',
         )}
         onClick={() => setOpen((prev) => !prev)}
@@ -70,8 +83,10 @@ function HoverDropdown({ label, items }: HoverDropdownProps) {
         <ChevronDown className={cn('h-3.5 w-3.5', open && 'rotate-180')} />
       </button>
       <div
+        ref={menuRef}
+        style={menuStyle}
         className={cn(
-          'pointer-events-none invisible absolute left-1/2 top-full z-[100] w-56 -translate-x-1/2 origin-top scale-[0.98] opacity-0 transition-all duration-150 ease-out',
+          'pointer-events-none invisible fixed z-[100] w-56 origin-top scale-[0.98] opacity-0 transition-all duration-150 ease-out',
           open && 'visible pointer-events-auto scale-100 opacity-100',
         )}
       >

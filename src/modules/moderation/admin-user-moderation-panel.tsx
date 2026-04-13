@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectItem } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 type UserModerationState = {
   id: string;
@@ -35,6 +36,8 @@ export function AdminUserModerationPanel({
   user: UserModerationState;
   onUpdated?: (next: UserModerationState) => void;
 }) {
+  const { messages } = useI18n();
+  const copy = messages.admin?.moderationPanel?.toasts;
   const [open, setOpen] = useState(false);
   const [action, setAction] = useState<ActionKind>('SUSPEND');
   const [duration, setDuration] = useState<'24H' | '1W' | '1M'>('24H');
@@ -70,7 +73,7 @@ export function AdminUserModerationPanel({
   const submit = async () => {
     const trimmed = reason.trim();
     if (!trimmed) {
-      toast.error('Reason is required.');
+      toast.error(copy?.reasonRequired ?? 'Reason is required.');
       return;
     }
     setSubmitting(true);
@@ -86,10 +89,12 @@ export function AdminUserModerationPanel({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to update user.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(copy?.updateFailed ?? 'Failed to update user.', extractErrorMessage(data)),
+        );
         return;
       }
-      toast.success('Updated.');
+      toast.success(copy?.updated ?? 'Updated.');
       if (onUpdated) {
         onUpdated({
           id: user.id,
@@ -107,7 +112,7 @@ export function AdminUserModerationPanel({
     } catch (error) {
       toast.error(
         formatErrorToast(
-          'Failed to update user.',
+          copy?.updateFailed ?? 'Failed to update user.',
           error instanceof Error ? error.message : null,
         ),
       );

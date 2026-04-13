@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
+import { useI18n } from '@/src/i18n/i18n-provider';
 
 type TargetType = 'MATERIAL' | 'DISCUSSION' | 'DISCUSSION_REPLY' | 'MATERIAL_COMMENT';
 
@@ -32,6 +33,8 @@ export function AdminRemoveContentButton({
   buttonVariant?: 'destructive' | 'outline' | 'ghost' | 'secondary-primary';
   onRemoved?: () => void;
 }) {
+  const { messages } = useI18n();
+  const copy = messages.admin?.removeContent?.toasts;
   const { user } = useCurrentUser();
   const isAdmin = user.role === 'ADMIN';
   const [open, setOpen] = useState(false);
@@ -43,7 +46,7 @@ export function AdminRemoveContentButton({
   const submit = async () => {
     const trimmed = reason.trim();
     if (!trimmed) {
-      toast.error('Reason is required.');
+      toast.error(copy?.reasonRequired ?? 'Reason is required.');
       return;
     }
     setSubmitting(true);
@@ -55,16 +58,18 @@ export function AdminRemoveContentButton({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(formatErrorToast('Failed to remove content.', extractErrorMessage(data)));
+        toast.error(
+          formatErrorToast(copy?.removeFailed ?? 'Failed to remove content.', extractErrorMessage(data)),
+        );
         return;
       }
-      toast.success('Removed.');
+      toast.success(copy?.removed ?? 'Removed.');
       setOpen(false);
       setReason('');
       onRemoved?.();
     } catch (error) {
       toast.error(
-        formatErrorToast('Failed to remove content.', error instanceof Error ? error.message : null),
+        formatErrorToast(copy?.removeFailed ?? 'Failed to remove content.', error instanceof Error ? error.message : null),
       );
     } finally {
       setSubmitting(false);

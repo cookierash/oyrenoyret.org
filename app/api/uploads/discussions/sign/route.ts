@@ -8,6 +8,9 @@ import { NextResponse } from 'next/server';
 import crypto from 'node:crypto';
 
 import { MAX_IMAGE_UPLOAD_BYTES } from '@/src/config/uploads';
+
+export const runtime = 'nodejs';
+
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const EXT_BY_MIME: Record<string, string> = {
   'image/jpeg': 'jpg',

@@ -72,7 +72,7 @@ export async function POST(
               { slugAz: { equals: rawSlug, mode: 'insensitive' } },
             ],
           },
-      select: { id: true, slug: true },
+      select: { id: true, slug: true, slugAz: true },
     });
     if (!subject) {
       return NextResponse.json({ error: 'Subject not found', subject: rawSlug }, { status: 404 });
@@ -94,7 +94,6 @@ export async function POST(
     const existing = await prisma.topic.findFirst({
       where: {
         subjectId: subject.id,
-        deletedAt: null,
         OR: [{ slug }, { slugAz }, { slug: slugAz }, { slugAz: slug }],
       },
       select: { id: true },
@@ -116,7 +115,9 @@ export async function POST(
 
     revalidatePath('/catalog');
     revalidatePath(`/catalog/${subject.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}`);
     revalidatePath(`/catalog/${subject.slug}/${created.slug}`);
+    revalidatePath(`/catalog/${subject.slugAz}/${created.slugAz}`);
 
     return NextResponse.json(created);
   } catch (error) {

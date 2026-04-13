@@ -14,6 +14,7 @@
 import { z } from 'zod';
 import { PRACTICE_TEST_LIMITS } from '@/src/config/practice-test';
 import { maybeDecodeEscapedHtml } from '@/src/lib/html';
+import DOMPurify from 'isomorphic-dompurify';
 
 /**
  * Validates email format
@@ -78,27 +79,6 @@ export function sanitizeHtml(input: string): string {
   return normalized.replace(/\n/g, '<br>');
 }
 
-function escapeHtml(raw: string) {
-  return raw
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function sanitizeToPlainHtmlWithBreaks(input: string) {
-  const dirty = maybeDecodeEscapedHtml(String(input ?? '').trim());
-  if (!dirty) return '';
-
-  const withBreaks = dirty
-    .replace(/<\s*br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|li|h1|h2|h3|h4|h5|h6|blockquote|pre)>/gi, '\n');
-  const stripped = withBreaks.replace(/<[^>]*>/g, '');
-  const normalized = stripped.replace(/\n{3,}/g, '\n\n').trim();
-  return escapeHtml(normalized).replace(/\n/g, '<br>');
-}
-
 function filterInlineStyle(style: string) {
   const kept: string[] = [];
   for (const part of style.split(';')) {
@@ -125,6 +105,39 @@ function filterInlineStyle(style: string) {
   return kept.join('; ');
 }
 
+function sanitizeWithDomPurify(options: {
+  input: string;
+  allowedTags: string[];
+  allowedAttrs: string[];
+  allowImgSrc?: (src: string) => boolean;
+}) {
+  const { input, allowedTags, allowedAttrs, allowImgSrc } = options;
+  const dirty = maybeDecodeEscapedHtml(String(input ?? '').trim());
+  if (!dirty) return '';
+
+  const sanitized = DOMPurify.sanitize(dirty, {
+    ALLOWED_TAGS: allowedTags,
+    ALLOWED_ATTR: allowedAttrs,
+    KEEP_CONTENT: true,
+  }) as string;
+
+  // Further restrict inline styles to a safe subset.
+  const withFilteredStyles = sanitized.replace(/(\sstyle)="([^"]*)"/gi, (_m, attrName, raw) => {
+    const filtered = filterInlineStyle(raw);
+    return filtered ? `${attrName}="${filtered}"` : '';
+  });
+
+  // Enforce image src allowlist (if enabled).
+  if (typeof allowImgSrc !== 'function') return withFilteredStyles;
+
+  return withFilteredStyles.replace(/<img\b[^>]*>/gi, (tag) => {
+    const srcMatch = tag.match(/\ssrc=(?:"([^"]*)"|'([^']*)')/i);
+    const src = (srcMatch?.[1] ?? srcMatch?.[2] ?? '').trim();
+    if (!src) return '';
+    return allowImgSrc(src) ? tag : '';
+  });
+}
+
 function sanitizeWithDomParser(options: {
   input: string;
   allowedTags: string[];
@@ -136,7 +149,7 @@ function sanitizeWithDomParser(options: {
   if (!dirty) return '';
 
   if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
-    return sanitizeToPlainHtmlWithBreaks(dirty);
+    return sanitizeWithDomPurify({ input: dirty, allowedTags, allowedAttrs, allowImgSrc });
   }
 
   const doc = new DOMParser().parseFromString(`<div>${dirty}</div>`, 'text/html');

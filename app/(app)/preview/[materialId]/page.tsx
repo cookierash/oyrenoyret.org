@@ -111,7 +111,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
     topicId: material.topicId,
   });
   if (!curriculum) notFound();
-  const { subjectName, topicName } = curriculum;
+  const { subjectName, topicName, subjectHrefSlug, topicHrefSlug } = curriculum;
 
   const userId = await getCurrentSession();
   const viewer = userId
@@ -131,7 +131,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
   // Moderation removal blocks access for everyone except the author and admins.
   if (material.removedAt && !canSeeRemoved) notFound();
   if (unlocked && !isOwn) {
-    redirect(`/catalog/${material.subjectId}/${material.topicId}/${material.id}`);
+    redirect(`/catalog/${subjectHrefSlug}/${topicHrefSlug}/${material.id}`);
   }
 
   const [balance, unlockCount] = await Promise.all([
@@ -166,7 +166,7 @@ export default async function PreviewPage({ params }: PreviewPageProps) {
         actions={
           <div className="flex items-center gap-2">
             <Button size="sm" variant="secondary-primary" asChild>
-              <Link href={hasAccess ? '/library' : '/catalog'}>
+              <Link href={hasAccess ? '/my-library' : '/catalog'}>
                 {hasAccess ? libraryCopy.backToLibrary : catalogCopy.backToCatalog}
               </Link>
             </Button>

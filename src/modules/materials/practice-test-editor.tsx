@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectItem } from '@/components/ui/select';
 import { cn } from '@/src/lib/utils';
+import { useAnchoredOverlayStyle } from '@/src/lib/anchored-overlay';
 import { CREDITS_MATERIAL } from '@/src/config/credits';
 import { PRACTICE_TEST_LIMITS } from '@/src/config/practice-test';
 import { toast } from 'sonner';
@@ -219,10 +220,21 @@ function RichTextField({
   const statusCopy = messages.editor.status;
   const symbolsCopy = messages.studio.practice.symbols;
   const [showSymbols, setShowSymbols] = useState(false);
+  const symbolsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const symbolsMenuRef = useRef<HTMLDivElement | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [wordCount, setWordCount] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [, setToolbarTick] = useState(0);
+  const symbolsMenuStyle = useAnchoredOverlayStyle({
+    open: showSymbols,
+    triggerRef: symbolsTriggerRef,
+    overlayRef: symbolsMenuRef,
+    align: 'start',
+    sideOffset: 6,
+    collisionPadding: 8,
+    zIndex: 1000,
+  });
   const isMac = useMemo(() => {
     if (typeof navigator === 'undefined') return false;
     return /Mac|iPhone|iPad|iPod/.test(navigator.platform);
@@ -362,7 +374,9 @@ function RichTextField({
       {toolbarVisibility !== 'none' && showToolbar ? (
         <div
           className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-1"
-          onMouseDown={(e) => e.preventDefault()}
+          onPointerDown={(e) => {
+            if (e.pointerType === 'mouse') e.preventDefault();
+          }}
         >
           <Button
             type="button"
@@ -463,6 +477,7 @@ function RichTextField({
           </Button>
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <Button
+              ref={symbolsTriggerRef}
               type="button"
               variant="ghost"
               size="icon"
@@ -480,12 +495,16 @@ function RichTextField({
               <Sigma className="h-3.5 w-3.5" />
             </Button>
             {showSymbols ? (
-              <div className="absolute left-0 top-full mt-1.5 grid grid-cols-5 gap-2 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg z-50 min-w-[220px]">
+              <div
+                ref={symbolsMenuRef}
+                style={symbolsMenuStyle}
+                className="grid min-w-[220px] grid-cols-5 gap-2 overflow-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg"
+              >
                 {SCIENCE_SYMBOLS.map((symbol) => (
                   <button
                     key={symbol.value}
                     type="button"
-                    className="h-8 w-8 rounded-sm border border-border text-base leading-none transition-colors hover:bg-muted flex items-center justify-center"
+                    className="flex h-8 w-8 touch-manipulation items-center justify-center rounded-sm border border-border text-base leading-none transition-colors hover:bg-muted"
                     onClick={() => insertSymbol(symbol.value)}
                     aria-label={symbolsCopy[symbol.key]}
                     title={symbolsCopy[symbol.key]}

@@ -123,7 +123,7 @@ export function SiteFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/library" className="transition-colors hover:text-foreground">
+                  <Link href="/my-library" className="transition-colors hover:text-foreground">
                     {t('footer.library')}
                   </Link>
                 </li>

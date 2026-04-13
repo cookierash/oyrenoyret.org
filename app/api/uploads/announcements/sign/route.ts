@@ -23,6 +23,8 @@ const EXT_BY_MIME: Record<string, string> = {
   'image/webp': 'webp',
 };
 
+export const runtime = 'nodejs';
+
 export async function POST(request: Request) {
   try {
     const { getR2Config } = await import('@/src/services/r2');

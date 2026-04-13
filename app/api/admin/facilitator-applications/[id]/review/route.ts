@@ -2,7 +2,7 @@
  * Admin Facilitator Application Review API
  *
  * POST: Approve / reject / request changes for a facilitator application (staff only).
- * Creates a notice visible on the applicant's Recent activities page.
+ * Creates a notice visible on the applicant's Notifications page.
  */
 
 import { NextResponse } from 'next/server';
@@ -29,10 +29,16 @@ const reviewSchema = z.object({
   approvedSubjectIds: z.array(subjectIdSchema).max(12).optional(),
 });
 
-function buildApprovedBody(subjectIds: string[], message?: string) {
-  const header = subjectIds.length > 0 ? `Approved subjects: ${subjectIds.join(', ')}` : 'Approved.';
-  const cleanMessage = message ? message.trim() : '';
-  return cleanMessage ? `${header}\n\n${cleanMessage}` : header;
+type FacilitatorApplicationNoticePayloadV1 = {
+  v: 1;
+  kind: 'facilitator_application';
+  status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+  approvedSubjectIds?: string[];
+  message?: string | null;
+};
+
+function buildFacilitatorApplicationNoticeBody(payload: FacilitatorApplicationNoticePayloadV1) {
+  return JSON.stringify(payload);
 }
 
 export async function POST(
@@ -189,8 +195,14 @@ export async function POST(
             userId: application.userId,
             type: 'FACILITATOR_APPLICATION_APPROVED',
             title: 'Facilitator application approved',
-            body: buildApprovedBody(approvedSubjectIds, message),
-            linkUrl: '/library/guided-group-sessions',
+            body: buildFacilitatorApplicationNoticeBody({
+              v: 1,
+              kind: 'facilitator_application',
+              status: 'APPROVED',
+              approvedSubjectIds,
+              message: message || null,
+            }),
+            linkUrl: '/my-library/guided-group-sessions',
           },
         });
       });
@@ -209,6 +221,7 @@ export async function POST(
         : ('FACILITATOR_APPLICATION_CHANGES_REQUESTED' as const);
     const noticeTitle =
       action === 'reject' ? 'Facilitator application rejected' : 'Facilitator application: changes requested';
+    const noticeStatus = action === 'reject' ? 'REJECTED' : 'CHANGES_REQUESTED';
 
     const now = new Date();
     await prisma.$transaction(async (tx) => {
@@ -229,8 +242,13 @@ export async function POST(
           userId: application.userId,
           type: noticeType,
           title: noticeTitle,
-          body: message,
-          linkUrl: '/library/guided-group-sessions',
+          body: buildFacilitatorApplicationNoticeBody({
+            v: 1,
+            kind: 'facilitator_application',
+            status: noticeStatus,
+            message,
+          }),
+          linkUrl: '/my-library/guided-group-sessions',
         },
       });
     });

@@ -15,6 +15,8 @@ import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-acc
 import { spendGroupSessionCancelPenalty } from '@/src/modules/credits';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+export const runtime = 'nodejs';
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -108,14 +110,14 @@ export async function POST(
           body: hasRegistrations
             ? `You cancelled "${session.title}". A 1-credit cancellation penalty was applied.`
             : `You cancelled "${session.title}".`,
-          linkUrl: '/library/guided-group-sessions',
+          linkUrl: '/my-library/guided-group-sessions',
         },
         ...enrollments.map((e) => ({
           userId: e.userId,
           type: 'GUIDED_GROUP_SESSION_CANCELLED' as const,
           title: 'Guided group session cancelled',
           body: `"${session.title}" was cancelled by the facilitator.`,
-          linkUrl: '/library/guided-group-sessions',
+          linkUrl: '/my-library/guided-group-sessions',
         })),
       ];
 
@@ -144,4 +146,3 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

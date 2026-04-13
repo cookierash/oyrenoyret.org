@@ -30,13 +30,14 @@ export const AZ_MESSAGES = {
     platform: 'Platforma',
     dashboard: 'İdarəetmə paneli',
     catalog: 'Kataloq',
-    library: 'Kitabxana',
+    library: 'Mənim kitabxanam',
     liveActivities: 'İnteraktiv sessiyalar',
     discussions: 'Müzakirələr',
     learning: 'Öyrənmə',
     studio: 'Studio',
     myMaterials: 'Mənim materiallarım',
     notifications: 'Bildirişlər',
+    recentActivities: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     settings: 'Tənzimləmələr',
     account: 'Hesab',
@@ -358,11 +359,12 @@ export const AZ_MESSAGES = {
     studio: 'oyrenoyret studio',
     leaderboard: 'Liderlər cədvəli',
     catalog: 'Kataloq',
-    library: 'Kitabxana',
+    library: 'Mənim kitabxanam',
     guidedGroupSessions: 'Bələdçili qrup sessiyaları',
     liveActivities: 'İnteraktiv sessiyalar',
     discussions: 'Müzakirələr',
     notifications: 'Bildirişlər',
+    recentActivities: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     adminDashboard: 'Admin paneli',
     adminHome: 'Admin',
@@ -381,7 +383,7 @@ export const AZ_MESSAGES = {
     studio: 'Studio',
     leaderboard: 'Liderlər cədvəli',
     catalog: 'Kataloq',
-    library: 'Kitabxana',
+    library: 'Mənim kitabxanam',
     guidedGroupSessions: 'Bələdçili qrup sessiyaları',
     liveActivities: 'İnteraktiv sessiyalar',
     admin: 'Admin',
@@ -395,6 +397,7 @@ export const AZ_MESSAGES = {
     events: 'Tədbirlər',
     discussions: 'Müzakirələr',
     notifications: 'Bildirişlər',
+    recentActivities: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     settings: 'Tənzimləmələr',
     preview: 'Ön baxış',
@@ -504,6 +507,41 @@ export const AZ_MESSAGES = {
     open: 'Aç',
     sprints: 'Sprintlər',
     announcements: 'Elanlar',
+    moderationPanel: {
+      toasts: {
+        reasonRequired: 'Səbəb mütləqdir.',
+        updateFailed: 'İstifadəçini yeniləmək mümkün olmadı.',
+        updated: 'Yeniləndi.',
+      },
+    },
+    removeContent: {
+      toasts: {
+        reasonRequired: 'Səbəb mütləqdir.',
+        removeFailed: 'Məzmunu silmək mümkün olmadı.',
+        removed: 'Silindi.',
+      },
+    },
+    curriculumPanel: {
+      toasts: {
+        seedRequired: 'Redaktə üçün default məlumatları seed edin (və ya fən yaradın).',
+        subjectNotFoundHint: 'Fən bazada tapılmadı. Default məlumatları seed edin və ya əvvəlcə fəni yaradın.',
+        createSubjectFailed: 'Fən yaratmaq mümkün olmadı.',
+        subjectCreated: 'Fən yaradıldı.',
+        saveSubjectFailed: 'Fəni yadda saxlamaq mümkün olmadı.',
+        subjectSaved: 'Fən yadda saxlanıldı.',
+        deleteSubjectFailed: 'Fəni silmək mümkün olmadı.',
+        subjectDeleted: 'Fən silindi.',
+        createTopicFailed: 'Mövzu yaratmaq mümkün olmadı.',
+        topicCreated: 'Mövzu yaradıldı.',
+        saveTopicFailed: 'Mövzunu yadda saxlamaq mümkün olmadı.',
+        topicSaved: 'Mövzu yadda saxlanıldı.',
+        deleteTopicFailed: 'Mövzunu silmək mümkün olmadı.',
+        topicDeleted: 'Mövzu silindi.',
+        initFailed: 'Tədris planını başladmaq mümkün olmadı.',
+        initSeeded: 'Tədris planı başladıldı.',
+        initAlready: 'Tədris planı artıq başladılıb.',
+      },
+    },
   },
   landing: {
     headline: 'Biliyi biliklə al',
@@ -519,61 +557,61 @@ export const AZ_MESSAGES = {
     pill: 'Daha çox öyrən',
     title: 'Həqiqi anlayışı daha rahat şəkildə qurmaq.',
     subtitle:
-      'oyrenoyret.org təzyiqsiz, lakin strukturlu öyrənmə istəyən ailələr üçün hazırlanmış öyrənmə yoldaşıdır. Şagirdlərə yeni anlayışları aydın şəkildə qat-qat qurmağa kömək edirik ki, hər dərs əvvəlkinin üzərində qurulsun.',
+      'oyrenoyret.org təzyiqsiz, lakin strukturlu öyrənmə istəyən ailələr üçün hazırlanmış öyrənmə yoldaşıdır. Layihə ADA Universitetinin Hacı Zeynalabdin Tağıyev mükafatları üçün yaradılan sosial təhsil təşəbbüsü kimi başlayıb və indi anlayışı addım-addım qurmağa kömək edən platformaya çevrilir.',
     ctaPrimary: 'Pulsuz başla',
     ctaSecondary: 'Bizimlə danış',
-    focusLabel: 'Fokusumuz',
-    focusTitle: 'Yönləndirilən məşq, əlçatan hissi ilə.',
+    focusLabel: 'oyrenoyret nədir?',
+    focusTitle: 'Davamlı irəliləyiş üçün sosial təhsil təşəbbüsü.',
     focusBody:
-      'Strukturlu dərsləri yumşaq yönləndirmə ilə birləşdiririk ki, şagirdlər çətin mövzulara qayıda, əsasları mənimsəyə və inamla irəliləyə bilsinlər.',
+      'Yönləndirilmiş praktikanı, aydın öyrənmə yollarını və valideyn üçün görünən irəliləyişi birləşdiririk ki, şagirdlər ardıcıl və inamla öyrənsinlər.',
     values: [
       {
-        title: 'Mərhələli öyrənmə',
+        title: 'Ailə üçün qurulub',
         description:
-          'Şagirdlərə anlayışları düzgün ardıcıllıqla qurmağa kömək edirik ki, hər yeni bacarıq növbəti addım kimi hiss edilsin.',
+          'Valideynlər fokus və tempi seçir, şagirdlər isə sadə və dəstəkləyici bir axınla irəliləyirlər.',
       },
       {
-        title: 'Valideyn yönləndirməli yol xəritələri',
+        title: 'Strukturlu, qarışıq deyil',
         description:
-          'Ailələr sürəti və fokus sahələrini seçir, platformamız isə hər məşq sessiyasını həmin xəttə uyğun saxlayır.',
+          'Mövzular kiçik addımlara bölünür; nümunələr və yoxlama nöqtələri ilə praktika aydın qalır.',
       },
       {
-        title: 'Məşq ilə inam',
+        title: 'Təsiri olan sosial layihə',
         description:
-          'Qısa, fokuslanmış məşqlər və yumşaq geribildirimlə şagirdləri motivasiyalı saxlayırıq.',
+          'Məqsədimiz real nəticədir: daha yaxşı anlayış, görünən irəliləyiş və şagirdlər üçün daha təhlükəsiz mühit.',
       },
     ],
-    pillarsTitle: 'Aydınlıq, məsuliyyət və qayğı üçün qurulub.',
+    pillarsTitle: 'Missiyamız',
     pillarsSubtitle:
-      'oyrenoyret.org-də hər şey öyrənməni fokuslu və ailələri idarədə saxlayacaq şəkildə qurulub.',
-    pillarsBadge: 'Valideyn-öncəli öyrənmə',
+      'Öyrənməni daha aydın, daha təhlükəsiz və daha ardıcıl etmək — ailələri və müəllimləri idarədə saxlayaraq.',
+    pillarsBadge: 'Öhdəliyimiz',
     pillars: [
       {
-        title: 'Aydın yollar, xaos yox',
+        title: 'Qarışıqlıq yox, aydınlıq',
         description:
-          'Seçilmiş öyrənmə xəritələri şagirdləri yolda saxlayır və sonsuz resursların yaratdığı qarışıqlığı azaldır.',
+          'Böyük mövzuları anlaşılan ardıcıllığa çeviririk ki, şagird növbəti addımı bilsin.',
       },
       {
-        title: 'Görünən irəliləyiş',
+        title: 'Real həyata uyğun ardıcıllıq',
         description:
-          'Valideyn və müəllimlər mərhələləri görə, məşq tarixçəsini izləyə və uğurları birlikdə qeyd edə bilirlər.',
+          'Qısa və təkrarlana bilən məşqi təşviq edirik ki, təzyiq olmadan davamlılıq yaransın.',
       },
       {
-        title: 'Dəstəkləyici yönləndirmə',
+        title: 'Mehriban məsuliyyət',
         description:
-          'Yönləndirici ipucları, nümunələr və kiçik təkanlar şagirdləri təxmin deyil, anlayışa fokuslayır.',
+          'İrəliləyişi görünən, geribildirimi isə dəstəkləyici edərək motivasiyanı qoruyuruq.',
       },
       {
-        title: 'Təhlükəsizlik əsaslı dizayn',
+        title: 'Təhlükəsizlik və etibar',
         description:
           'Məxfilik, moderasiya və valideyn nəzarəti ilə öyrənmə təhlükəsiz və yaşa uyğun qalır.',
       },
     ],
-    rhythmTitle: 'Real həyatı nəzərə alan öyrənmə ritmi.',
+    rhythmTitle: 'Metodologiyamız',
     rhythmSubtitle:
-      'Ailələrin məktəb, fəaliyyətlər və istirahət arasında tarazlıq qurduğunu bilirik. Buna görə platformamız qısa, fokuslanmış sessiyalar üçün hazırlanıb.',
+      'Sadə dövr: məqsədi seçin, yönləndirmə ilə praktika edin, nəticələri nəzərdən keçirin, sonra növbəti addımı tənzimləyin.',
     rhythmNote:
-      'Valideynlər öyrənmə yolunu müəyyən edir. Şagirdlər yönləndirici addımlarla irəliləyir. Hər kəs irəliləyişi bir yerdə görür.',
+      'Qısa və tez-tez sessiyalar uzun və nadir sessiyalardan daha effektlidir — xüsusən də yönləndirmə və görünən irəliləyiş olduqda.',
     steps: [
       {
         title: 'Fokusu seçin',
@@ -809,25 +847,29 @@ export const AZ_MESSAGES = {
         '- Əlaqə forması mesajları üçün admin panelində inbox əlavə edildi.\n' +
         '- Adminlər üçün istifadəçi şikayəti və moderasiya alətləri əlavə edildi.\n' +
         '- Müzakirələr və elanlar üçün təhlükəsiz fayl yükləmə əlavə edildi.\n' +
-        'Təkmilləşdirmə:\n' +
-        '- Daha sürətli kəşf üçün full-text axtarış indeksləri əlavə edildi.\n' +
-        '- Auth və sessiya təhlükəsizliyi gücləndirildi (tokenlərin hash-lənməsi daxil).\n' +
-        '- Kurikulum, interaktiv sessiyalar, hesabatlar və mesajlar üçün admin bölmələri genişləndirildi.\n' +
-        '- Avatar variantları və ictimai istifadəçi kartları zənginləşdirildi.\n' +
-        'Düzəliş:\n' +
-        '- Ümumi stabillik və UI cilalanması.',
-    },
-    contact: {
-      title: 'Əlaqə',
-      subtitle:
+	        'Təkmilləşdirmə:\n' +
+	        '- Daha sürətli kəşf üçün full-text axtarış indeksləri əlavə edildi.\n' +
+	        '- Auth və sessiya təhlükəsizliyi gücləndirildi (tokenlərin hash-lənməsi daxil).\n' +
+	        '- Kurikulum, interaktiv sessiyalar, hesabatlar və mesajlar üçün admin bölmələri genişləndirildi.\n' +
+	        '- Avatar variantları və ictimai istifadəçi kartları zənginləşdirildi.\n' +
+	        '- Bələdçi qrup sessiyaları təkmilləşdirildi: yalnız qarşıdakı sessiyaların siyahılanması, heç kim qeydiyyatdan keçmədikdə fasilitatora bildiriş, və 2 mərhələli daha sadə planlama axını.\n' +
+	        '- Müzakirələr və kataloq qaydalarına uyğun bələdçi qrup sessiyaları üçün slug axtarışı (#fənn / #mövzu) əlavə edildi.\n' +
+	        '- “Dəstəyə müraciət et” keçidləri /contact səhifəsinə yönləndirildi və əlaqə formasında ad/mövzu məcburi edildi.\n' +
+	        'Düzəliş:\n' +
+	        '- Ümumi stabillik və UI cilalanması.\n' +
+	        '- Turbopack runtime xətalarının qarşısını almaq üçün dev server default olaraq webpack-ə keçirildi.',
+	    },
+	    contact: {
+	      title: 'Əlaqə',
+	      subtitle:
         'Öyrənmə, giriş və ya dəstək sualları üçün oyrenoyret komandası ilə əlaqə saxlayın.',
       noticeEmail: 'Bizə e-poçt yazın: ',
       noticeInstagram: ' və ya Instagram-da yazın: ',
       formTitle: 'Mesaj göndər',
       formSubtitle: 'Buradan göndərilən mesajlar admin panelində görünəcək.',
-      nameLabel: 'Ad (istəyə bağlı)',
+      nameLabel: 'Ad',
       emailLabel: 'E-poçt',
-      subjectLabel: 'Mövzu (istəyə bağlı)',
+      subjectLabel: 'Mövzu',
       messageLabel: 'Mesaj',
       formSend: 'Mesajı göndər',
       formSending: 'Göndərilir...',
@@ -1207,10 +1249,10 @@ export const AZ_MESSAGES = {
       emptyOption: '(Boş variant)',
     },
     catalogSearch: {
-      placeholderSubject: 'Materialları axtarın və ya #fənn istifadə edin (məs., #riyaziyyat)',
-      placeholderTopic: 'Materialları axtarın və ya #mövzu istifadə edin (məs., #kəsrlər)',
-      helperSubject: 'Fənn üzrə süzmək üçün #fənn istifadə edin, məsələn #fizika və ya #azerbaycan-dili.',
-      helperTopic: 'Mövzu üzrə süzmək üçün #mövzu istifadə edin, məsələn #kəsrlər.',
+      placeholderSubject: 'Materialları axtarın və ya #fenn istifadə edin (məs., #riyaziyyat)',
+      placeholderTopic: 'Materialları axtarın və ya #movzu istifadə edin (məs., #kesrler)',
+      helperSubject: 'Fənn üzrə süzmək üçün #fenn istifadə edin, məsələn #fizika və ya #azerbaycan-dili.',
+      helperTopic: 'Mövzu üzrə süzmək üçün #movzu istifadə edin, məsələn #kesrler.',
       searchLabel: 'Materialları başlıq, fənn və ya mövzu üzrə axtar',
       searchButton: 'Axtar',
       searchButtonLabel: 'Materialları axtar',
@@ -1546,6 +1588,7 @@ export const AZ_MESSAGES = {
       titleRequired: 'Başlıq və məzmun tələb olunur',
       contentTooLong: 'Məzmun ən çox {{count}} simvoldan ibarət ola bilər.',
       created: 'Müzakirə yaradıldı',
+      createdWithCost: 'Müzakirə yaradıldı (-{{count}} kredit)',
       createFailed: 'Yaratmaq mümkün olmadı',
       dialogTitle: 'Yeni müzakirə yarat',
       dialogDescription: 'Başqalarının müzakirə etməsi üçün sual və ya mövzu paylaşın.',
@@ -1563,7 +1606,7 @@ export const AZ_MESSAGES = {
       loadFailed: 'Müzakirələr yüklənmədi.',
       errorCode: 'Xəta kodu',
       noFound: 'Müzakirə tapılmadı.',
-      noFoundHint: 'Başqa açar söz yoxlayın və ya fənn filtrini silin.',
+      noFoundHint: 'Başqa açar söz yoxlayın və ya #teqləri silin.',
       clear: 'Axtarışı təmizlə',
       noDiscussions: 'Hələ müzakirə yoxdur.',
       noDiscussionsHint: 'Yuxarıdakı düymədən istifadə edərək ilk müzakirəni başlayın.',
@@ -1575,14 +1618,14 @@ export const AZ_MESSAGES = {
       title: 'Müzakirələr',
       description: 'Sual verin, bilik paylaşın.',
       newPost: 'Yeni yazı',
-      placeholder: 'Müzakirələri axtarın və ya #fənn istifadə edin (məs., #riyaziyyat)',
+      placeholder: 'Müzakirələri axtarın və ya #fenn / #movzu istifadə edin (məs., #riyaziyyat #cebr)',
       search: 'Axtar',
       searchLabel: 'Müzakirələri axtar',
       remove: '{{name}} sil',
-      subjects: 'Fənlər',
+      subjects: 'Teqlər',
       added: 'Əlavə edildi',
       helper:
-        'Fənn üzrə süzmək üçün #fənn istifadə edin, məsələn #fizika və ya #azerbaycan-dili.',
+        'Fənn/mövzu üzrə süzmək üçün #teqlərdən istifadə edin, məsələn #fizika və ya #cebr.',
       onlineNow: 'Hazırda {{count}} nəfər əlavə onlayndadır',
     },
     relativeTime: {
@@ -1626,6 +1669,7 @@ export const AZ_MESSAGES = {
       failedAccept: 'Qəbul etmək mümkün olmadı',
       markedBest: 'Ən yaxşı cavab kimi seçildi',
       failedReply: 'Cavab yazmaq mümkün olmadı',
+      removedByModerators: 'Bu yazı moderatorlar tərəfindən silinib.',
     },
     replyDetail: {
       back: 'Geri',
@@ -1656,6 +1700,8 @@ export const AZ_MESSAGES = {
       failedLoadReplies: 'Cavabları yükləmək mümkün olmadı',
       failedVote: 'Səs vermək mümkün olmadı',
       failedPostReply: 'Cavabı göndərmək mümkün olmadı',
+      removedReplyByModerators: 'Bu cavab moderatorlar tərəfindən silinib.',
+      removedThreadByModerators: 'Bu mövzu moderatorlar tərəfindən silinib.',
     },
   },
   record: {
@@ -1730,6 +1776,17 @@ export const AZ_MESSAGES = {
         toastSubmitFailed: 'Müraciəti göndərmək mümkün olmadı.',
         toastSubmitted: 'Müraciət göndərildi.',
       },
+      sessionRoom: {
+        toasts: {
+          materialUpdated: 'Material yeniləndi.',
+          materialUpdateFailed: 'Materialı yeniləmək mümkün olmadı.',
+          starRatingRequired: 'Zəhmət olmasa ulduz reytinqini seçin.',
+          feedbackThanks: 'Rəy üçün təşəkkür edirik!',
+          ratingSaveFailed: 'Reytinqi yadda saxlamaq mümkün olmadı.',
+          saved: 'Yadda saxlanıldı.',
+          learnerFeedbackSaveFailed: 'Şagird rəyi yadda saxlanıla bilmədi.',
+        },
+      },
     },
     notifications: {
       title: 'Bildirişlər',
@@ -1786,9 +1843,9 @@ export const AZ_MESSAGES = {
       publicIdLabel: 'İctimai ID:',
     },
     library: {
-      title: 'Kitabxana',
+      title: 'Mənim kitabxanam',
       description: 'Satın aldığınız bütün materiallar.',
-      backToLibrary: 'Kitabxanaya qayıt',
+      backToLibrary: 'Mənim kitabxanama qayıt',
       searchPlaceholder: 'Materialları axtarın...',
       searchLabel: 'Materialları başlıq və ya fənnə görə axtar',
       sortBy: 'Sıralama',
@@ -1935,6 +1992,29 @@ export const AZ_MESSAGES = {
       discussion: 'müzakirənizə cavab verdi',
     },
     noContent: '(Məzmun yoxdur)',
+    moderation: {
+      fallbackTitle: 'Moderator yeniləməsi',
+      contactSupport: 'Dəstək ilə əlaqə saxla',
+      facilitator: {
+        approvedSubjectsLabel: 'Təsdiqlənmiş fənlər',
+        approvedFallback: 'Müraciətiniz təsdiqləndi.',
+      },
+      titles: {
+        ACCOUNT_SUSPENDED: 'Hesabınız dayandırıldı',
+        ACCOUNT_UNSUSPENDED: 'Hesabınız bərpa edildi',
+        ACCOUNT_BANNED: 'Hesabınız bloklandı',
+        ACCOUNT_UNBANNED: 'Hesabınızdakı blok aradan qaldırıldı',
+        CONTENT_REMOVED: 'Məzmun silindi',
+        FACILITATOR_APPLICATION_CHANGES_REQUESTED: 'Bələdçi şagird müraciətiniz üçün dəyişiklik tələb olunur',
+        FACILITATOR_APPLICATION_REJECTED: 'Bələdçi şagird müraciətiniz rədd edildi',
+        FACILITATOR_APPLICATION_APPROVED: 'Bələdçi şagird müraciətiniz təsdiqləndi',
+        GUIDED_GROUP_SESSION_CANCELLED: 'Qrup sessiyası ləğv edildi',
+        GUIDED_GROUP_SESSION_AUTO_CANCELLED: 'Qrup sessiyası avtomatik ləğv edildi',
+        GUIDED_GROUP_SESSION_NO_SHOW: 'Qrup sessiyasına gəlmədiniz',
+        GUIDED_GROUP_SESSION_ENROLLMENT_APPROVED: 'Qrup sessiyasına qeydiyyatınız təsdiqləndi',
+        GUIDED_GROUP_SESSION_ENROLLMENT_REJECTED: 'Qrup sessiyasına qeydiyyatınız rədd edildi',
+      },
+    },
     sprint: {
       cancelledTitle: 'Qeydiyyat ləğv edilib',
       pendingTitle: 'Sprint qeydiyyatını tamamlayın',
@@ -2063,16 +2143,16 @@ export const AZ_MESSAGES = {
   },
   liveActivities: {
     board: {
-      myEventsTitle: 'Sessiyalar',
+      myEventsTitle: 'Sessiyalarım',
       myEventsSubtitle: 'Yaxınlaşan sessiyalarınız üçün təsdiqlənmiş qeydiyyatlar.',
       enrolledCount: '{{count}} qeydiyyatlı',
-      allEventsTitle: 'Sessiyalar',
+      allEventsTitle: 'Bütün sessiyalar',
       allEventsSubtitle: 'Növbəti 10–15 dəqiqədə qoşula biləcəyiniz interaktiv sessiyalar.',
       noLiveScheduled: 'Planlaşdırılmış interaktiv sessiya yoxdur.',
-      noConfirmedEvents: 'Hələ təsdiqlənmiş tədbir yoxdur.',
+      noConfirmedEvents: 'Hələ təsdiqlənmiş sessiya yoxdur.',
       noEventsHint: 'Tezliklə yenidən yoxlayın və ya elanlar panelinə baxın.',
-      noConfirmedHint: 'Burada görünməsi üçün Bütün tədbirlər bölməsindən qeydiyyat edin.',
-      allEnrolled: 'Mövcud bütün tədbirlər üçün artıq qeydiyyatlısınız.',
+      noConfirmedHint: 'Burada görünməsi üçün Bütün sessiyalar bölməsindən qeydiyyat edin.',
+      allEnrolled: 'Mövcud bütün sessiyalar üçün artıq qeydiyyatlısınız.',
       allEnrolledHint: 'Tezliklə yeni sessiyalar əlavə olunacaq.',
       statusEnrolled: 'Qeydiyyatlı',
       statusVerification: 'Təsdiq tələb olunur',

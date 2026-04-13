@@ -10,9 +10,34 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { roundCredits } from '@/src/modules/credits';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
-import { getSettingsPreferences } from '@/src/lib/settings-preferences-server';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
+import { cookies } from 'next/headers';
+import {
+  NOTIFY_CREDITS_DISABLED_AT_COOKIE,
+  NOTIFY_CREDITS_MUTED_WINDOWS_COOKIE,
+  NOTIFY_REPLIES_DISABLED_AT_COOKIE,
+  NOTIFY_REPLIES_MUTED_WINDOWS_COOKIE,
+  NOTIFY_SPRINTS_DISABLED_AT_COOKIE,
+  NOTIFY_SPRINTS_MUTED_WINDOWS_COOKIE,
+  buildMutedCreatedAtNotFilters,
+  parseIsoOrNull,
+  parseMutedWindows,
+} from '@/src/modules/notifications/mute-windows';
+
+async function getCookieValue(key: string): Promise<string | undefined> {
+  const store = cookies();
+  const cookieStore =
+    typeof (store as { then?: unknown })?.then === 'function' ? await store : store;
+  const getCookie =
+    typeof (cookieStore as { get?: (key: string) => { value?: string } | undefined }).get ===
+    'function'
+      ? (cookieStore as { get: (key: string) => { value?: string } | undefined }).get.bind(
+          cookieStore,
+        )
+      : undefined;
+  return getCookie?.(key)?.value;
+}
 
 export async function GET(request: Request) {
   const userId = await getCurrentSession();
@@ -28,96 +53,125 @@ export async function GET(request: Request) {
       return NextResponse.json(body, { status, headers });
     }
 
-    const { notifications } = await getSettingsPreferences();
+    // Note: notification toggles are treated as "mute new items" (not "hide all").
+    // Past items remain visible; items created during muted windows are excluded.
+    const [
+      repliesMutedWindowsRaw,
+      creditsMutedWindowsRaw,
+      sprintsMutedWindowsRaw,
+      repliesDisabledAtRaw,
+      creditsDisabledAtRaw,
+      sprintsDisabledAtRaw,
+    ] = await Promise.all([
+      getCookieValue(NOTIFY_REPLIES_MUTED_WINDOWS_COOKIE),
+      getCookieValue(NOTIFY_CREDITS_MUTED_WINDOWS_COOKIE),
+      getCookieValue(NOTIFY_SPRINTS_MUTED_WINDOWS_COOKIE),
+      getCookieValue(NOTIFY_REPLIES_DISABLED_AT_COOKIE),
+      getCookieValue(NOTIFY_CREDITS_DISABLED_AT_COOKIE),
+      getCookieValue(NOTIFY_SPRINTS_DISABLED_AT_COOKIE),
+    ]);
+
+    const repliesNotFilters = buildMutedCreatedAtNotFilters(
+      parseMutedWindows(repliesMutedWindowsRaw),
+      parseIsoOrNull(repliesDisabledAtRaw),
+    );
+    const creditsNotFilters = buildMutedCreatedAtNotFilters(
+      parseMutedWindows(creditsMutedWindowsRaw),
+      parseIsoOrNull(creditsDisabledAtRaw),
+    );
+    const sprintsNotFilters = buildMutedCreatedAtNotFilters(
+      parseMutedWindows(sprintsMutedWindowsRaw),
+      parseIsoOrNull(sprintsDisabledAtRaw),
+    );
+
     const now = new Date();
 
     const [replyNotifications, transactions, pendingEnrollments, moderationNotices] = await Promise.all([
-      notifications.replies
-        ? prisma.discussionReply.findMany({
+      prisma.discussionReply.findMany({
+        where: {
+          ...(repliesNotFilters.length ? { AND: repliesNotFilters } : {}),
+          userId: { not: userId },
+          OR: [{ discussion: { userId } }, { parentReply: { userId } }],
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+        select: {
+          id: true,
+          content: true,
+          createdAt: true,
+          discussionId: true,
+          parentReplyId: true,
+          discussion: {
+            select: {
+              title: true,
+              userId: true,
+            },
+          },
+          parentReply: {
+            select: {
+              userId: true,
+            },
+          },
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+      }),
+      prisma.creditTransaction.findMany({
+        where: {
+          ...(creditsNotFilters.length ? { AND: creditsNotFilters } : {}),
+          userId,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        select: {
+          id: true,
+          amount: true,
+          balanceAfter: true,
+          type: true,
+          createdAt: true,
+          metadata: true,
+        },
+      }),
+      (async () => {
+        try {
+          return await prisma.liveEventEnrollment.findMany({
             where: {
-              userId: { not: userId },
-              OR: [{ discussion: { userId } }, { parentReply: { userId } }],
+              ...(sprintsNotFilters.length ? { AND: sprintsNotFilters } : {}),
+              userId,
+              status: { in: ['PENDING', 'CANCELLED'] },
+              liveEvent: {
+                deletedAt: null,
+                type: 'PROBLEM_SPRINT',
+                date: { gte: now },
+              },
             },
             orderBy: { createdAt: 'desc' },
             take: 50,
             select: {
               id: true,
-              content: true,
               createdAt: true,
-              discussionId: true,
-              parentReplyId: true,
-              discussion: {
-                select: {
-                  title: true,
-                  userId: true,
-                },
-              },
-              parentReply: {
-                select: {
-                  userId: true,
-                },
-              },
-              user: {
-                select: {
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                },
-              },
-            },
-          })
-        : Promise.resolve([]),
-      notifications.credits
-        ? prisma.creditTransaction.findMany({
-            where: { userId },
-            orderBy: { createdAt: 'desc' },
-            take: 100,
-            select: {
-              id: true,
-              amount: true,
-              balanceAfter: true,
-              type: true,
-              createdAt: true,
-              metadata: true,
-            },
-          })
-        : Promise.resolve([]),
-      notifications.sprints
-        ? (async () => {
-            try {
-              return await prisma.liveEventEnrollment.findMany({
-                where: {
-                  userId,
-                  status: { in: ['PENDING', 'CANCELLED'] },
-                  liveEvent: {
-                    deletedAt: null,
-                    type: 'PROBLEM_SPRINT',
-                    date: { gte: now },
-                  },
-                },
-                orderBy: { createdAt: 'desc' },
-                take: 50,
+              status: true,
+              liveEvent: {
                 select: {
                   id: true,
-                  createdAt: true,
-                  status: true,
-                  liveEvent: {
-                    select: {
-                      id: true,
-                      topic: true,
-                      date: true,
-                      creditCost: true,
-                      durationMinutes: true,
-                    },
-                  },
+                  topic: true,
+                  date: true,
+                  creditCost: true,
+                  durationMinutes: true,
                 },
-              });
-            } catch (error) {
-              if (isDbSchemaMismatch(error)) return [];
-              throw error;
-            }
-          })()
-        : Promise.resolve([]),
+              },
+            },
+          });
+        } catch (error) {
+          if (isDbSchemaMismatch(error)) return [];
+          throw error;
+        }
+      })(),
       prisma.moderationNotice.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },

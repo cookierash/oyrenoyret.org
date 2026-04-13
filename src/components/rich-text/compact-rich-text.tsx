@@ -27,6 +27,7 @@ import {
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { toast } from 'sonner';
 import { MAX_IMAGE_UPLOAD_BYTES } from '@/src/config/uploads';
+import { useAnchoredOverlayStyle } from '@/src/lib/anchored-overlay';
 
 const SCIENCE_SYMBOLS = [
   { value: '±', key: 'plusMinus' },
@@ -114,8 +115,19 @@ export function CompactRichText({
   const [, setToolbarTick] = useState(0);
   const [uploadingImages, setUploadingImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const symbolsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const symbolsMenuRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<ReturnType<typeof useEditor> | null>(null);
   const [localAttachments, setLocalAttachments] = useState<CompactRichTextImage[]>([]);
+  const symbolsMenuStyle = useAnchoredOverlayStyle({
+    open: showSymbols,
+    triggerRef: symbolsTriggerRef,
+    overlayRef: symbolsMenuRef,
+    align: 'start',
+    sideOffset: 6,
+    collisionPadding: 8,
+    zIndex: 1000,
+  });
 
   const imagesEnabled = Boolean(imageUploadEndpoint) && !disabled;
   const showAttachmentTray = Boolean(imageUploadEndpoint) && imageMode === 'attachments';
@@ -544,7 +556,9 @@ export function CompactRichText({
       {toolbarVisibility !== 'none' && showToolbar ? (
         <div
           className="flex flex-wrap items-center gap-1 rounded-md border border-border bg-muted/30 px-2 py-1"
-          onMouseDown={(e) => e.preventDefault()}
+          onPointerDown={(e) => {
+            if (e.pointerType === 'mouse') e.preventDefault();
+          }}
         >
           <Button
             type="button"
@@ -663,6 +677,7 @@ export function CompactRichText({
           ) : null}
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <Button
+              ref={symbolsTriggerRef}
               type="button"
               variant="ghost"
               size="icon"
@@ -680,12 +695,16 @@ export function CompactRichText({
               <Sigma className="h-3.5 w-3.5" />
             </Button>
             {showSymbols ? (
-              <div className="absolute left-0 top-full z-50 mt-1.5 grid min-w-[220px] grid-cols-5 gap-2 rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg">
+              <div
+                ref={symbolsMenuRef}
+                style={symbolsMenuStyle}
+                className="grid min-w-[220px] grid-cols-5 gap-2 overflow-auto rounded-md border border-border bg-popover p-2 text-popover-foreground shadow-lg"
+              >
                 {SCIENCE_SYMBOLS.map((symbol) => (
                   <button
                     key={symbol.value}
                     type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-sm border border-border text-base leading-none transition-colors hover:bg-muted"
+                    className="flex h-8 w-8 touch-manipulation items-center justify-center rounded-sm border border-border text-base leading-none transition-colors hover:bg-muted"
                     onClick={() => insertSymbol(symbol.value)}
                     aria-label={symbolsCopy[symbol.key]}
                     title={symbolsCopy[symbol.key]}

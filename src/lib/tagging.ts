@@ -1,3 +1,5 @@
+import { slugify } from '@/src/modules/curriculum/slug';
+
 export interface TagOption {
   id: string;
   name: string;
@@ -15,22 +17,12 @@ export interface TagIndexEntry {
 export const TAG_REGEX = /#[\p{L}0-9-]+/giu;
 export const TAG_MATCH_REGEX = /(?:^|\s)#([\p{L}0-9-]*)/giu;
 
-function foldTagCase(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\u0131/g, 'i')
-    .replace(/\u0307/g, '');
-}
-
 export function normalizeTagToken(value: string) {
-  return foldTagCase(value);
+  return slugify(value);
 }
 
 export function slugifyTag(value: string) {
-  return foldTagCase(value)
-    .replace(/[^\p{L}0-9]+/gu, '-')
-    .replace(/^-+|-+$/g, '');
+  return slugify(value);
 }
 
 export function buildTagIndex(options: TagOption[]): TagIndexEntry[] {

@@ -14,6 +14,8 @@ import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-acc
 import { sanitizeInput } from '@/src/security/validation';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
+export const runtime = 'nodejs';
+
 const bodySchema = z.object({
   learnerId: z.string().trim().min(1),
   sentiment: z.enum(['GOOD', 'BAD']),
@@ -121,4 +123,3 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

@@ -10,6 +10,7 @@ import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { Button } from '@/components/ui/button';
 import { USER_ROLES } from '@/src/config/constants';
+import { NOTIFICATIONS_UNREAD_UPDATED_EVENT } from '@/src/lib/notifications-events';
 
 interface AppSidebarProps {
   user: {
@@ -32,9 +33,12 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
   const router = useRouter();
   const { t } = useI18n();
   const [credits, setCredits] = useState<number | null>(user.credits ?? null);
+  const [unreadNotifications, setUnreadNotifications] = useState<number>(0);
   const [logoutPending, setLogoutPending] = useState(false);
   const lastBalanceFetchRef = useRef(0);
   const fetchInFlightRef = useRef(false);
+  const lastUnreadFetchRef = useRef(0);
+  const unreadFetchInFlightRef = useRef(false);
   const normalizedRole = typeof user.role === 'string' ? user.role.toUpperCase() : '';
   const isStaff = normalizedRole === USER_ROLES.ADMIN || normalizedRole === USER_ROLES.TEACHER;
   const homeHref = isStaff ? '/admin' : '/dashboard';
@@ -78,8 +82,8 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     { href: '/studio', label: t('sidebar.studio'), icon: Sparkles, isBrand: true },
     { href: '/leaderboard', label: t('sidebar.leaderboard'), icon: Trophy },
     { href: '/catalog', label: t('sidebar.catalog'), icon: BookOpen },
-    { href: '/library', label: t('sidebar.library'), icon: Library },
-    { href: '/library/guided-group-sessions', label: t('sidebar.guidedGroupSessions'), icon: UsersThree },
+    { href: '/my-library', label: t('sidebar.library'), icon: Library },
+    { href: '/my-library/guided-group-sessions', label: t('sidebar.guidedGroupSessions'), icon: UsersThree },
     { href: '/interactive-sessions', label: t('sidebar.liveActivities'), icon: CalendarDays },
     { href: '/discussions', label: t('sidebar.discussions'), icon: MessageSquare },
     { href: '/notifications', label: t('sidebar.notifications'), icon: Bell },
@@ -105,12 +109,43 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     }
   }, []);
 
+  const fetchUnreadNotifications = useCallback(async (force = false) => {
+    if (unreadFetchInFlightRef.current) return;
+    const now = Date.now();
+    if (!force && now - lastUnreadFetchRef.current < 8_000) return;
+    unreadFetchInFlightRef.current = true;
+    try {
+      const res = await fetch('/api/notifications/unread-count', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const unreadCount = typeof data?.unreadCount === 'number' ? data.unreadCount : 0;
+        setUnreadNotifications(unreadCount);
+        lastUnreadFetchRef.current = Date.now();
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      unreadFetchInFlightRef.current = false;
+    }
+  }, []);
+
   const handleCreditsUpdated = useCallback(
     (e: CustomEvent<{ balance: number }>) => {
       setCredits(e.detail.balance);
       fetchBalance(true); // Re-fetch to stay in sync with server
+      fetchUnreadNotifications(true); // Credit changes often imply a new credit activity item.
     },
-    [fetchBalance],
+    [fetchBalance, fetchUnreadNotifications],
+  );
+
+  const handleUnreadUpdated = useCallback(
+    (e: CustomEvent<{ unreadCount: number }>) => {
+      const nextUnread =
+        typeof e.detail?.unreadCount === 'number' ? e.detail.unreadCount : 0;
+      setUnreadNotifications(nextUnread);
+      fetchUnreadNotifications(true);
+    },
+    [fetchUnreadNotifications],
   );
 
   useEffect(() => {
@@ -119,14 +154,24 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       window.removeEventListener(CREDITS_UPDATED_EVENT, handleCreditsUpdated as EventListener);
   }, [handleCreditsUpdated]);
 
+  useEffect(() => {
+    window.addEventListener(NOTIFICATIONS_UNREAD_UPDATED_EVENT, handleUnreadUpdated as EventListener);
+    return () =>
+      window.removeEventListener(
+        NOTIFICATIONS_UNREAD_UPDATED_EVENT,
+        handleUnreadUpdated as EventListener,
+      );
+  }, [handleUnreadUpdated]);
+
   // Fetch on navigation (e.g. after publish from editor, user lands here with fresh data)
   useEffect(() => {
     if (!pathname) return;
     const id = requestAnimationFrame(() => {
       void fetchBalance();
+      void fetchUnreadNotifications(true);
     });
     return () => cancelAnimationFrame(id);
-  }, [pathname, fetchBalance]);
+  }, [pathname, fetchBalance, fetchUnreadNotifications]);
 
   // Poll balance when tab is visible (catches external changes e.g. upvotes on your reply)
   useEffect(() => {
@@ -134,6 +179,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         void fetchBalance();
+        void fetchUnreadNotifications(true);
       }
     };
     window.addEventListener('focus', handleVisibility);
@@ -143,9 +189,88 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       window.removeEventListener('focus', handleVisibility);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [fetchBalance]);
+  }, [fetchBalance, fetchUnreadNotifications]);
+
+  // Lightweight polling for unread badge while tab is visible.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let interval: number | null = null;
+    const start = () => {
+      if (interval) return;
+      interval = window.setInterval(() => {
+        if (document.visibilityState !== 'visible') return;
+        void fetchUnreadNotifications(true);
+      }, 10_000);
+    };
+    const stop = () => {
+      if (!interval) return;
+      window.clearInterval(interval);
+      interval = null;
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+
+    handleVisibility();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchUnreadNotifications]);
 
   const displayCredits = credits ?? user.credits ?? 0;
+
+  // Near real-time unread badge updates (server-sent events).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (typeof EventSource === 'undefined') return;
+
+    let closed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelayMs = 3000;
+
+    const cleanup = () => {
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      source?.close();
+      source = null;
+    };
+
+    const connect = () => {
+      cleanup();
+      if (closed) return;
+
+      source = new EventSource('/api/notifications/unread-stream');
+      source.addEventListener('unread', (event) => {
+        try {
+          const data = JSON.parse((event as MessageEvent).data ?? '{}') as { unreadCount?: unknown };
+          const nextUnread = typeof data.unreadCount === 'number' ? data.unreadCount : 0;
+          setUnreadNotifications(nextUnread);
+          lastUnreadFetchRef.current = Date.now();
+          reconnectDelayMs = 3000; // reset backoff on success
+        } catch {
+          /* ignore */
+        }
+      });
+
+      source.onerror = () => {
+        // Fall back to polling; keep trying to reconnect in the background.
+        cleanup();
+        if (closed) return;
+        reconnectTimer = window.setTimeout(connect, reconnectDelayMs);
+        reconnectDelayMs = Math.min(reconnectDelayMs * 2, 30000);
+      };
+    };
+
+    connect();
+    return () => {
+      closed = true;
+      cleanup();
+    };
+  }, []);
 
   const handleLogout = useCallback(async () => {
     if (logoutPending) return;
@@ -261,6 +386,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
               ? navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
+                  const showUnreadBadge = item.href === '/notifications' && unreadNotifications > 0;
                   return (
                     <Link
                       key={item.href}
@@ -278,8 +404,13 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                           <span className="brand-font">oyrenoyret</span> studio
                         </span>
                       ) : (
-                        item.label
+                        <span className="flex-1">{item.label}</span>
                       )}
+                      {showUnreadBadge ? (
+                        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-none text-destructive-foreground">
+                          {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })

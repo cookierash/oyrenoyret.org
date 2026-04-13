@@ -164,7 +164,7 @@ export default function ReplyPage() {
       return;
     }
     if (parentReply?.removedAt) {
-      toast.error('This reply was removed by moderators.');
+      toast.error(copy.removedReplyByModerators);
       return;
     }
     if (!parentReply || voteLoading) return;
@@ -232,7 +232,7 @@ export default function ReplyPage() {
       return;
     }
     if (parentReply?.removedAt || discussionInfo?.removedAt) {
-      toast.error('This thread was removed by moderators.');
+      toast.error(copy.removedThreadByModerators);
       return;
     }
     if (!discussionRichTextHasContent(content)) return;

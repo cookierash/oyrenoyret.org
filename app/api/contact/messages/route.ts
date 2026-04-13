@@ -43,9 +43,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const name = parsed.data.name ? sanitizeInput(parsed.data.name) : '';
+    const name = sanitizeInput(parsed.data.name);
     const email = sanitizeInput(parsed.data.email);
-    const subject = parsed.data.subject ? sanitizeInput(parsed.data.subject) : '';
+    const subject = sanitizeInput(parsed.data.subject);
     const message = sanitizeInput(parsed.data.message);
 
     const ipAddress = getClientIpFromHeaders(request.headers);
@@ -54,9 +54,9 @@ export async function POST(request: Request) {
     await prisma.contactMessage.create({
       data: {
         userId: userId ?? null,
-        name: name || null,
+        name,
         email,
-        subject: subject || null,
+        subject,
         message,
         ipAddress,
         userAgent,
@@ -70,4 +70,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
-

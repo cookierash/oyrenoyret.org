@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { StarRating } from '@/src/components/ui/star-rating';
+import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
 
 interface MaterialCardCompactProps {
   id: string;
@@ -60,11 +61,14 @@ export function MaterialCardCompact({
 }: MaterialCardCompactProps) {
   const router = useRouter();
   const { t, messages } = useI18n();
+  const { subjectHrefMap, topicHrefMap } = useCurriculum();
   const copy = messages.materials.card;
   const detailCopy = messages.materials.detail;
   const [unlocking, setUnlocking] = useState(false);
   const [unlocked, setUnlocked] = useState(isUnlocked);
-  const detailHref = `/catalog/${subjectId}/${topicId}/${id}`;
+  const subjectHrefSlug = subjectHrefMap.get(subjectId) ?? subjectId;
+  const topicHrefSlug = topicHrefMap.get(`${subjectId}:${topicId}`) ?? topicId;
+  const detailHref = `/catalog/${subjectHrefSlug}/${topicHrefSlug}/${id}`;
   const previewHref = `/preview/${id}`;
   const canViewFull = unlocked && !isOwn;
   const typeBadge =

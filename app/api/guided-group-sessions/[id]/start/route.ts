@@ -13,6 +13,8 @@ import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-acc
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { calcGroupSessionParticipantCost, roundCredits } from '@/src/modules/credits';
 
+export const runtime = 'nodejs';
+
 const EARLY_START_WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(
@@ -108,7 +110,7 @@ export async function POST(
             type: 'GUIDED_GROUP_SESSION_ENROLLMENT_REJECTED' as const,
             title: 'Guided group session: removed',
             body: `You were removed from "${session.title}" because you did not have enough credits at the start time.`,
-            linkUrl: '/library/guided-group-sessions',
+            linkUrl: '/my-library/guided-group-sessions',
           })),
         });
       });

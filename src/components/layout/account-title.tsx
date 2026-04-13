@@ -11,7 +11,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
     '/studio': 'pages.studio',
     '/leaderboard': 'pages.leaderboard',
     '/catalog': 'pages.catalog',
-    '/library': 'pages.library',
+    '/my-library': 'pages.library',
     '/interactive-sessions': 'pages.liveActivities',
     '/admin': 'pages.admin',
     '/admin/interactive-sessions': 'pages.manageLiveActivities',
@@ -31,7 +31,7 @@ function getPageLabel(pathname: string, t: (key: MessageKey) => string): string 
   if (pathname.startsWith('/catalog/')) return t('pages.catalog');
   if (pathname.startsWith('/leaderboard')) return t('pages.leaderboard');
   if (pathname.startsWith('/preview/')) return t('pages.preview');
-  if (pathname.startsWith('/library/')) return t('pages.library');
+  if (pathname.startsWith('/my-library/')) return t('pages.library');
   if (pathname.startsWith('/discussions/')) return t('pages.discussion');
   if (pathname.startsWith('/notifications')) return t('pages.notifications');
   if (pathname.startsWith('/recent-activities')) return t('pages.notifications'); // legacy redirect
