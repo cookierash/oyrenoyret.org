@@ -254,31 +254,33 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
           </div>
         ) : (
           <>
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                    isActive
-                      ? 'bg-muted text-foreground font-medium'
-                      : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.isBrand ? (
-                    <span className="lowercase">
-                      <span className="brand-font">oyrenoyret</span> studio
-                    </span>
-                  ) : (
-                    item.label
-                  )}
-                </Link>
-              );
-            })}
+            {!isStaff
+              ? navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
+                        isActive
+                          ? 'bg-muted text-foreground font-medium'
+                          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.isBrand ? (
+                        <span className="lowercase">
+                          <span className="brand-font">oyrenoyret</span> studio
+                        </span>
+                      ) : (
+                        item.label
+                      )}
+                    </Link>
+                  );
+                })
+              : null}
             {isStaff ? (
               <div className="space-y-0.5">
                 <Link
