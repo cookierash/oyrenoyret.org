@@ -948,7 +948,7 @@ export function GuidedGroupSessionsClient({
                   : 'border-border bg-muted/30 text-foreground',
             )}
           >
-            <div className="text-xs font-medium uppercase tracking-wider opacity-80">
+            <div className="text-xs font-medium uppercase opacity-80">
               {application.status === 'CHANGES_REQUESTED'
                 ? copy.facilitatorApplication?.changesRequestedLabel ?? 'Changes requested'
                 : application.status === 'REJECTED'

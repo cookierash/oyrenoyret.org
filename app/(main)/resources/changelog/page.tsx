@@ -83,7 +83,7 @@ export default async function ChangelogPage() {
               <div className="flex items-start gap-3">
                 <div className="mt-2 h-2.5 w-2.5 rounded-full bg-foreground/80 ring-4 ring-muted/40" />
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
                     <BrandText>{copy.releaseLabel}</BrandText>
                   </p>
                   <p className="text-lg font-medium text-foreground">
@@ -95,7 +95,7 @@ export default async function ChangelogPage() {
                 <div className="space-y-6">
                   {entry.sections.map((section, sectionIndex) => (
                     <div key={`${entry.date}-${sectionIndex}`} className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium uppercase text-muted-foreground">
                         <span className="rounded-full border border-border/60 bg-muted/40 px-2 py-1">
                           <BrandText>{section.label}</BrandText>
                         </span>

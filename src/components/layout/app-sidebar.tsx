@@ -448,7 +448,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
       {!isStaff && !isSettingsRoute ? (
         <div className="px-2 pb-3">
           <div className="w-full rounded-md border border-primary/20 bg-primary/10 px-3 py-2">
-            <p className="text-[10px] font-medium uppercase tracking-wider text-primary/80">
+            <p className="text-[10px] font-medium uppercase text-primary/80">
               {t('sidebar.creditsLabel')}
             </p>
             <p className="mt-1 text-sm font-medium text-primary">

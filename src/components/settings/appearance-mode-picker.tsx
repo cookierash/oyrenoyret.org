@@ -42,7 +42,7 @@ export function AppearanceModePicker() {
             >
               <div
                 className={cn(
-                  'flex h-7 items-center justify-between border-b px-2 py-1 text-[10px] font-medium uppercase tracking-wide',
+                  'flex h-7 items-center justify-between border-b px-2 py-1 text-[10px] font-medium uppercase',
                   option.id === 'light'
                     ? 'border-slate-200/60 bg-white/70 text-slate-500'
                     : 'border-neutral-800/70 bg-neutral-950/35 text-neutral-300/90',

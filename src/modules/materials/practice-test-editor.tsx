@@ -1101,7 +1101,7 @@ export function PracticeTestEditor({
               <div key={q.id} className="card-frame bg-card p-5 space-y-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    <p className="text-xs uppercase text-muted-foreground">
                       {t('studio.practice.questionLabel', { count: i + 1 })}
                     </p>
                     <p className="text-xs text-muted-foreground">

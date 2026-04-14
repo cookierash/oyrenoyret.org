@@ -494,7 +494,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             <div className="mt-4 space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
                     {wizardCopy.stepLabel
                       .replace('{{current}}', String(createStep))
                       .replace('{{total}}', '2')}
@@ -797,7 +797,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
 
                       return (
                         <div key={p.id} className="rounded-md border border-border/70 bg-muted/10 px-4 py-4 space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                          <p className="text-xs font-medium uppercase text-muted-foreground">
                             {messages.liveActivities.cms.problemLabel.replace('{{n}}', String(p.order))}
                           </p>
                           <p className="text-sm text-foreground/90 whitespace-pre-wrap">{p.prompt}</p>
@@ -1127,7 +1127,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                 <div className="overflow-x-auto pb-1">
                   <table className="min-w-[1080px] w-max table-auto border-collapse text-left">
                     <thead>
-                      <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                      <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground whitespace-nowrap">
                         <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
                         <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
                         <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
@@ -1246,7 +1246,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                   <div className="overflow-x-auto pb-1">
                     <table className="min-w-[1080px] w-max table-auto border-collapse text-left">
                       <thead>
-                        <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                        <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground whitespace-nowrap">
                           <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
                           <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
                           <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
@@ -1340,7 +1340,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             <div className="overflow-x-auto pb-1">
               <table className="min-w-[980px] w-max table-auto border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                  <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground whitespace-nowrap">
                     <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
                     <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
                     <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
@@ -1845,7 +1845,7 @@ export function AnnouncementsAdminPanel() {
             <div className="overflow-x-auto pb-1">
               <table className="min-w-[920px] w-max table-auto border-collapse text-left">
                 <thead>
-                  <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                  <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground whitespace-nowrap">
                     <th className="min-w-[260px] py-2 pr-4 font-medium">{announcementCopy.tableHeaders.title}</th>
                     <th className="py-2 pr-4 font-medium">{announcementCopy.tableHeaders.body}</th>
                     <th className="w-[140px] py-2 pr-4 font-medium">{announcementCopy.tableHeaders.created}</th>

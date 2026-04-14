@@ -85,7 +85,7 @@ export default async function LeaderboardPage() {
           <div className="pointer-events-none absolute -bottom-12 left-4 h-28 w-28 rounded-full bg-amber-400/20 blur-3xl animate-pulse-soft motion-reduce:animate-none" />
 
           <div className="relative">
-            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="flex items-center justify-between border-b border-border/70 px-4 py-3 text-[11px] font-medium uppercase text-muted-foreground">
               <span>{copy.rankLabel}</span>
               <span>{copy.learnerLabel}</span>
               <span className="text-right">{copy.creditsLabel}</span>

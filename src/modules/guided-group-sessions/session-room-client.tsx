@@ -511,7 +511,7 @@ export function GuidedGroupSessionRoomClient({
                   <div className="space-y-4">
                     {practicePreview.map((q, idx) => (
                       <div key={idx} className="space-y-2">
-                        <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <p className="text-[11px] font-medium uppercase text-muted-foreground">
                           Question {idx + 1}
                         </p>
                         <div

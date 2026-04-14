@@ -416,7 +416,7 @@ function SprintEnrollmentRow({
                       </p>
                     ) : null}
                   </div>
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="text-[10px] font-medium uppercase text-muted-foreground">
                     {copy.required}
                   </span>
                 </div>

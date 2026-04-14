@@ -334,7 +334,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
           </div>
           <nav className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
             <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">
                 {t('header.resources')}
               </span>
               <Link
@@ -367,7 +367,7 @@ export function SiteHeader({ showSpacer = true, showSeparator = false }: SiteHea
               </Link>
             </div>
             <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="text-[11px] font-medium uppercase text-muted-foreground">
                 {t('header.legals')}
               </span>
               <Link

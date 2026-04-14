@@ -90,7 +90,7 @@ export function Step4Consent({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-medium uppercase text-muted-foreground">
               {copy.badge}
             </p>
             <h3 className="text-lg font-medium">{copy.title}</h3>
@@ -146,7 +146,7 @@ export function Step4Consent({
                       {copy.requiredHint}
                     </p>
                   </div>
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="text-[10px] font-medium uppercase text-muted-foreground">
                     {copy.requiredBadge}
                   </span>
                 </div>

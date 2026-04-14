@@ -31,7 +31,7 @@ export default function RecordVerifyPage() {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="xxxx-xxxx-xxxx-xxxx"
-            className="text-center tracking-widest uppercase"
+            className="text-center uppercase"
             aria-label={copy.label}
           />
           <Button type="submit" variant="primary" className="w-full">

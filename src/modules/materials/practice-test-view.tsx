@@ -83,7 +83,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
             }}
             className="space-y-3 rounded-md border border-border/60 bg-card p-4"
           >
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            <p className="text-[10px] uppercase text-muted-foreground">
               {t('materials.practiceTest.questionLabel', { count: idx + 1 })}
             </p>
             <div
@@ -127,7 +127,7 @@ export function PracticeTestView({ content, className }: PracticeTestViewProps) 
                         }}
                       />
                       {isRevealed ? (
-                        <span className="text-[10px] font-medium uppercase tracking-wide">
+                        <span className="text-[10px] font-medium uppercase">
                           {showCorrect
                             ? copy.correctLabel
                             : showIncorrect

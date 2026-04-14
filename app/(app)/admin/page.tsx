@@ -42,7 +42,7 @@ export default async function AdminPage() {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="card-frame bg-card p-5 flex flex-col gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                 <CalendarDays className="h-4 w-4" />
                 {messages.sidebar.liveActivities}
               </div>
@@ -67,7 +67,7 @@ export default async function AdminPage() {
 
           <div className="card-frame bg-card p-5 flex flex-col gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                 <UsersThree className="h-4 w-4" />
                 {messages.sidebar.guidedGroupSessions}
               </div>
@@ -82,7 +82,7 @@ export default async function AdminPage() {
 
           <div className="card-frame bg-card p-5 flex flex-col gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                 <BookOpen className="h-4 w-4" />
                 {messages.sidebar.curriculum}
               </div>
@@ -97,7 +97,7 @@ export default async function AdminPage() {
 
           <div className="card-frame bg-card p-5 flex flex-col gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                 <WarningCircle className="h-4 w-4" />
                 {messages.sidebar.reports}
               </div>
@@ -112,7 +112,7 @@ export default async function AdminPage() {
 
           <div className="card-frame bg-card p-5 flex flex-col gap-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
                 <MessageSquare className="h-4 w-4" />
                 {messages.sidebar.contactMessages}
               </div>
