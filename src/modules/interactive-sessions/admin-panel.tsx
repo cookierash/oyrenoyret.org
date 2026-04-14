@@ -1031,7 +1031,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
               />
             </div>
           </div>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="mt-4">
             <AlertDialogCancel disabled={payingOut}>{commonCopy.cancel}</AlertDialogCancel>
             <AlertDialogAction onClick={confirmPayout} disabled={payingOut}>
               {payingOut ? commonCopy.payingOut : commonCopy.payWinners}
