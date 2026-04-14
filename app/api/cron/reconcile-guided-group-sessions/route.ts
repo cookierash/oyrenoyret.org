@@ -98,7 +98,7 @@ export async function GET(request: Request) {
             select: { userId: true },
           });
 
-          const linkUrl = `/my-library/guided-group-sessions/${session.id}`;
+          const linkUrl = `/my-library/guided-group-sessions/${session.id}/live`;
           await prisma.moderationNotice.createMany({
             data: [
               {

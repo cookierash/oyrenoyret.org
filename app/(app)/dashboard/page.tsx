@@ -560,8 +560,8 @@ export default async function DashboardPage() {
               </p>
               <p className="mt-1 text-xs text-muted-foreground/70">
                 {locale === 'az'
-                  ? 'Sessiya olduqda avtomatik qeydiyyat olunacaqsınız.'
-                  : 'When a session is available, you will be registered automatically.'}
+                  ? 'Sessiya olduqda “Bələdçili qrup sessiyaları” bölməsindən qeydiyyatdan keçin.'
+                  : 'When a session is available, register from Guided group sessions.'}
               </p>
             </div>
           ) : (

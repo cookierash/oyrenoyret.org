@@ -31,18 +31,27 @@ const strokeSchema = z.object({
   createdBy: z.string().trim().min(1).max(80).optional(),
 });
 
+const chatMessageSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  text: z.string().trim().min(1).max(500),
+  createdAt: z.number().int(),
+  createdBy: z.string().trim().min(1).max(80),
+});
+
 const patchSchema = z.object({
   activeMaterialId: z.string().trim().max(64).optional().nullable(),
   appendStrokes: z.array(strokeSchema).max(10).optional(),
+  appendChatMessages: z.array(chatMessageSchema).max(20).optional(),
   clearWhiteboard: z.boolean().optional(),
 });
 
-function normalizeWhiteboardData(raw: unknown): { version: number; strokes: any[] } {
-  if (!raw || typeof raw !== 'object') return { version: 1, strokes: [] };
-  const obj = raw as { version?: unknown; strokes?: unknown };
+function normalizeWhiteboardData(raw: unknown): { version: number; strokes: any[]; chat: any[] } {
+  if (!raw || typeof raw !== 'object') return { version: 1, strokes: [], chat: [] };
+  const obj = raw as { version?: unknown; strokes?: unknown; chat?: unknown };
   const version = typeof obj.version === 'number' ? obj.version : 1;
   const strokes = Array.isArray(obj.strokes) ? obj.strokes : [];
-  return { version, strokes };
+  const chat = Array.isArray(obj.chat) ? obj.chat : [];
+  return { version, strokes, chat };
 }
 
 function mergeStrokes(existing: any[], append: any[]): any[] {
@@ -53,6 +62,19 @@ function mergeStrokes(existing: any[], append: any[]): any[] {
   for (const stroke of append) {
     if (stroke && typeof stroke.id === 'string' && !map.has(stroke.id)) {
       map.set(stroke.id, stroke);
+    }
+  }
+  return Array.from(map.values());
+}
+
+function mergeChat(existing: any[], append: any[]): any[] {
+  const map = new Map<string, any>();
+  for (const msg of existing) {
+    if (msg && typeof msg.id === 'string') map.set(msg.id, msg);
+  }
+  for (const msg of append) {
+    if (msg && typeof msg.id === 'string' && !map.has(msg.id)) {
+      map.set(msg.id, msg);
     }
   }
   return Array.from(map.values());
@@ -215,22 +237,36 @@ export async function PATCH(
       return NextResponse.json({ error: 'Only the facilitator can change materials.' }, { status: 403 });
     }
 
+    const wantsWhiteboardWrite = Boolean(parsed.data.appendStrokes?.length) || Boolean(parsed.data.clearWhiteboard);
+    if (wantsWhiteboardWrite && access.role !== 'FACILITATOR') {
+      return NextResponse.json({ error: 'Only the facilitator can use the whiteboard.' }, { status: 403 });
+    }
+
     const canWriteWhiteboard =
       session.status === 'LIVE' || (access.role === 'FACILITATOR' && session.status === 'COMPLETED');
-    if ((parsed.data.appendStrokes || parsed.data.clearWhiteboard) && !canWriteWhiteboard) {
+    if (wantsWhiteboardWrite && !canWriteWhiteboard) {
       return NextResponse.json({ error: 'Whiteboard is read-only right now.' }, { status: 409 });
+    }
+
+    const wantsChatWrite = Boolean(parsed.data.appendChatMessages?.length);
+    const canWriteChat = session.status === 'LIVE';
+    if (wantsChatWrite && !canWriteChat) {
+      return NextResponse.json({ error: 'Chat is read-only right now.' }, { status: 409 });
     }
 
     const activeMaterialId =
       wantsMaterialChange ? (parsed.data.activeMaterialId ? parsed.data.activeMaterialId.trim() : null) : undefined;
     const appendStrokes = parsed.data.appendStrokes ?? [];
+    const appendChatMessages = parsed.data.appendChatMessages ?? [];
 
     const existing = normalizeWhiteboardData(session.whiteboardData);
     const nextStrokes = parsed.data.clearWhiteboard ? [] : mergeStrokes(existing.strokes, appendStrokes);
-    const nextWhiteboardData =
-      parsed.data.clearWhiteboard || appendStrokes.length > 0
-        ? { version: existing.version ?? 1, strokes: nextStrokes }
-        : session.whiteboardData;
+    const nextChat = mergeChat(existing.chat, appendChatMessages);
+    const shouldUpdateWhiteboard =
+      parsed.data.clearWhiteboard || appendStrokes.length > 0 || appendChatMessages.length > 0;
+    const nextWhiteboardData = shouldUpdateWhiteboard
+      ? { version: existing.version ?? 1, strokes: nextStrokes, chat: nextChat }
+      : session.whiteboardData;
 
     const updated = await prisma.guidedGroupSession.update({
       where: { id: session.id },

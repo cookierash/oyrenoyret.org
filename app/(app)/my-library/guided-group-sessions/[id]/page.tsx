@@ -1,7 +1,7 @@
 /**
- * Guided Group Session Room / Archive Page
+ * Guided Group Session Details Page
  *
- * Accessible to the facilitator + approved learners.
+ * Shows session information (date/time/objectives/etc) and actions like register/join.
  */
 
 import { redirect } from 'next/navigation';
@@ -14,12 +14,12 @@ import { Button } from '@/components/ui/button';
 import { getI18n } from '@/src/i18n/server';
 import { resolveCurriculumNames } from '@/src/modules/curriculum/resolve-curriculum-names';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
-import { GuidedGroupSessionRoomClient } from '@/src/modules/guided-group-sessions/session-room-client';
+import { GuidedGroupSessionDetailsClient } from '@/src/modules/guided-group-sessions/session-details-client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export default async function GuidedGroupSessionRoomPage({
+export default async function GuidedGroupSessionDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
@@ -35,8 +35,6 @@ export default async function GuidedGroupSessionRoomPage({
 
   let session: any = null;
   let myEnrollment: { status: string } | null = null;
-  let myFacilitatorFeedback: { rating: number; comment: string | null } | null = null;
-  let learnerFeedback: Array<{ learnerId: string; sentiment: 'GOOD' | 'BAD'; note: string | null }> = [];
 
   try {
     session = await prisma.guidedGroupSession.findFirst({
@@ -51,10 +49,6 @@ export default async function GuidedGroupSessionRoomPage({
         durationMinutes: true,
         learnerCapacity: true,
         status: true,
-        ratingAvg: true,
-        ratingCount: true,
-        activeMaterialId: true,
-        whiteboardData: true,
         facilitatorId: true,
         facilitator: {
           select: { id: true, firstName: true, lastName: true, email: true, avatarVariant: true },
@@ -68,11 +62,6 @@ export default async function GuidedGroupSessionRoomPage({
             },
           },
         },
-        facilitatorFeedback: {
-          where: { learnerId: userId },
-          select: { rating: true, comment: true },
-          take: 1,
-        },
       },
     });
 
@@ -80,16 +69,6 @@ export default async function GuidedGroupSessionRoomPage({
       where: { sessionId_userId: { sessionId, userId } },
       select: { status: true },
     });
-
-    if (session?.facilitatorId === userId) {
-      learnerFeedback = await prisma.guidedGroupSessionLearnerFeedback.findMany({
-        where: { sessionId: session.id, facilitatorId: userId },
-        select: { learnerId: true, sentiment: true, note: true },
-      });
-    }
-
-    const feedbackRow = Array.isArray(session?.facilitatorFeedback) ? session.facilitatorFeedback[0] : null;
-    myFacilitatorFeedback = feedbackRow ? { rating: feedbackRow.rating, comment: feedbackRow.comment ?? null } : null;
   } catch (error) {
     if (!isDbSchemaMismatch(error)) throw error;
     redirect('/my-library/guided-group-sessions');
@@ -98,10 +77,6 @@ export default async function GuidedGroupSessionRoomPage({
   if (!session) redirect('/my-library/guided-group-sessions');
 
   const isFacilitator = session.facilitatorId === userId;
-  const isApprovedLearner = myEnrollment?.status === 'APPROVED';
-  if (!isFacilitator && !isApprovedLearner) {
-    redirect('/my-library/guided-group-sessions');
-  }
 
   const curriculum = await resolveCurriculumNames({
     messages,
@@ -115,27 +90,11 @@ export default async function GuidedGroupSessionRoomPage({
   const facilitatorName =
     [session.facilitator?.firstName, session.facilitator?.lastName].filter(Boolean).join(' ') ||
     (session.facilitator?.email ? session.facilitator.email.split('@')[0] : '');
-
-  const activeMaterial = session.activeMaterialId
-    ? await prisma.material.findFirst({
-        where: { id: session.activeMaterialId, userId: session.facilitatorId, deletedAt: null },
-        select: {
-          id: true,
-          title: true,
-          objectives: true,
-          content: true,
-          materialType: true,
-          subjectId: true,
-          topicId: true,
-          difficulty: true,
-        },
-      })
-    : null;
-
-  const learnerFeedbackMap = learnerFeedback.reduce<Record<string, any>>((acc, row) => {
-    acc[row.learnerId] = { sentiment: row.sentiment, note: row.note ?? null };
-    return acc;
-  }, {});
+  const approvedLearners = (Array.isArray(session.enrollments) ? session.enrollments : []).map((row: any) => {
+    const u = row.user;
+    const name = [u?.firstName, u?.lastName].filter(Boolean).join(' ') || (u?.email ? u.email.split('@')[0] : '—');
+    return { id: String(u?.id ?? ''), name };
+  }).filter((l: any) => Boolean(l.id));
 
   return (
     <DashboardShell>
@@ -150,32 +109,21 @@ export default async function GuidedGroupSessionRoomPage({
       />
 
       <main className="space-y-4 pt-2">
-        <GuidedGroupSessionRoomClient
+        <GuidedGroupSessionDetailsClient
           session={{
             id: session.id,
             title: session.title,
-            subjectId: session.subjectId,
-            topicId: session.topicId,
             objectives: session.objectives ?? null,
             scheduledAt: session.scheduledAt.toISOString(),
             durationMinutes: session.durationMinutes,
             learnerCapacity: session.learnerCapacity,
             status: session.status,
-            ratingAvg: session.ratingAvg ?? 0,
-            ratingCount: session.ratingCount ?? 0,
-            facilitator: {
-              id: session.facilitatorId,
-              name: facilitatorName,
-              avatarVariant: session.facilitator?.avatarVariant ?? null,
-            },
-            learners: Array.isArray(session.enrollments) ? session.enrollments : [],
+            facilitator: { id: session.facilitatorId, name: facilitatorName },
           }}
-          isFacilitator={isFacilitator}
+          curriculum={{ subjectName, topicName }}
           myEnrollmentStatus={myEnrollment?.status ?? null}
-          initialActiveMaterial={activeMaterial}
-          initialWhiteboardData={session.whiteboardData}
-          initialMyFacilitatorFeedback={myFacilitatorFeedback}
-          initialLearnerFeedback={learnerFeedbackMap}
+          isFacilitator={isFacilitator}
+          approvedLearners={approvedLearners}
         />
       </main>
     </DashboardShell>

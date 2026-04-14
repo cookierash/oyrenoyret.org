@@ -147,7 +147,6 @@ export function GuidedGroupSessionsClient({
   const [browseFocused, setBrowseFocused] = useState(false);
   const browseInputRef = useRef<HTMLInputElement>(null);
   const browseBlurTimer = useRef<NodeJS.Timeout | null>(null);
-  const autoEnrollAttemptedRef = useRef(false);
 
   const localeCode = getLocaleCode(locale);
   const hour12 = timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -459,43 +458,6 @@ export function GuidedGroupSessionsClient({
         setSelectedSubjectIds(
           Array.isArray(nextApplication.subjects) ? nextApplication.subjects.map((s) => s.subjectId).filter(Boolean) : [],
         );
-      }
-
-      // Auto-register the learner for the next available session (first-come, first-served).
-      // Keep this idempotent per page view to avoid accidental loops.
-      if (!autoEnrollAttemptedRef.current) {
-        autoEnrollAttemptedRef.current = true;
-
-        const isAlreadyRegistered = nextSessions.some((s) => {
-          const status = s.enrollmentStatus;
-          if (status !== 'APPROVED') return false;
-          const startMs = new Date(s.scheduledAt).getTime();
-          const endMs = startMs + (s.durationMinutes ?? 0) * 60_000;
-          return Number.isFinite(startMs) && nowMs < endMs;
-        });
-
-        if (!isAlreadyRegistered && canWrite && user?.id) {
-          const candidate = [...nextSessions]
-            .filter((s) => {
-              const startMs = new Date(s.scheduledAt).getTime();
-              if (!Number.isFinite(startMs)) return false;
-              const seatsLeft = Math.max(0, (s.learnerCapacity ?? 0) - (s.approvedCount ?? 0));
-              const isOwnSession = s.facilitator?.id === user.id;
-              const status = s.enrollmentStatus;
-              return (
-                s.status === 'SCHEDULED' &&
-                !isOwnSession &&
-                startMs > nowMs &&
-                seatsLeft > 0 &&
-                (!status || status === 'CANCELLED' || status === 'REJECTED')
-              );
-            })
-            .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
-
-          if (candidate?.id) {
-            void requestToJoin(candidate.id, { silentToast: true });
-          }
-        }
       }
     } catch {
       setSubjects([]);
@@ -818,7 +780,11 @@ export function GuidedGroupSessionsClient({
           return (
             <li key={session.id}>
               <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/20">
-                <div className="min-w-0 flex-1 space-y-1">
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 space-y-1 text-left"
+                  onClick={() => router.push(`/my-library/guided-group-sessions/${session.id}`)}
+                >
                   <p className="text-sm font-medium text-foreground truncate">{session.title}</p>
                   <p className="text-xs text-muted-foreground truncate">
                     {subjectLabel} · {topicLabel}
@@ -845,16 +811,16 @@ export function GuidedGroupSessionsClient({
                   <p className="text-[11px] text-muted-foreground">
                     {guideStudentLabel}: {session.facilitator?.name ?? '—'}
                   </p>
-                </div>
+                </button>
 
                 <div className="shrink-0">
                   <Button
                     size="sm"
-                    variant="secondary"
+                    variant={canRegister ? 'primary' : 'secondary'}
                     disabled={isBusy || (!canRegister && !canEnterRoom)}
                     onClick={() => {
                       if (canEnterRoom) {
-                        router.push(`/my-library/guided-group-sessions/${session.id}`);
+                        router.push(`/my-library/guided-group-sessions/${session.id}/live`);
                         return;
                       }
                       if (canRegister) {
