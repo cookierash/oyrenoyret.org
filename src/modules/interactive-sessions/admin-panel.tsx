@@ -84,6 +84,18 @@ function isLiveEventOver(
   return startMs + event.durationMinutes * 60_000 < nowMs;
 }
 
+function getLiveEventWindowStatus(
+  event: Pick<LiveEvent, 'date' | 'durationMinutes'>,
+  nowMs: number,
+): 'upcoming' | 'ongoing' | 'over' {
+  const startMs = new Date(event.date).getTime();
+  if (Number.isNaN(startMs)) return 'upcoming';
+  const endMs = startMs + event.durationMinutes * 60_000;
+  if (nowMs < startMs) return 'upcoming';
+  if (nowMs > endMs) return 'over';
+  return 'ongoing';
+}
+
 interface LiveEventsAdminPanelProps {
   type: 'PROBLEM_SPRINT' | 'EVENT';
   labels: {
@@ -481,6 +493,12 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     () => archivedEvents.slice(0, archivedPage * EVENT_PAGE_SIZE),
     [archivedEvents, archivedPage],
   );
+
+  const [statusNowMs, setStatusNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setStatusNowMs(Date.now()), 10_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -1139,11 +1157,14 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleScheduledEvents.map((liveEvent) => {
-                        const eventDate = new Date(liveEvent.date);
-                        const payoutRequired = isLiveEventOver(liveEvent) && !liveEvent.hasPayout;
-                        return (
-                          <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
+	                      {visibleScheduledEvents.map((liveEvent) => {
+	                        const eventDate = new Date(liveEvent.date);
+	                        const windowStatus = getLiveEventWindowStatus(liveEvent, statusNowMs);
+	                        const isSprint = liveEvent.type === 'PROBLEM_SPRINT';
+	                        const payoutRequired =
+	                          isSprint && windowStatus === 'over' && !liveEvent.hasPayout;
+	                        return (
+	                          <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
                             <td className="py-3 pr-4">
                               <div className="font-medium truncate">{liveEvent.topic}</div>
                             </td>
@@ -1174,17 +1195,25 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                                 {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
                               </span>
                             </td>
-                            <td className="py-3 pr-4">
-                              {payoutRequired ? (
-                                <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
-                                  {commonCopy.statusPayoutRequired}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-                                  {commonCopy.statusScheduled}
-                                </span>
-                              )}
-                            </td>
+	                            <td className="py-3 pr-4">
+	                              {windowStatus === 'ongoing' ? (
+	                                <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+	                                  {commonCopy.statusOngoing}
+	                                </span>
+	                              ) : payoutRequired ? (
+	                                <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+	                                  {commonCopy.statusPayoutRequired}
+	                                </span>
+	                              ) : windowStatus === 'over' ? (
+	                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+	                                  {commonCopy.statusArchived}
+	                                </span>
+	                              ) : (
+	                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+	                                  {commonCopy.statusScheduled}
+	                                </span>
+	                              )}
+	                            </td>
                             <td className="py-3 pr-2">
                               <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
                                 <Button asChild variant="outline" size="sm">
@@ -1292,11 +1321,11 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                                   {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
                                 </span>
                               </td>
-                              <td className="py-3 pr-4">
-                                <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                  {commonCopy.statusArchived}
-                                </span>
-                              </td>
+	                              <td className="py-3 pr-4">
+	                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+	                                  {commonCopy.statusArchived}
+	                                </span>
+	                              </td>
                               <td className="py-3 pr-2">
                                 <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
                                   <Button asChild variant="outline" size="sm">
@@ -1336,25 +1365,27 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="overflow-x-auto pb-1">
-              <table className="min-w-[980px] w-max table-auto border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground whitespace-nowrap">
-                    <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
-                    <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
-                    <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
-                    <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.duration}</th>
-                    <th className="w-[150px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.difficulty}</th>
-                    <th className="w-[120px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.credits}</th>
-                    <th className="w-[190px] py-2 pr-2 text-right font-medium">{commonCopy.tableHeaders.actions}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleScheduledEvents.map((liveEvent) => {
-                    const eventDate = new Date(liveEvent.date);
-                    return (
-                      <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
+	          <div className="space-y-4">
+	            <div className="overflow-x-auto pb-1">
+	              <table className="min-w-[980px] w-max table-auto border-collapse text-left">
+	                <thead>
+	                  <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground whitespace-nowrap">
+	                    <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
+	                    <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
+	                    <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
+	                    <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.duration}</th>
+	                    <th className="w-[150px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.difficulty}</th>
+	                    <th className="w-[120px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.credits}</th>
+	                    <th className="w-[160px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.status}</th>
+	                    <th className="w-[190px] py-2 pr-2 text-right font-medium">{commonCopy.tableHeaders.actions}</th>
+	                  </tr>
+	                </thead>
+	                <tbody>
+	                  {visibleScheduledEvents.map((liveEvent) => {
+	                    const eventDate = new Date(liveEvent.date);
+	                    const windowStatus = getLiveEventWindowStatus(liveEvent, statusNowMs);
+	                    return (
+	                      <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
                         <td className="py-3 pr-4">
                           <div className="font-medium truncate">{liveEvent.topic}</div>
                         </td>
@@ -1379,16 +1410,31 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                             </span>
                           )}
                         </td>
-                        <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1">
-                            <Coins className="h-3.5 w-3.5" />
-                            {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-2">
-                          <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
-                            <Button
-                              variant="danger"
+	                        <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+	                          <span className="inline-flex items-center gap-1">
+	                            <Coins className="h-3.5 w-3.5" />
+	                            {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
+	                          </span>
+	                        </td>
+	                        <td className="py-3 pr-4">
+	                          {windowStatus === 'ongoing' ? (
+	                            <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+	                              {commonCopy.statusOngoing}
+	                            </span>
+	                          ) : windowStatus === 'over' ? (
+	                            <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+	                              {commonCopy.statusArchived}
+	                            </span>
+	                          ) : (
+	                            <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+	                              {commonCopy.statusScheduled}
+	                            </span>
+	                          )}
+	                        </td>
+	                        <td className="py-3 pr-2">
+	                          <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
+	                            <Button
+	                              variant="danger"
                               size="sm"
                               onClick={() => requestDelete(liveEvent)}
                             >
