@@ -789,28 +789,10 @@ export function GuidedGroupSessionsClient({
     }
   };
 
-  const renderSessionList = (
-    items: GuidedGroupSessionRow[],
-    accent: 'live' | 'new' | 'top' | 'soon' = 'new',
-  ) => {
+  const renderSessionList = (items: GuidedGroupSessionRow[]) => {
     if (items.length === 0) return null;
-    const accentGradient =
-      accent === 'live'
-        ? 'before:bg-gradient-to-r before:from-rose-500/12 before:via-fuchsia-500/10 before:to-sky-500/12'
-        : accent === 'top'
-          ? 'before:bg-gradient-to-r before:from-amber-500/12 before:via-rose-500/10 before:to-fuchsia-500/12'
-          : accent === 'soon'
-            ? 'before:bg-gradient-to-r before:from-sky-500/12 before:via-emerald-500/10 before:to-lime-500/12'
-            : 'before:bg-gradient-to-r before:from-violet-500/12 before:via-sky-500/10 before:to-emerald-500/12';
     return (
-      <ul
-        className={cn(
-          'relative overflow-hidden rounded-xl border border-border/80 bg-card/40 shadow-sm backdrop-blur',
-          'before:pointer-events-none before:absolute before:inset-0 before:opacity-100',
-          accentGradient,
-          'divide-y divide-border/70',
-        )}
-      >
+      <ul className="divide-y divide-border rounded-lg border border-border">
         {items.map((session) => {
           const when = new Date(session.scheduledAt);
           const startMs = when.getTime();
@@ -835,29 +817,23 @@ export function GuidedGroupSessionsClient({
 
           return (
             <li key={session.id}>
-              <div
-                className={cn(
-                  'flex flex-wrap items-start justify-between gap-3 px-4 py-3',
-                  'transition-colors hover:bg-muted/20',
-                  'hover:bg-gradient-to-r hover:from-primary/5 hover:to-transparent',
-                )}
-              >
+              <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/20">
                 <div className="min-w-0 flex-1 space-y-1">
                   <p className="text-sm font-medium text-foreground truncate">{session.title}</p>
                   <p className="text-xs text-muted-foreground truncate">
                     {subjectLabel} · {topicLabel}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                    <span className="rounded-full bg-background/50 px-2 py-0.5 text-foreground shadow-sm ring-1 ring-border/50">
+                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
                       {dateFormatter.format(when)}
                     </span>
-                    <span className="rounded-full bg-background/50 px-2 py-0.5 text-foreground shadow-sm ring-1 ring-border/50">
+                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
                       {timeFormatter.format(when)}
                     </span>
-                    <span className="rounded-full bg-background/50 px-2 py-0.5 text-foreground shadow-sm ring-1 ring-border/50">
+                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
                       {session.durationMinutes} min
                     </span>
-                    <span className="rounded-full bg-background/50 px-2 py-0.5 text-foreground shadow-sm ring-1 ring-border/50">
+                    <span className="rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
                       {approvedCount}/{session.learnerCapacity}
                     </span>
                     {isOngoing ? (
@@ -953,105 +929,93 @@ export function GuidedGroupSessionsClient({
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <div
-          className={cn(
-            'relative overflow-hidden rounded-xl border border-border/80 bg-card/40 p-4 shadow-sm backdrop-blur',
-            'before:pointer-events-none before:absolute before:inset-0',
-            'before:bg-gradient-to-r before:from-violet-500/10 before:via-sky-500/8 before:to-emerald-500/10',
-          )}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-[220px] flex-1 space-y-2">
-              <div className="relative">
-                <Input
-                  ref={browseInputRef}
-                  value={browseQuery}
-                  onChange={(e) => setBrowseQuery(e.target.value)}
-                  onFocus={() => {
-                    if (browseBlurTimer.current) clearTimeout(browseBlurTimer.current);
-                    setBrowseFocused(true);
-                  }}
-                  onBlur={() => {
-                    browseBlurTimer.current = setTimeout(() => setBrowseFocused(false), 150);
-                  }}
-                  className={cn(
-                    'relative bg-background/60 shadow-sm',
-                    'ring-1 ring-border/60 focus-visible:ring-2 focus-visible:ring-primary/25',
-                  )}
-                  placeholder={
-                    locale === 'az'
-                      ? 'Sessiya axtar… və ya #fənn / #mövzu (məs. #riyaziyyat #cəbr)'
-                      : 'Search sessions… or use #subject / #topic (e.g., #mathematics #algebra)'
-                  }
-                  disabled={loading}
-                />
-                {showTagSuggestions ? (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-card/95 p-2 shadow-sm backdrop-blur">
-                    <div className="grid gap-1">
-                      {tagSuggestions.map((s) => (
-                        <button
-                          key={`${s.kind}:${s.id}:${s.tag}`}
-                          type="button"
-                          onClick={() => applyTagSuggestion(s)}
-                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted/40"
-                          disabled={loading}
-                        >
-                          <span className="truncate">
-                            #{s.tag} <span className="text-muted-foreground">· {s.name}</span>
-                          </span>
-                          <span className="ml-3 shrink-0 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
-                            {s.kind === 'subject'
-                              ? locale === 'az'
-                                ? 'fənn'
-                                : 'subject'
-                              : locale === 'az'
-                                ? 'mövzu'
-                                : 'topic'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              {selectedBrowseTags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {selectedBrowseTags.map((tagId) => {
-                    const entry = tagLookup.get(tagId);
-                    const label = entry ? `#${entry.tag}` : tagId;
-                    return (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-[220px] flex-1 space-y-2">
+            <div className="relative">
+              <Input
+                ref={browseInputRef}
+                value={browseQuery}
+                onChange={(e) => setBrowseQuery(e.target.value)}
+                onFocus={() => {
+                  if (browseBlurTimer.current) clearTimeout(browseBlurTimer.current);
+                  setBrowseFocused(true);
+                }}
+                onBlur={() => {
+                  browseBlurTimer.current = setTimeout(() => setBrowseFocused(false), 150);
+                }}
+                placeholder={
+                  locale === 'az'
+                    ? 'Sessiya axtar… və ya #fənn / #mövzu (məs. #riyaziyyat #cəbr)'
+                    : 'Search sessions… or use #subject / #topic (e.g., #mathematics #algebra)'
+                }
+                disabled={loading}
+              />
+              {showTagSuggestions ? (
+                <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-lg border border-border bg-card p-2 shadow-sm">
+                  <div className="grid gap-1">
+                    {tagSuggestions.map((s) => (
                       <button
-                        key={`browse-tag-${tagId}`}
+                        key={`${s.kind}:${s.id}:${s.tag}`}
                         type="button"
-                        onClick={() => removeBrowseTag(tagId)}
-                        className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/50 px-3 py-1 text-xs text-foreground shadow-sm hover:bg-background/70"
+                        onClick={() => applyTagSuggestion(s)}
+                        className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-muted/40"
                         disabled={loading}
-                        title={entry?.name ?? undefined}
                       >
-                        <span className="truncate max-w-[180px]">{label}</span>
-                        <span className="text-muted-foreground">×</span>
+                        <span className="truncate">
+                          #{s.tag} <span className="text-muted-foreground">· {s.name}</span>
+                        </span>
+                        <span className="ml-3 shrink-0 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] text-muted-foreground">
+                          {s.kind === 'subject'
+                            ? locale === 'az'
+                              ? 'fənn'
+                              : 'subject'
+                            : locale === 'az'
+                              ? 'mövzu'
+                              : 'topic'}
+                        </span>
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
-            <div className="flex flex-wrap items-center gap-2 self-start">
-              <Button size="sm" variant="secondary-primary" disabled={loading} onClick={openSchedule}>
-                {scheduleLabel}
-              </Button>
-              <Button
-                size="sm"
-                variant={application?.status === 'CHANGES_REQUESTED' ? 'secondary-primary' : 'outline'}
-                disabled={loading || !canWrite}
-                onClick={() => setApplicationDialogOpen(true)}
-              >
-                {applyLabel}
-              </Button>
-              <Button size="sm" variant="outline" onClick={load} disabled={loading}>
-                {locale === 'az' ? 'Yenilə' : 'Refresh'}
-              </Button>
-            </div>
+            {selectedBrowseTags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {selectedBrowseTags.map((tagId) => {
+                  const entry = tagLookup.get(tagId);
+                  const label = entry ? `#${entry.tag}` : tagId;
+                  return (
+                    <button
+                      key={`browse-tag-${tagId}`}
+                      type="button"
+                      onClick={() => removeBrowseTag(tagId)}
+                      className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/30 px-3 py-1 text-xs text-foreground hover:bg-muted/40"
+                      disabled={loading}
+                      title={entry?.name ?? undefined}
+                    >
+                      <span className="truncate max-w-[180px]">{label}</span>
+                      <span className="text-muted-foreground">×</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 self-start">
+            <Button size="sm" variant="secondary-primary" disabled={loading} onClick={openSchedule}>
+              {scheduleLabel}
+            </Button>
+            <Button
+              size="sm"
+              variant={application?.status === 'CHANGES_REQUESTED' ? 'secondary-primary' : 'outline'}
+              disabled={loading || !canWrite}
+              onClick={() => setApplicationDialogOpen(true)}
+            >
+              {applyLabel}
+            </Button>
+            <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+              {locale === 'az' ? 'Yenilə' : 'Refresh'}
+            </Button>
           </div>
         </div>
 
@@ -1452,13 +1416,10 @@ export function GuidedGroupSessionsClient({
             {myRegisteredSessions.length > 0 ? (
               <section className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span className="h-2 w-2 rounded-full bg-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.15)]" />
-                    {locale === 'az' ? 'Mənim qeydiyyat sessiyalarım' : 'My registered sessions'}
-                  </h2>
+                  <h2 className="text-sm font-medium text-foreground">{locale === 'az' ? 'Mənim qeydiyyat sessiyalarım' : 'My registered sessions'}</h2>
                   <p className="text-[11px] text-muted-foreground">{myRegisteredSessions.length}</p>
                 </div>
-                {renderSessionList(myRegisteredSessions, 'soon')}
+                {renderSessionList(myRegisteredSessions)}
               </section>
             ) : null}
 
@@ -1472,49 +1433,39 @@ export function GuidedGroupSessionsClient({
                 {liveNowSessions.length > 0 ? (
                   <section className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.15)]" />
-                        {locale === 'az' ? 'İndi canlı' : 'Live now'}
-                      </h2>
+                      <h2 className="text-sm font-medium text-foreground">{locale === 'az' ? 'İndi canlı' : 'Live now'}</h2>
                       <p className="text-[11px] text-muted-foreground">{liveNowSessions.length}</p>
                     </div>
-                    {renderSessionList(liveNowSessions, 'live')}
+                    {renderSessionList(liveNowSessions)}
                   </section>
                 ) : null}
 
                 <section className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="h-2 w-2 rounded-full bg-violet-500 shadow-[0_0_0_3px_rgba(139,92,246,0.15)]" />
-                      {locale === 'az' ? 'Ən yeni əlavə olunanlar' : 'Most recently added'}
-                    </h2>
+                    <h2 className="text-sm font-medium text-foreground">{locale === 'az' ? 'Ən yeni əlavə olunanlar' : 'Most recently added'}</h2>
                     <p className="text-[11px] text-muted-foreground">{mostRecentSessions.length}</p>
                   </div>
-                  {renderSessionList(mostRecentSessions, 'new')}
+                  {renderSessionList(mostRecentSessions)}
                 </section>
 
                 {topRatedGuideSessions.length > 0 ? (
                   <section className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                        <span className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" />
+                      <h2 className="text-sm font-medium text-foreground">
                         {locale === 'az' ? `Ən yüksək reytinqli ${guideStudentLabel}lər` : 'Top rated facilitators'}
                       </h2>
                       <p className="text-[11px] text-muted-foreground">{topRatedGuideSessions.length}</p>
                     </div>
-                    {renderSessionList(topRatedGuideSessions, 'top')}
+                    {renderSessionList(topRatedGuideSessions)}
                   </section>
                 ) : null}
 
                 <section className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" />
-                      {locale === 'az' ? 'Tezliklə başlayır' : 'Starting soon'}
-                    </h2>
+                    <h2 className="text-sm font-medium text-foreground">{locale === 'az' ? 'Tezliklə başlayır' : 'Starting soon'}</h2>
                     <p className="text-[11px] text-muted-foreground">{startingSoonSessions.length}</p>
                   </div>
-                  {renderSessionList(startingSoonSessions, 'soon')}
+                  {renderSessionList(startingSoonSessions)}
                 </section>
               </>
             )}
