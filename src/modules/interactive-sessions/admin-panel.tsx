@@ -4,7 +4,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiMagnifyingGlass as Search } from 'react-icons/pi';
+import {
+  PiCalendar as Calendar,
+  PiCaretDown as ChevronDown,
+  PiCheck as Check,
+  PiClock as Clock,
+  PiCoins as Coins,
+  PiMagnifyingGlass as Search,
+} from 'react-icons/pi';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +50,13 @@ interface LiveAnnouncement {
   imageUrl?: string | null;
   createdAt: string;
 }
+
+type LiveEventParticipant = {
+  id: string;
+  publicId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+};
 
 type EventSortKey = 'soonest' | 'latest' | 'topicAz' | 'topicZa';
 
@@ -94,6 +108,156 @@ function getLiveEventWindowStatus(
   if (nowMs < startMs) return 'upcoming';
   if (nowMs > endMs) return 'over';
   return 'ongoing';
+}
+
+function formatParticipantLabel(participant: LiveEventParticipant) {
+  const identifier = participant.publicId ?? participant.id;
+  const name = [participant.firstName, participant.lastName].filter(Boolean).join(' ').trim();
+  return name ? `${identifier} — ${name}` : identifier;
+}
+
+function matchesParticipantQuery(participant: LiveEventParticipant, rawQuery: string) {
+  const query = rawQuery.trim().toLowerCase();
+  if (!query) return true;
+  const haystack = [
+    participant.publicId ?? '',
+    participant.id,
+    participant.firstName ?? '',
+    participant.lastName ?? '',
+  ]
+    .join(' ')
+    .toLowerCase();
+  return haystack.includes(query);
+}
+
+function SearchableParticipantSelect({
+  id,
+  value,
+  onValueChange,
+  participants,
+  disabled,
+  placeholder,
+  searchPlaceholder,
+  emptyLabel,
+}: {
+  id: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  participants: LiveEventParticipant[];
+  disabled?: boolean;
+  placeholder: string;
+  searchPlaceholder: string;
+  emptyLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setTimeout(() => searchRef.current?.focus(), 0);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (!containerRef.current?.contains(target)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
+
+  const filtered = useMemo(
+    () => participants.filter((participant) => matchesParticipantQuery(participant, query)),
+    [participants, query],
+  );
+
+  const selected = useMemo(() => {
+    if (!value) return null;
+    return (
+      participants.find((participant) => (participant.publicId ?? participant.id) === value) ??
+      null
+    );
+  }, [participants, value]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        id={id}
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        className={[
+          'flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm',
+          'transition-colors duration-150',
+          'focus:outline-none focus:ring-2 focus:ring-primary/15 focus:border-primary/40',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+        ].join(' ')}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className={selected ? 'truncate' : 'truncate text-muted-foreground'}>
+          {selected ? formatParticipantLabel(selected) : placeholder}
+        </span>
+        <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </button>
+
+      {open ? (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-background shadow-md">
+          <div className="border-b p-2">
+            <Input
+              ref={(node) => {
+                searchRef.current = node;
+              }}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={searchPlaceholder}
+              className="h-8"
+              aria-label={searchPlaceholder}
+            />
+          </div>
+
+          <div className="max-h-64 overflow-auto py-1" role="listbox">
+            {filtered.length ? (
+              filtered.map((participant) => {
+                const participantValue = participant.publicId ?? participant.id;
+                const isSelected = participantValue === value;
+                return (
+                  <button
+                    key={participant.id}
+                    type="button"
+                    className={[
+                      'flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm',
+                      'hover:bg-muted/60',
+                      isSelected ? 'bg-muted/40' : '',
+                    ].join(' ')}
+                    onClick={() => {
+                      onValueChange(participantValue);
+                      setOpen(false);
+                      setQuery('');
+                    }}
+                    role="option"
+                    aria-selected={isSelected}
+                  >
+                    <span className="truncate">{formatParticipantLabel(participant)}</span>
+                    {isSelected ? (
+                      <Check className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    ) : null}
+                  </button>
+                );
+              })
+            ) : (
+              <p className="px-3 py-2 text-xs text-muted-foreground">{emptyLabel}</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 interface LiveEventsAdminPanelProps {
@@ -159,6 +323,9 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     second: '',
     third: '',
   });
+  const payoutParticipantsCache = useRef(new Map<string, LiveEventParticipant[]>());
+  const [payoutParticipants, setPayoutParticipants] = useState<LiveEventParticipant[]>([]);
+  const [payoutParticipantsLoading, setPayoutParticipantsLoading] = useState(false);
   const [payingOut, setPayingOut] = useState(false);
   const minDateTime = toLocalInputValue(new Date());
 
@@ -370,6 +537,33 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     setDeleteTarget(null);
   };
 
+  const loadPayoutParticipants = async (eventId: string) => {
+    const cached = payoutParticipantsCache.current.get(eventId);
+    if (cached) {
+      setPayoutParticipants(cached);
+      return;
+    }
+
+    setPayoutParticipantsLoading(true);
+    setPayoutParticipants([]);
+    try {
+      const res = await fetch(`/api/live-events/${encodeURIComponent(eventId)}/participants`, {
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !Array.isArray(data)) {
+        toast.error(adminCopy.toasts.payoutFailed);
+        return;
+      }
+      payoutParticipantsCache.current.set(eventId, data as LiveEventParticipant[]);
+      setPayoutParticipants(data as LiveEventParticipant[]);
+    } catch {
+      toast.error(adminCopy.toasts.payoutFailed);
+    } finally {
+      setPayoutParticipantsLoading(false);
+    }
+  };
+
   const requestPayout = (event: LiveEvent) => {
     if (event.type !== 'PROBLEM_SPRINT') return;
     const sanitizedId = typeof event.id === 'string' ? event.id.trim() : '';
@@ -380,6 +574,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     setPayoutTarget(event);
     setPayoutForm({ first: '', second: '', third: '' });
     setPayoutDialogOpen(true);
+    void loadPayoutParticipants(sanitizedId);
   };
 
   const confirmPayout = async () => {
@@ -986,6 +1181,8 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
           if (!open) {
             setPayoutTarget(null);
             setPayingOut(false);
+            setPayoutParticipants([]);
+            setPayoutParticipantsLoading(false);
           }
         }}
       >
@@ -1001,33 +1198,57 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
               <Label htmlFor={`${type}-payout-first`}>
                 {commonCopy.firstPlaceLabel}
               </Label>
-              <Input
+              <SearchableParticipantSelect
                 id={`${type}-payout-first`}
                 value={payoutForm.first}
-                onChange={(e) => setPayoutForm((prev) => ({ ...prev, first: e.target.value }))}
-                placeholder={commonCopy.payoutPlaceholder}
+                onValueChange={(value) => setPayoutForm((prev) => ({ ...prev, first: value }))}
+                participants={payoutParticipants}
+                disabled={payingOut || payoutParticipantsLoading}
+                placeholder={commonCopy.payoutSelectPlaceholder}
+                searchPlaceholder={commonCopy.payoutSearchPlaceholder}
+                emptyLabel={
+                  payoutParticipantsLoading
+                    ? commonCopy.payoutParticipantsLoading
+                    : commonCopy.payoutParticipantsEmpty
+                }
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor={`${type}-payout-second`}>
                 {commonCopy.secondPlaceLabel}
               </Label>
-              <Input
+              <SearchableParticipantSelect
                 id={`${type}-payout-second`}
                 value={payoutForm.second}
-                onChange={(e) => setPayoutForm((prev) => ({ ...prev, second: e.target.value }))}
-                placeholder={commonCopy.payoutPlaceholder}
+                onValueChange={(value) => setPayoutForm((prev) => ({ ...prev, second: value }))}
+                participants={payoutParticipants}
+                disabled={payingOut || payoutParticipantsLoading}
+                placeholder={commonCopy.payoutSelectPlaceholder}
+                searchPlaceholder={commonCopy.payoutSearchPlaceholder}
+                emptyLabel={
+                  payoutParticipantsLoading
+                    ? commonCopy.payoutParticipantsLoading
+                    : commonCopy.payoutParticipantsEmpty
+                }
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor={`${type}-payout-third`}>
                 {commonCopy.thirdPlaceLabel}
               </Label>
-              <Input
+              <SearchableParticipantSelect
                 id={`${type}-payout-third`}
                 value={payoutForm.third}
-                onChange={(e) => setPayoutForm((prev) => ({ ...prev, third: e.target.value }))}
-                placeholder={commonCopy.payoutPlaceholder}
+                onValueChange={(value) => setPayoutForm((prev) => ({ ...prev, third: value }))}
+                participants={payoutParticipants}
+                disabled={payingOut || payoutParticipantsLoading}
+                placeholder={commonCopy.payoutSelectPlaceholder}
+                searchPlaceholder={commonCopy.payoutSearchPlaceholder}
+                emptyLabel={
+                  payoutParticipantsLoading
+                    ? commonCopy.payoutParticipantsLoading
+                    : commonCopy.payoutParticipantsEmpty
+                }
               />
             </div>
           </div>
