@@ -23,6 +23,7 @@ import { getI18n } from '@/src/i18n/server';
 import { getLocaleCode } from '@/src/i18n';
 import { getLocalizedSubjects } from '@/src/i18n/subject-utils';
 import { getAnnouncementImageSrc } from '@/src/lib/announcement-images';
+import { DailyWheelCard } from '@/src/components/daily-wheel/daily-wheel-card';
 
 type LiveAnnouncement = { id: string; title: string; body: string; createdAt: Date; imageUrl?: string | null };
 
@@ -46,6 +47,18 @@ async function getLatestLiveAnnouncements(take: number): Promise<LiveAnnouncemen
     } catch {
       return [];
     }
+  }
+}
+
+async function getTodayDailyWheelSpin(userId: string, dayNumber: number): Promise<null | { reward: number; spunAt: Date }> {
+  try {
+    return await prisma.dailyWheelSpin.findUnique({
+      where: { userId_dayNumber: { userId, dayNumber } },
+      select: { reward: true, spunAt: true },
+    });
+  } catch (error) {
+    if (isDbSchemaMismatch(error)) return null;
+    throw error;
   }
 }
 
@@ -215,10 +228,11 @@ export default async function DashboardPage() {
   const difficultyCopy = messages.materials.difficulty;
 
   const now = new Date();
+  const todayDayNumber = toDayNumber(now);
   await recordDailyVisit(userId, now);
 
   // Fetch user info + upcoming activities + recent purchases in parallel
-  const [user, upcomingActivities, upcomingGuidedSessions, recentPurchases, dailyVisits, liveAnnouncements] = await Promise.all([
+  const [user, upcomingActivities, upcomingGuidedSessions, recentPurchases, dailyVisits, liveAnnouncements, dailyWheelSpin] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { firstName: true, lastName: true, role: true },
@@ -308,6 +322,7 @@ export default async function DashboardPage() {
       select: { dayNumber: true },
     }),
     getLatestLiveAnnouncements(3),
+    getTodayDailyWheelSpin(userId, todayDayNumber),
   ]);
 
   if (user?.role === 'ADMIN' || user?.role === 'TEACHER') {
@@ -349,6 +364,21 @@ export default async function DashboardPage() {
                 {copy.snapshot}
               </p>
             </div>
+
+            {user?.role === 'STUDENT' ? (
+              <DailyWheelCard
+                copy={copy.dailyWheel}
+                initialSpin={
+                  dailyWheelSpin
+                    ? {
+                        dayNumber: todayDayNumber,
+                        reward: dailyWheelSpin.reward,
+                        spunAtIso: dailyWheelSpin.spunAt.toISOString(),
+                      }
+                    : null
+                }
+              />
+            ) : null}
 
             <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-gradient-to-br from-amber-50 via-orange-50/70 to-rose-50 px-4 py-4 sm:px-6 sm:py-5 dark:border-white/10 dark:from-amber-500/10 dark:via-orange-500/10 dark:to-rose-500/10">
               <div className="pointer-events-none absolute -top-12 right-6 h-32 w-32 rounded-full bg-amber-300/40 blur-3xl dark:bg-amber-400/20" />

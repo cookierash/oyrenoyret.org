@@ -29,6 +29,26 @@ export function isDbSchemaMismatch(error: unknown): boolean {
 
   if (!message) return false;
 
+  // Stale generated Prisma client can manifest as runtime TypeErrors when a model delegate
+  // doesn't exist (e.g. prisma.someNewModel is undefined).
+  // Example: "Cannot read properties of undefined (reading 'findUnique')"
+  if (error instanceof TypeError) {
+    const lowered = message.toLowerCase();
+    if (
+      lowered.includes('cannot read properties of undefined') &&
+      (lowered.includes("reading 'findunique'") ||
+        lowered.includes("reading 'findmany'") ||
+        lowered.includes("reading 'findfirst'") ||
+        lowered.includes("reading 'create'") ||
+        lowered.includes("reading 'update'") ||
+        lowered.includes("reading 'upsert'") ||
+        lowered.includes("reading 'deletemany'") ||
+        lowered.includes("reading 'count'"))
+    ) {
+      return true;
+    }
+  }
+
   // Prisma validation errors often indicate a stale generated client vs. code (e.g. field added in schema but
   // not yet regenerated in the runtime environment). Treat these as schema drift so callers can gracefully
   // fall back to a narrower query shape.

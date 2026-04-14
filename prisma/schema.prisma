@@ -187,6 +187,7 @@ model User {
   certificates     Certificate[]
   activities       Activity[]
   userDailyVisits  UserDailyVisit[]
+  dailyWheelSpins  DailyWheelSpin[]
   liveEventsCreated LiveEvent[] @relation("LiveEventsCreated")
   liveEventEnrollments LiveEventEnrollment[]
   liveEventSubmissions LiveEventSubmission[]
@@ -552,6 +553,26 @@ model UserDailyVisit {
   @@index([userId])
   @@index([dayNumber])
   @@index([visitedAt])
+}
+
+model DailyWheelSpin {
+  id                  String             @id @default(uuid())
+  userId              String
+  dayNumber           Int
+  reward              Int
+  creditTransactionId String?            @unique
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creditTransaction  CreditTransaction? @relation(fields: [creditTransactionId], references: [id], onDelete: SetNull)
+
+  spunAt    DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dayNumber])
+  @@index([userId])
+  @@index([dayNumber])
+  @@index([spunAt])
 }
 
 model GuardianVerification {
@@ -1135,6 +1156,7 @@ enum CreditTransactionType {
   SPRINT_ENTRY
   SPRINT_PAYOUT
   SPECIAL_EVENT
+  DAILY_WHEEL
 }
 
 model CreditTransaction {
@@ -1148,6 +1170,7 @@ model CreditTransaction {
   
   // Relations
   user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyWheelSpin DailyWheelSpin?
   
   createdAt DateTime              @default(now())
   
