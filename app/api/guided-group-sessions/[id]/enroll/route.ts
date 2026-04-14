@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/src/db/client';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
+import { isStaff } from '@/src/lib/permissions';
 import { RATE_LIMITS } from '@/src/config/constants';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
@@ -40,6 +41,17 @@ export async function POST(
       return NextResponse.json(
         { error: message, errorKey: verified.errorKey },
         { status: verified.status },
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    if (user?.role && isStaff(user.role)) {
+      return NextResponse.json(
+        { error: 'Staff accounts cannot enroll in guided group sessions.' },
+        { status: 403 },
       );
     }
 
