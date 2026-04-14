@@ -59,7 +59,7 @@ export function PartnersMarquee({ partners }: PartnersMarqueeProps) {
   return (
     <div className="w-full">
       <div className="mx-auto flex w-full flex-row flex-wrap items-center justify-center gap-4 text-center sm:gap-6 lg:max-w-4xl lg:flex-nowrap">
-        <p className="text-[11px] font-medium uppercase tracking-normal text-muted-foreground">
+        <p className="text-[11px] font-medium uppercase text-muted-foreground">
           {copy.partnersLabel}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">

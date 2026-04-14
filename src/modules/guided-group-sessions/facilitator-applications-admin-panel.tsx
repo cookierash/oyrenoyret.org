@@ -331,7 +331,7 @@ export function FacilitatorApplicationsAdminPanel() {
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Parent</p>
+                      <p className="text-[11px] font-medium uppercase text-muted-foreground">Parent</p>
                       <p className="mt-1 text-sm text-foreground">
                         {[row.user.parentFirstName, row.user.parentLastName].filter(Boolean).join(' ') || '—'}
                       </p>
@@ -341,14 +341,14 @@ export function FacilitatorApplicationsAdminPanel() {
                     </div>
 
                     <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Contact</p>
+                      <p className="text-[11px] font-medium uppercase text-muted-foreground">Contact</p>
                       <p className="mt-1 text-sm text-foreground">{row.phoneNumber}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">FIN: {row.finCode}</p>
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <p className="text-[11px] font-medium uppercase text-muted-foreground">
                       Subjects requested
                     </p>
                     <div className="mt-1 flex flex-wrap gap-2">
@@ -365,7 +365,7 @@ export function FacilitatorApplicationsAdminPanel() {
                   </div>
 
                   <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    <p className="text-[11px] font-medium uppercase text-muted-foreground">
                       Motivation letter
                     </p>
                     <div className="mt-1 rounded-lg border border-border bg-muted/10 px-4 py-3">
@@ -377,7 +377,7 @@ export function FacilitatorApplicationsAdminPanel() {
 
                   {row.reviewerMessage ? (
                     <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      <p className="text-[11px] font-medium uppercase text-muted-foreground">
                         Reviewer message
                       </p>
                       <p className="mt-1 text-sm text-foreground whitespace-pre-wrap">{row.reviewerMessage}</p>

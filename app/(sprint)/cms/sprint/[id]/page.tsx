@@ -129,6 +129,10 @@ export default async function SprintWorkspacePage({
 
   const allowPromptForClient = staff || Date.now() >= event.date.getTime();
   const allowProblemsForClient = allowPromptForClient;
+  const difficulty =
+    event.difficulty === 'BASIC' || event.difficulty === 'INTERMEDIATE' || event.difficulty === 'ADVANCED'
+      ? (event.difficulty as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')
+      : null;
 
   let problems: Array<{
     id: string;
@@ -208,6 +212,7 @@ export default async function SprintWorkspacePage({
             initialTopic={event.topic}
             startsAt={event.date.toISOString()}
             durationMinutes={event.durationMinutes}
+            initialDifficulty={difficulty}
             initialPrompt={allowPromptForClient ? (event.prompt ?? null) : null}
             initialProblems={allowProblemsForClient ? problems : null}
             initialProblemsLocked={!allowProblemsForClient}

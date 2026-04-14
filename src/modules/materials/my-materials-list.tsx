@@ -386,7 +386,7 @@ export function MyMaterialsList({ onRefresh }: MyMaterialsListProps) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] border-collapse">
               <thead>
-                <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr className="border-b border-border/70 text-left text-xs uppercase text-muted-foreground">
                   <th className="py-2 pr-4 font-medium">{copy.table.title}</th>
                   <th className="py-2 pr-4 font-medium">{copy.table.subject}</th>
                   <th className="py-2 pr-4 font-medium">{copy.table.topic}</th>

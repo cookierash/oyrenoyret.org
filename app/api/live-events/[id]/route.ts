@@ -217,12 +217,31 @@ export async function PATCH(
       return NextResponse.json({ error: 'topic is required' }, { status: 400 });
     }
 
+    const date =
+      typeof body?.date === 'string'
+        ? new Date(body.date)
+        : undefined;
+
+    if (date !== undefined && !Number.isFinite(date.getTime())) {
+      return NextResponse.json({ error: 'date must be a valid datetime' }, { status: 400 });
+    }
+
+    const allowedDifficulties = ['BASIC', 'INTERMEDIATE', 'ADVANCED'] as const;
+    const difficulty =
+      typeof body?.difficulty === 'string' && (allowedDifficulties as readonly string[]).includes(body.difficulty)
+        ? (body.difficulty as (typeof allowedDifficulties)[number])
+        : body?.difficulty === null
+          ? null
+          : undefined;
+
     let updated:
       | {
           id: string;
           topic?: string;
           maxParticipants?: number | null;
           prompt?: string | null;
+          date?: Date | null;
+          difficulty?: any;
           updatedAt: Date;
         }
       | null = null;
@@ -233,12 +252,16 @@ export async function PATCH(
           ...(topic !== undefined ? { topic: topic.trim() } : {}),
           ...(maxParticipants !== undefined ? { maxParticipants } : {}),
           ...(prompt !== undefined ? { prompt } : {}),
+          ...(date !== undefined ? { date } : {}),
+          ...(difficulty !== undefined ? { difficulty } : {}),
         },
         select: {
           id: true,
           topic: true,
           maxParticipants: true,
           prompt: true,
+          date: true,
+          difficulty: true,
           updatedAt: true,
         },
       });

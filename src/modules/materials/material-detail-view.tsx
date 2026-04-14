@@ -245,7 +245,7 @@ export function MaterialDetailView({
               <div className="text-sm font-medium text-foreground">{copy.statsTitle}</div>
               <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(140px,1fr))]">
                 <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[10px] uppercase text-muted-foreground">
                     {copy.statsUnlocked}
                   </div>
                   <div className="text-sm font-medium text-foreground">
@@ -253,7 +253,7 @@ export function MaterialDetailView({
                   </div>
                 </div>
                 <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[10px] uppercase text-muted-foreground">
                     {copy.statsRatingAvg}
                   </div>
                   <div className="mt-0.5 flex items-center gap-2">
@@ -274,7 +274,7 @@ export function MaterialDetailView({
                   </div>
                 </div>
                 <div className="rounded-md border border-border/70 bg-background px-3 py-2">
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  <div className="text-[10px] uppercase text-muted-foreground">
                     {copy.statsRatingCount}
                   </div>
                   <div className="text-sm font-medium text-foreground">
@@ -366,7 +366,7 @@ export function MaterialDetailView({
                   {practicePreview.questions.map((q, i) => (
                     <div key={i} className="card-frame bg-card p-5 space-y-4">
                       <div className="space-y-1">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        <p className="text-xs uppercase text-muted-foreground">
                           {t('materials.detail.previewQuestionLabel', { count: i + 1 })}
                         </p>
                         <p className="text-xs text-muted-foreground">
