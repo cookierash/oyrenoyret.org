@@ -208,9 +208,19 @@ export async function PATCH(
           ? null
           : undefined;
 
+    const topic =
+      typeof body?.topic === 'string'
+        ? sanitizeInput(body.topic).slice(0, 200)
+        : undefined;
+
+    if (topic !== undefined && !topic.trim()) {
+      return NextResponse.json({ error: 'topic is required' }, { status: 400 });
+    }
+
     let updated:
       | {
           id: string;
+          topic?: string;
           maxParticipants?: number | null;
           prompt?: string | null;
           updatedAt: Date;
@@ -220,11 +230,13 @@ export async function PATCH(
       updated = await prisma.liveEvent.update({
         where: { id: eventId },
         data: {
+          ...(topic !== undefined ? { topic: topic.trim() } : {}),
           ...(maxParticipants !== undefined ? { maxParticipants } : {}),
           ...(prompt !== undefined ? { prompt } : {}),
         },
         select: {
           id: true,
+          topic: true,
           maxParticipants: true,
           prompt: true,
           updatedAt: true,

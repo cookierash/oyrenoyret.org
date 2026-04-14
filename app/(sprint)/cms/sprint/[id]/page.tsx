@@ -7,16 +7,10 @@
 
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import {
-  PiCalendar as Calendar,
-  PiClock as Clock,
-  PiCoins as Coins,
-  PiArrowLeft as ArrowLeft,
-} from 'react-icons/pi';
+import { PiArrowLeft as ArrowLeft } from 'react-icons/pi';
 import { prisma } from '@/src/db/client';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
-import { DifficultyBars } from '@/src/modules/materials/difficulty-bars';
 import { isStaff } from '@/src/lib/permissions';
 import { SprintCmsClient } from '@/src/modules/interactive-sessions/sprint-cms-client';
 import { Button } from '@/components/ui/button';
@@ -133,7 +127,6 @@ export default async function SprintWorkspacePage({
     );
   }
 
-  const eventDate = new Date(event.date);
   const allowPromptForClient = staff || Date.now() >= event.date.getTime();
   const allowProblemsForClient = allowPromptForClient;
 
@@ -170,99 +163,21 @@ export default async function SprintWorkspacePage({
   }
 
   let mySubmission: { id: string; createdAt: Date } | null = null;
-  let submissions: Array<{
-    id: string;
-    answer: string;
-    createdAt: Date;
-    user: {
-      id: string;
-      publicId: string | null;
-      email: string;
-      firstName: string | null;
-      lastName: string | null;
-    };
-    answers?: Array<{
-      id: string;
-      problemId: string;
-      type: 'MULTIPLE_CHOICE' | 'SHORT_ANSWER';
-      textAnswer: string | null;
-      selectedOptionId: string | null;
-      selectedOption?: { id: string; text: string } | null;
-      images?: Array<{ id: string; order: number; key: string }>;
-    }>;
-  }> = [];
   try {
-    [mySubmission, submissions] = await Promise.all([
-      prisma.liveEventSubmission.findUnique({
-        where: { liveEventId_userId: { liveEventId: event.id, userId } },
-        select: { id: true, createdAt: true },
-      }),
-      staff
-        ? prisma.liveEventSubmission.findMany({
-            where: { liveEventId: event.id, deletedAt: null },
-            orderBy: { createdAt: 'asc' },
-            select: {
-              id: true,
-              answer: true,
-              createdAt: true,
-              answers: {
-                orderBy: { createdAt: 'asc' },
-                select: {
-                  id: true,
-                  problemId: true,
-                  type: true,
-                  textAnswer: true,
-                  selectedOptionId: true,
-                  selectedOption: { select: { id: true, text: true } },
-                  images: { orderBy: { order: 'asc' }, select: { id: true, order: true, key: true } },
-                },
-              },
-              user: {
-                select: {
-                  id: true,
-                  publicId: true,
-                  email: true,
-                  firstName: true,
-                  lastName: true,
-                },
-              },
-            },
-          })
-        : Promise.resolve([]),
-    ]);
+    mySubmission = await prisma.liveEventSubmission.findUnique({
+      where: { liveEventId_userId: { liveEventId: event.id, userId } },
+      select: { id: true, createdAt: true },
+    });
   } catch (error) {
     if (!isDbSchemaMismatch(error)) throw error;
     try {
-      [mySubmission, submissions] = await Promise.all([
-        prisma.liveEventSubmission.findUnique({
-          where: { liveEventId_userId: { liveEventId: event.id, userId } },
-          select: { id: true, createdAt: true },
-        }),
-        staff
-          ? prisma.liveEventSubmission.findMany({
-              where: { liveEventId: event.id, deletedAt: null },
-              orderBy: { createdAt: 'asc' },
-              select: {
-                id: true,
-                answer: true,
-                createdAt: true,
-                user: {
-                  select: {
-                    id: true,
-                    publicId: true,
-                    email: true,
-                    firstName: true,
-                    lastName: true,
-                  },
-                },
-              },
-            })
-          : Promise.resolve([]),
-      ]);
+      mySubmission = await prisma.liveEventSubmission.findUnique({
+        where: { liveEventId_userId: { liveEventId: event.id, userId } },
+        select: { id: true, createdAt: true },
+      });
     } catch (fallbackError) {
       if (!isDbSchemaMismatch(fallbackError)) throw fallbackError;
       mySubmission = null;
-      submissions = [];
     }
   }
 
@@ -287,84 +202,19 @@ export default async function SprintWorkspacePage({
           </Button>
         </header>
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[2fr_1fr]">
+        <div className="mt-5">
           <SprintCmsClient
             liveEventId={event.id}
+            initialTopic={event.topic}
             startsAt={event.date.toISOString()}
             durationMinutes={event.durationMinutes}
             initialPrompt={allowPromptForClient ? (event.prompt ?? null) : null}
             initialProblems={allowProblemsForClient ? problems : null}
             initialProblemsLocked={!allowProblemsForClient}
-            initialMaxParticipants={event.maxParticipants ?? null}
             isStaff={staff}
             initialHasSubmitted={Boolean(mySubmission)}
             initialSubmittedAt={mySubmission?.createdAt ? mySubmission.createdAt.toISOString() : null}
-            initialSubmissions={submissions.map((row) => ({
-              ...row,
-              createdAt: row.createdAt.toISOString(),
-            }))}
           />
-
-          <aside className="card-frame bg-card p-5 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-foreground">Event details</h3>
-              <p className="text-xs text-muted-foreground">Key info for this sprint.</p>
-            </div>
-
-            <div className="space-y-3 text-xs text-muted-foreground">
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Date
-                </span>
-                <span className="text-foreground">
-                  {eventDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Time
-                </span>
-                <span className="text-foreground">
-                  {eventDate.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Duration
-                </span>
-                <span className="text-foreground">{event.durationMinutes} min</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2">
-                  <Coins className="h-4 w-4" />
-                  Entry cost
-                </span>
-                <span className="text-foreground">{Math.round(event.creditCost)} credits</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-2">Difficulty</span>
-                <DifficultyBars difficulty={event.difficulty} />
-              </div>
-            </div>
-
-            <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-3">
-              <p className="text-xs font-medium text-foreground">Next steps</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Stay on this page. When the organizer starts the sprint, the timer and
-                problem statement will appear automatically.
-              </p>
-            </div>
-          </aside>
         </div>
       </div>
     </div>

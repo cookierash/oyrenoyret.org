@@ -4,32 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
 import { MAX_IMAGE_UPLOAD_BYTES, MAX_SPRINT_SUBMISSION_IMAGES_PER_ANSWER, MAX_SPRINT_SUBMISSION_IMAGES_TOTAL } from '@/src/config/uploads';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
-
-type SubmissionRow = {
-  id: string;
-  answer: string;
-  createdAt: string;
-  user: {
-    id: string;
-    publicId: string | null;
-    email: string;
-    firstName: string | null;
-    lastName: string | null;
-  };
-  answers?: Array<{
-    id: string;
-    problemId: string;
-    type: 'MULTIPLE_CHOICE' | 'SHORT_ANSWER';
-    textAnswer: string | null;
-    selectedOptionId: string | null;
-    selectedOption?: { id: string; text: string } | null;
-    images?: Array<{ id: string; order: number; key: string }>;
-  }>;
-};
 
 type LiveEventProblem = {
   id: string;
@@ -41,23 +18,17 @@ type LiveEventProblem = {
 
 type UploadedImage = { key: string; proxyUrl: string };
 
-function formatDisplayName(user: SubmissionRow['user']) {
-  const full = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-  return full || user.email.split('@')[0] || 'User';
-}
-
 export function SprintCmsClient(props: {
   liveEventId: string;
+  initialTopic: string;
   startsAt: string;
   durationMinutes: number;
   initialPrompt: string | null;
   initialProblems: LiveEventProblem[] | null;
   initialProblemsLocked: boolean;
-  initialMaxParticipants: number | null;
   isStaff: boolean;
   initialHasSubmitted: boolean;
   initialSubmittedAt: string | null;
-  initialSubmissions: SubmissionRow[];
 }) {
   const { messages } = useI18n();
   const copy = messages.liveActivities.cms;
@@ -72,10 +43,8 @@ export function SprintCmsClient(props: {
   const hasStarted = now >= startsAtMs;
   const isOver = now > endsAtMs;
 
+  const [topic, setTopic] = useState(props.initialTopic);
   const [prompt, setPrompt] = useState(props.initialPrompt ?? '');
-  const [maxParticipants, setMaxParticipants] = useState<string>(
-    props.initialMaxParticipants ? String(props.initialMaxParticipants) : '',
-  );
   const [saving, setSaving] = useState(false);
 
   const [problems, setProblems] = useState<LiveEventProblem[]>(props.initialProblems ?? []);
@@ -87,17 +56,7 @@ export function SprintCmsClient(props: {
   const [hasSubmitted, setHasSubmitted] = useState(props.initialHasSubmitted);
   const [submittedAt, setSubmittedAt] = useState<string | null>(props.initialSubmittedAt);
 
-  const [submissions, setSubmissions] = useState<SubmissionRow[]>(props.initialSubmissions);
-  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
-
-  const [payoutForm, setPayoutForm] = useState({ first: '', second: '', third: '' });
-  const [payingOut, setPayingOut] = useState(false);
-
-  const problemNumberById = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const p of problems) map[p.id] = p.order;
-    return map;
-  }, [problems]);
+  // Staff can manage submissions and payouts from the admin panel; the CMS focuses on contest setup + participation.
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -131,32 +90,6 @@ export function SprintCmsClient(props: {
     }
   };
 
-  const reloadSubmissions = async () => {
-    if (!props.isStaff) return;
-    setLoadingSubmissions(true);
-    try {
-      const res = await fetch(
-        `/api/live-events/${encodeURIComponent(props.liveEventId)}/submissions`,
-        { cache: 'no-store' },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(formatErrorToast(copy.toasts.loadSubmissionsFailed, extractErrorMessage(data)));
-        return;
-      }
-      setSubmissions(Array.isArray(data) ? (data as SubmissionRow[]) : []);
-    } catch (error) {
-      toast.error(
-        formatErrorToast(
-          copy.toasts.loadSubmissionsFailed,
-          error instanceof Error ? error.message : null,
-        ),
-      );
-    } finally {
-      setLoadingSubmissions(false);
-    }
-  };
-
   useEffect(() => {
     if (props.isStaff) return;
     if (!hasStarted) return;
@@ -170,8 +103,8 @@ export function SprintCmsClient(props: {
     setSaving(true);
     try {
       const payload: Record<string, unknown> = {
+        topic,
         prompt,
-        maxParticipants: maxParticipants.trim() ? Number(maxParticipants) : null,
       };
       const res = await fetch(`/api/live-events/${encodeURIComponent(props.liveEventId)}`, {
         method: 'PATCH',
@@ -262,9 +195,6 @@ export function SprintCmsClient(props: {
       setSubmittedAt(typeof data?.createdAt === 'string' ? data.createdAt : new Date().toISOString());
       toast.success(copy.toasts.submitted);
       setAnswer('');
-      if (props.isStaff) {
-        await reloadSubmissions();
-      }
     } catch (error) {
       toast.error(
         formatErrorToast(copy.toasts.submitFailed, error instanceof Error ? error.message : null),
@@ -420,41 +350,12 @@ export function SprintCmsClient(props: {
       toast.success(copy.toasts.submitted);
       setAnswer('');
       setStructuredAnswers({});
-      if (props.isStaff) await reloadSubmissions();
     } catch (error) {
       toast.error(
         formatErrorToast(copy.toasts.submitFailed, error instanceof Error ? error.message : null),
       );
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const payWinners = async () => {
-    setPayingOut(true);
-    try {
-      const res = await fetch(`/api/live-events/${encodeURIComponent(props.liveEventId)}/payout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          first: payoutForm.first.trim(),
-          second: payoutForm.second.trim(),
-          third: payoutForm.third.trim(),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(formatErrorToast(copy.toasts.payoutFailed, extractErrorMessage(data)));
-        return;
-      }
-      toast.success(copy.toasts.payoutSuccess);
-      setPayoutForm({ first: '', second: '', third: '' });
-    } catch (error) {
-      toast.error(
-        formatErrorToast(copy.toasts.payoutFailed, error instanceof Error ? error.message : null),
-      );
-    } finally {
-      setPayingOut(false);
     }
   };
 
@@ -465,6 +366,17 @@ export function SprintCmsClient(props: {
 
   return (
     <div className="space-y-5">
+      <section className="card-frame bg-card p-5">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-medium text-foreground">{copy.contestTitleEditorLabel}</h2>
+        </div>
+        <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
+          <p className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
+            {topic}
+          </p>
+        </div>
+      </section>
+
       <section className="card-frame bg-card p-5">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-medium text-foreground">{copy.promptTitle}</h2>
@@ -655,24 +567,17 @@ export function SprintCmsClient(props: {
         <section className="card-frame bg-card p-5 space-y-5">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-sm font-medium text-foreground">{copy.adminTitle}</h2>
-            <Button variant="outline" size="sm" onClick={reloadSubmissions} disabled={loadingSubmissions}>
-              {copy.refresh}
-            </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <label className="text-[11px] font-semibold uppercase text-muted-foreground">
-                {copy.maxParticipantsLabel}
+                {copy.contestTitleEditorLabel}
               </label>
               <Input
-                type="number"
-                min={1}
-                max={500}
-                step={1}
-                value={maxParticipants}
-                onChange={(e) => setMaxParticipants(e.target.value)}
-                placeholder={copy.maxParticipantsPlaceholder}
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder={copy.contestTitlePlaceholder}
               />
             </div>
             <div className="flex items-end">
@@ -935,105 +840,6 @@ export function SprintCmsClient(props: {
               }
             >
               {copy.addProblem}
-            </Button>
-          </div>
-
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium text-foreground">
-              {copy.submissionsTitle.replace('{{count}}', String(submissions.length))}
-            </h3>
-            {loadingSubmissions ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-1/2" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-3/5" />
-              </div>
-            ) : submissions.length === 0 ? (
-              <p className="text-xs text-muted-foreground">{copy.noSubmissions}</p>
-            ) : (
-              <div className="space-y-3">
-                {submissions.map((row) => (
-                  <div key={row.id} className="rounded-md border border-border/70 bg-muted/20 px-4 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {formatDisplayName(row.user)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {row.user.email}
-                          {row.user.publicId ? ` • ${row.user.publicId}` : ''}
-                        </p>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        {new Date(row.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    {Array.isArray(row.answers) && row.answers.length > 0 ? (
-                      <div className="mt-3 space-y-3">
-                        {row.answers.map((ans) => (
-                          <div key={ans.id} className="rounded-md border border-border/70 bg-background px-3 py-3">
-                            <p className="text-xs font-medium text-foreground">
-                              {copy.problemLabel.replace(
-                                '{{n}}',
-                                String(problemNumberById[ans.problemId] ?? ans.problemId),
-                              )}
-                            </p>
-                            {ans.type === 'MULTIPLE_CHOICE' ? (
-                              <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">
-                                {ans.selectedOption?.text ?? copy.noSelection}
-                              </p>
-                            ) : (
-                              <pre className="mt-1 whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
-                                {ans.textAnswer ?? ''}
-                              </pre>
-                            )}
-                            {Array.isArray(ans.images) && ans.images.length > 0 ? (
-                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                {ans.images.map((img) => (
-                                  <img
-                                    key={img.id}
-                                    src={`/api/uploads/sprint-submissions/file?key=${encodeURIComponent(img.key)}`}
-                                    alt=""
-                                    className="h-28 w-full rounded-md border border-border/70 object-cover"
-                                  />
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <pre className="mt-3 whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
-                        {row.answer}
-                      </pre>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-md border border-border/70 bg-background px-4 py-4 space-y-3">
-            <h3 className="text-sm font-medium text-foreground">{copy.payoutTitle}</h3>
-            <div className="grid gap-3 md:grid-cols-3">
-              <Input
-                value={payoutForm.first}
-                onChange={(e) => setPayoutForm((prev) => ({ ...prev, first: e.target.value }))}
-                placeholder={copy.winnerFirst}
-              />
-              <Input
-                value={payoutForm.second}
-                onChange={(e) => setPayoutForm((prev) => ({ ...prev, second: e.target.value }))}
-                placeholder={copy.winnerSecond}
-              />
-              <Input
-                value={payoutForm.third}
-                onChange={(e) => setPayoutForm((prev) => ({ ...prev, third: e.target.value }))}
-                placeholder={copy.winnerThird}
-              />
-            </div>
-            <Button onClick={payWinners} disabled={payingOut}>
-              {payingOut ? copy.paying : copy.payWinners}
             </Button>
           </div>
         </section>
