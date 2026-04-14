@@ -2342,6 +2342,7 @@ export const EN_MESSAGES = {
     },
     cms: {
       promptTitle: 'Contest description',
+      countdownStartsIn: 'Starts in {{time}}',
       notStarted: 'Starts soon',
       inProgress: 'In progress',
       ended: 'Ended',

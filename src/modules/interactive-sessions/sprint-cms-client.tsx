@@ -76,6 +76,64 @@ export function SprintCmsClient(props: {
     return () => window.clearInterval(id);
   }, []);
 
+  const formatCountdown = (ms: number) => {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const seconds = totalSeconds % 60;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const minutes = totalMinutes % 60;
+    const totalHours = Math.floor(totalMinutes / 60);
+    const hours = totalHours % 24;
+    const days = Math.floor(totalHours / 24);
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    const time = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return days > 0 ? `${days}d ${time}` : time;
+  };
+
+  const remainingToStartMs = Math.max(0, startsAtMs - now);
+  const startsInLabel =
+    !hasStarted && Number.isFinite(startsAtMs)
+      ? (copy.countdownStartsIn ?? 'Starts in {{time}}').replace(
+          '{{time}}',
+          formatCountdown(remainingToStartMs),
+        )
+      : null;
+
+  const reloadEvent = async () => {
+    try {
+      const res = await fetch(`/api/live-events/${encodeURIComponent(props.liveEventId)}`, {
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+
+      const nextTopic = typeof (data as any)?.topic === 'string' ? String((data as any).topic) : null;
+      const nextPrompt = typeof (data as any)?.prompt === 'string' ? String((data as any).prompt) : null;
+      const nextDate = typeof (data as any)?.date === 'string' ? String((data as any).date) : null;
+
+      if (nextDate) setStartsAtIso(nextDate);
+      if (nextTopic !== null) setTopic(nextTopic);
+      if (nextPrompt !== null) setPrompt(nextPrompt);
+    } catch {
+      // Silent: polling only.
+    }
+  };
+
+  useEffect(() => {
+    if (props.isStaff) return;
+    void reloadEvent();
+    const id = window.setInterval(() => void reloadEvent(), 15_000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.isStaff, props.liveEventId]);
+
+  useEffect(() => {
+    if (props.isStaff) return;
+    if (!hasStarted) return;
+    void reloadEvent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasStarted, props.isStaff, props.liveEventId]);
+
   const reloadProblems = async () => {
     setSavingProblems(true);
     try {
@@ -424,7 +482,7 @@ export function SprintCmsClient(props: {
             <div className="flex items-center justify-between gap-4">
               <h2 className="text-sm font-medium text-foreground">{copy.promptTitle}</h2>
               {!hasStarted ? (
-                <span className="text-xs text-muted-foreground">{copy.notStarted}</span>
+                <span className="text-xs text-muted-foreground">{startsInLabel ?? copy.notStarted}</span>
               ) : isOver ? (
                 <span className="text-xs text-muted-foreground">{copy.ended}</span>
               ) : (

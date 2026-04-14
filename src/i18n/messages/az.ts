@@ -2345,6 +2345,7 @@ export const AZ_MESSAGES = {
     },
     cms: {
       promptTitle: 'Müsabiqə təsviri',
+      countdownStartsIn: 'Başlamağa {{time}} qalıb',
       notStarted: 'Tezliklə başlayır',
       inProgress: 'Davam edir',
       ended: 'Bitib',
