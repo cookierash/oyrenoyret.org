@@ -15,6 +15,7 @@ import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';
 import { useSettings } from '@/src/components/settings/settings-provider';
 import { getLocaleCode } from '@/src/i18n';
+import { getLocalizedSubject } from '@/src/i18n/subject-utils';
 
 type ReplyNotificationItem = {
   type: 'reply';
@@ -570,8 +571,11 @@ export function CombinedMessagesList({ items, onRefresh }: CombinedMessagesListP
                             (payload?.message ?? '').trim() ||
                             legacy?.message ||
                             '';
+                          const subjectNames = subjectIds
+                            .map((subjectId) => getLocalizedSubject(messages, subjectId)?.name ?? subjectId)
+                            .filter(Boolean);
                           const header = subjectIds.length
-                            ? `${moderationCopy?.facilitator?.approvedSubjectsLabel ?? 'Approved subjects'}: ${subjectIds.join(', ')}`
+                            ? `${moderationCopy?.facilitator?.approvedSubjectsLabel ?? 'Approved subjects'}: ${subjectNames.join(', ')}`
                             : moderationCopy?.facilitator?.approvedFallback ?? '';
                           bodyText = [header, message].filter(Boolean).join('\n\n');
                         } else if (
