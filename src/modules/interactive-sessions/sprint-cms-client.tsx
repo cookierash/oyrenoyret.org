@@ -23,6 +23,7 @@ export function SprintCmsClient(props: {
   initialTopic: string;
   startsAt: string;
   durationMinutes: number;
+  initialDifficulty: 'BASIC' | 'INTERMEDIATE' | 'ADVANCED' | null;
   initialPrompt: string | null;
   initialProblems: LiveEventProblem[] | null;
   initialProblemsLocked: boolean;
@@ -34,7 +35,8 @@ export function SprintCmsClient(props: {
   const copy = messages.liveActivities.cms;
   const [now, setNow] = useState(() => Date.now());
 
-  const startsAtMs = useMemo(() => new Date(props.startsAt).getTime(), [props.startsAt]);
+  const [startsAtIso, setStartsAtIso] = useState(props.startsAt);
+  const startsAtMs = useMemo(() => new Date(startsAtIso).getTime(), [startsAtIso]);
   const endsAtMs = useMemo(
     () => startsAtMs + props.durationMinutes * 60_000,
     [props.durationMinutes, startsAtMs],
@@ -45,7 +47,18 @@ export function SprintCmsClient(props: {
 
   const [topic, setTopic] = useState(props.initialTopic);
   const [prompt, setPrompt] = useState(props.initialPrompt ?? '');
-  const [saving, setSaving] = useState(false);
+  const [difficulty, setDifficulty] = useState(props.initialDifficulty);
+  const [startsAtInput, setStartsAtInput] = useState(() => {
+    const date = new Date(props.startsAt);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+      date.getHours(),
+    )}:${pad(date.getMinutes())}`;
+  });
+
+  const [savingField, setSavingField] = useState<
+    null | 'topic' | 'prompt' | 'startsAt' | 'difficulty'
+  >(null);
 
   const [problems, setProblems] = useState<LiveEventProblem[]>(props.initialProblems ?? []);
   const [problemsLocked, setProblemsLocked] = useState(props.initialProblemsLocked);
@@ -99,13 +112,27 @@ export function SprintCmsClient(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasStarted]);
 
-  const saveAdminChanges = async () => {
-    setSaving(true);
+  const saveField = async (field: 'topic' | 'prompt' | 'startsAt' | 'difficulty') => {
+    if (!props.isStaff) return;
+    setSavingField(field);
     try {
       const payload: Record<string, unknown> = {
-        topic,
-        prompt,
       };
+      if (field === 'topic') {
+        payload.topic = topic;
+      } else if (field === 'prompt') {
+        payload.prompt = prompt;
+      } else if (field === 'startsAt') {
+        const nextDate = new Date(startsAtInput);
+        if (!Number.isFinite(nextDate.getTime())) {
+          toast.error(copy.toasts.invalidStartTime ?? 'Invalid start time.');
+          return;
+        }
+        payload.date = nextDate.toISOString();
+      } else if (field === 'difficulty') {
+        payload.difficulty = difficulty;
+      }
+
       const res = await fetch(`/api/live-events/${encodeURIComponent(props.liveEventId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -116,13 +143,29 @@ export function SprintCmsClient(props: {
         toast.error(formatErrorToast(copy.toasts.saveFailed, extractErrorMessage(data)));
         return;
       }
+      if (field === 'startsAt' && typeof (data as any)?.date === 'string') {
+        setStartsAtIso((data as any).date);
+        const date = new Date((data as any).date);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        setStartsAtInput(
+          `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+            date.getHours(),
+          )}:${pad(date.getMinutes())}`,
+        );
+      }
+      if (field === 'difficulty') {
+        const next = (data as any)?.difficulty;
+        if (next === 'BASIC' || next === 'INTERMEDIATE' || next === 'ADVANCED' || next === null) {
+          setDifficulty(next);
+        }
+      }
       toast.success(copy.toasts.saved);
     } catch (error) {
       toast.error(
         formatErrorToast(copy.toasts.saveFailed, error instanceof Error ? error.message : null),
       );
     } finally {
-      setSaving(false);
+      setSavingField(null);
     }
   };
 
@@ -366,40 +409,42 @@ export function SprintCmsClient(props: {
 
   return (
     <div className="space-y-5">
-      <section className="card-frame bg-card p-5">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium text-foreground">{copy.contestTitleEditorLabel}</h2>
-        </div>
-        <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
-          <p className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
-            {topic}
-          </p>
-        </div>
-      </section>
+      {!props.isStaff ? (
+        <>
+          <section className="card-frame bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-medium text-foreground">{copy.contestTitleEditorLabel}</h2>
+            </div>
+            <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
+              <p className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">{topic}</p>
+            </div>
+          </section>
 
-      <section className="card-frame bg-card p-5">
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-medium text-foreground">{copy.promptTitle}</h2>
-          {!hasStarted ? (
-            <span className="text-xs text-muted-foreground">{copy.notStarted}</span>
-          ) : isOver ? (
-            <span className="text-xs text-muted-foreground">{copy.ended}</span>
-          ) : (
-            <span className="text-xs text-emerald-600">{copy.inProgress}</span>
-          )}
-        </div>
-        <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
-          {displayPrompt ? (
-            <pre className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
-              {displayPrompt}
-            </pre>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {showPrompt ? copy.noPrompt : copy.promptLocked}
-            </p>
-          )}
-        </div>
-      </section>
+          <section className="card-frame bg-card p-5">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-medium text-foreground">{copy.promptTitle}</h2>
+              {!hasStarted ? (
+                <span className="text-xs text-muted-foreground">{copy.notStarted}</span>
+              ) : isOver ? (
+                <span className="text-xs text-muted-foreground">{copy.ended}</span>
+              ) : (
+                <span className="text-xs text-emerald-600">{copy.inProgress}</span>
+              )}
+            </div>
+            <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
+              {displayPrompt ? (
+                <pre className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
+                  {displayPrompt}
+                </pre>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {showPrompt ? copy.noPrompt : copy.promptLocked}
+                </p>
+              )}
+            </div>
+          </section>
+        </>
+      ) : null}
 
       {!props.isStaff ? (
         <section className="card-frame bg-card p-5">
@@ -564,42 +609,109 @@ export function SprintCmsClient(props: {
           )}
         </section>
       ) : (
-        <section className="card-frame bg-card p-5 space-y-5">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-sm font-medium text-foreground">{copy.adminTitle}</h2>
-          </div>
+        <>
+          <section className="card-frame bg-card p-5 space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-sm font-medium text-foreground">{copy.adminTitle}</h2>
+            </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
               <label className="text-[11px] font-semibold uppercase text-muted-foreground">
                 {copy.contestTitleEditorLabel}
               </label>
-              <Input
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder={copy.contestTitlePlaceholder}
-              />
+              <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                <Input
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder={copy.contestTitlePlaceholder}
+                />
+                <Button
+                  onClick={() => saveField('topic')}
+                  disabled={savingField !== null}
+                  className="w-full md:w-auto"
+                >
+                  {savingField === 'topic' ? copy.saving : copy.save}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-end">
-              <Button onClick={saveAdminChanges} disabled={saving} className="w-full md:w-auto">
-                {saving ? copy.saving : copy.save}
-              </Button>
+
+            <div className="grid gap-2">
+              <label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                {copy.promptTitle}
+              </label>
+              <div className="grid gap-2 md:grid-cols-[1fr_auto] md:items-start">
+                <textarea
+                  className="min-h-[180px] max-h-[420px] w-full overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder={copy.promptEditorPlaceholder}
+                />
+                <Button
+                  onClick={() => saveField('prompt')}
+                  disabled={savingField !== null}
+                  className="w-full md:w-auto"
+                >
+                  {savingField === 'prompt' ? copy.saving : copy.save}
+                </Button>
+              </div>
             </div>
-          </div>
 
-          <div className="grid gap-2">
-            <label className="text-[11px] font-semibold uppercase text-muted-foreground">
-              {copy.promptEditorLabel}
-            </label>
-            <textarea
-              className="min-h-[180px] max-h-[420px] w-full overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={copy.promptEditorPlaceholder}
-            />
-          </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {copy.startsAtLabel}
+                </label>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <Input
+                    type="datetime-local"
+                    value={startsAtInput}
+                    onChange={(e) => setStartsAtInput(e.target.value)}
+                  />
+                  <Button
+                    onClick={() => saveField('startsAt')}
+                    disabled={savingField !== null}
+                    className="w-full md:w-auto"
+                  >
+                    {savingField === 'startsAt' ? copy.saving : copy.save}
+                  </Button>
+                </div>
+              </div>
 
-          <div className="space-y-3">
+              <div className="grid gap-2">
+                <label className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {copy.difficultyLabel}
+                </label>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <select
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={difficulty ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === 'BASIC' || raw === 'INTERMEDIATE' || raw === 'ADVANCED') {
+                        setDifficulty(raw);
+                      } else {
+                        setDifficulty(null);
+                      }
+                    }}
+                  >
+                    <option value="">{copy.difficultyNone}</option>
+                    <option value="BASIC">{copy.difficultyBasic}</option>
+                    <option value="INTERMEDIATE">{copy.difficultyIntermediate}</option>
+                    <option value="ADVANCED">{copy.difficultyAdvanced}</option>
+                  </select>
+                  <Button
+                    onClick={() => saveField('difficulty')}
+                    disabled={savingField !== null}
+                    className="w-full md:w-auto"
+                  >
+                    {savingField === 'difficulty' ? copy.saving : copy.save}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="card-frame bg-card p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-medium text-foreground">{copy.problemsTitle}</h3>
@@ -632,7 +744,11 @@ export function SprintCmsClient(props: {
                         size="sm"
                         variant="outline"
                         onClick={() =>
-                          setProblems((prev) => prev.filter((p) => p.id !== problem.id).map((p, idx2) => ({ ...p, order: idx2 + 1 })))
+                          setProblems((prev) =>
+                            prev
+                              .filter((p) => p.id !== problem.id)
+                              .map((p, idx2) => ({ ...p, order: idx2 + 1 })),
+                          )
                         }
                       >
                         {copy.removeProblem}
@@ -841,8 +957,8 @@ export function SprintCmsClient(props: {
             >
               {copy.addProblem}
             </Button>
-          </div>
-        </section>
+          </section>
+        </>
       )}
     </div>
   );
