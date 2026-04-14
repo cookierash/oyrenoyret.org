@@ -29,29 +29,12 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
     const takeParam = Number(searchParams.get('take') ?? 100);
     const take = Number.isFinite(takeParam) ? Math.min(Math.max(takeParam, 1), 200) : 100;
     const typeParam = searchParams.get('type');
-    const includePastParam = searchParams.get('includePast');
-    const includePastRequested =
-      includePastParam === '1' || includePastParam === 'true' || includePastParam === 'yes';
     const isLiveEventType = (value: string | null): value is LiveEventType =>
       value === 'PROBLEM_SPRINT' || value === 'EVENT';
     const type = isLiveEventType(typeParam) ? typeParam : null;
 
     const userId = await getCurrentSession();
     const now = new Date();
-    const ongoingLookback = new Date(now.getTime() - 8 * 60 * 60 * 1000);
-
-    let includePast = false;
-    if (includePastRequested && userId) {
-      try {
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { role: true },
-        });
-        includePast = Boolean(user?.role && isStaff(user.role));
-      } catch {
-        includePast = false;
-      }
-    }
 
     let events: Array<{
       id: string;
@@ -68,9 +51,8 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
         where: {
           deletedAt: null,
           ...(type ? { type } : {}),
-          ...(includePast ? {} : { date: { gte: ongoingLookback } }),
         },
-        orderBy: { date: 'asc' },
+        orderBy: { date: 'desc' },
         take,
         select: {
           id: true,
@@ -89,9 +71,8 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
         events = await prisma.liveEvent.findMany({
           where: {
             ...(type ? { type } : {}),
-            ...(includePast ? {} : { date: { gte: ongoingLookback } }),
           },
-          orderBy: { date: 'asc' },
+          orderBy: { date: 'desc' },
           take,
           select: {
             id: true,
@@ -170,19 +151,7 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
     }
 
     const nowMs = now.getTime();
-    // For public listings, keep "problem sprints" visible even after they end so users can still
-    // see recently-finished sprints in the All events section. Other event types continue to hide
-    // once they are over (unless includePast is enabled for staff).
-    const visible = includePast
-      ? events
-      : events.filter((event) => {
-          if (event.type === 'PROBLEM_SPRINT') return true;
-          const startMs = event.date.getTime();
-          const endMs = startMs + event.durationMinutes * 60_000;
-          return startMs >= nowMs || endMs > nowMs;
-        });
-
-    const result = visible.map((event) => {
+    const result = events.map((event) => {
       const startMs = event.date.getTime();
       const endMs = startMs + event.durationMinutes * 60_000;
       const isOngoing = startMs <= nowMs && endMs > nowMs;
@@ -200,6 +169,19 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
         enrollmentStatus: enrollmentMap.get(event.id) ?? null,
         hasPayout: event.type === 'PROBLEM_SPRINT' ? paidOutSprintIds.has(event.id) : null,
       };
+    });
+
+    // Sort to show upcoming/ongoing first (soonest first), and ended events last (most recent first).
+    // This keeps "All events" usable even when many ended events are included.
+    result.sort((a, b) => {
+      const aStart = a.date.getTime();
+      const bStart = b.date.getTime();
+      const aEnd = aStart + a.durationMinutes * 60_000;
+      const bEnd = bStart + b.durationMinutes * 60_000;
+      const aOver = aEnd <= nowMs;
+      const bOver = bEnd <= nowMs;
+      if (aOver !== bOver) return aOver ? 1 : -1;
+      return aOver ? bStart - aStart : aStart - bStart;
     });
 
     return NextResponse.json(result, { headers: getPrivateNoStoreHeaders() });
