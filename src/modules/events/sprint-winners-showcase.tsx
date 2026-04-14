@@ -14,16 +14,19 @@ export type SprintWinnerSlot = {
   avatarVariant: string | null;
 };
 
-function rankLabel(rank: 1 | 2 | 3) {
-  return rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd';
-}
-
 export function SprintWinnersShowcase(props: {
   winners: SprintWinnerSlot[];
   isEvaluating: boolean;
 }) {
   const { messages } = useI18n();
   const copy = messages.liveActivities.cms;
+
+  const rankLabel = (rank: 1 | 2 | 3) =>
+    rank === 1
+      ? copy.winnersRankFirst
+      : rank === 2
+        ? copy.winnersRankSecond
+        : copy.winnersRankThird;
 
   const winnersByRank = useMemo(() => {
     const map = new Map<1 | 2 | 3, SprintWinnerSlot>();
@@ -130,4 +133,3 @@ export function SprintWinnersShowcase(props: {
     </div>
   );
 }
-
