@@ -13,6 +13,7 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
 import { SprintCmsClient } from '@/src/modules/events/sprint-cms-client';
+import { SprintWinnersShowcase, type SprintWinnerSlot } from '@/src/modules/events/sprint-winners-showcase';
 import { Button } from '@/components/ui/button';
 import { getI18n } from '@/src/i18n/server';
 
@@ -140,6 +141,68 @@ export default async function SprintWorkspacePage({
       ? (event.difficulty as 'BASIC' | 'INTERMEDIATE' | 'ADVANCED')
       : null;
 
+  const nowMs = Date.now();
+  const sprintEndsAtMs = event.date.getTime() + event.durationMinutes * 60_000;
+  const sprintIsOver = nowMs > sprintEndsAtMs;
+
+  let winners: SprintWinnerSlot[] = [];
+  if (sprintIsOver) {
+    const payoutReferenceIds = [`${event.id}:rank:1`, `${event.id}:rank:2`, `${event.id}:rank:3`];
+    try {
+      const payouts = await prisma.creditTransaction.findMany({
+        where: {
+          type: 'SPRINT_PAYOUT',
+          referenceId: { in: payoutReferenceIds },
+        },
+        select: { referenceId: true, userId: true },
+      });
+
+      const ranks: Array<{ rank: 1 | 2 | 3; userId: string }> = [];
+      for (const payout of payouts) {
+        const ref = payout.referenceId ?? '';
+        const match = ref.match(/:rank:(1|2|3)$/);
+        if (!match) continue;
+        const rank = Number(match[1]) as 1 | 2 | 3;
+        ranks.push({ rank, userId: payout.userId });
+      }
+
+      const userIds = Array.from(new Set(ranks.map((r) => r.userId)));
+      const users = userIds.length
+        ? await prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: {
+              id: true,
+              publicId: true,
+              firstName: true,
+              lastName: true,
+              avatarVariant: true,
+            },
+          })
+        : [];
+      const userMap = new Map(users.map((u) => [u.id, u]));
+
+      winners = [];
+      for (const r of ranks) {
+        const u = userMap.get(r.userId);
+        if (!u) continue;
+        const name =
+          [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.publicId || 'Winner';
+        winners.push({
+          rank: r.rank,
+          userId: u.id,
+          profileId: u.publicId ?? null,
+          name,
+          avatarVariant: u.avatarVariant ?? null,
+        });
+      }
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) throw error;
+      winners = [];
+    }
+  }
+
+  const isEvaluating = sprintIsOver && winners.length === 0;
+
   let problems: Array<{
     id: string;
     order: number;
@@ -211,6 +274,12 @@ export default async function SprintWorkspacePage({
             </Link>
           </Button>
         </header>
+
+        {winners.length > 0 || isEvaluating ? (
+          <div className="mt-4">
+            <SprintWinnersShowcase winners={winners} isEvaluating={isEvaluating} />
+          </div>
+        ) : null}
 
         <div className="mt-5">
           <SprintCmsClient

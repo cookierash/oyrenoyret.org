@@ -170,9 +170,13 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
     }
 
     const nowMs = now.getTime();
+    // For public listings, keep "problem sprints" visible even after they end so users can still
+    // see recently-finished sprints in the All events section. Other event types continue to hide
+    // once they are over (unless includePast is enabled for staff).
     const visible = includePast
       ? events
       : events.filter((event) => {
+          if (event.type === 'PROBLEM_SPRINT') return true;
           const startMs = event.date.getTime();
           const endMs = startMs + event.durationMinutes * 60_000;
           return startMs >= nowMs || endMs > nowMs;

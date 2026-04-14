@@ -23,6 +23,7 @@ interface LiveEvent {
   creditCost: number;
   type: string;
   enrollmentStatus: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | null;
+  hasPayout?: boolean | null;
   maxParticipants?: number | null;
   slotsTaken?: number;
   isOngoing?: boolean;
@@ -58,6 +59,8 @@ export function LiveEventsBoard() {
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [allEventsPage, setAllEventsPage] = useState(1);
+  const pageSize = 20;
 
   const fetchEvents = () => {
     setLoading(true);
@@ -83,6 +86,20 @@ export function LiveEventsBoard() {
     [events],
   );
   const hasNoEvents = events.length === 0;
+
+  const totalAllEventsPages = useMemo(
+    () => Math.max(1, Math.ceil(availableEvents.length / pageSize)),
+    [availableEvents.length],
+  );
+
+  useEffect(() => {
+    setAllEventsPage((prev) => Math.min(Math.max(prev, 1), totalAllEventsPages));
+  }, [totalAllEventsPages]);
+
+  const pagedAvailableEvents = useMemo(() => {
+    const start = (allEventsPage - 1) * pageSize;
+    return availableEvents.slice(start, start + pageSize);
+  }, [availableEvents, allEventsPage]);
 
   const handleEnroll = async (eventId: string) => {
     if (!canWrite) {
@@ -222,7 +239,7 @@ export function LiveEventsBoard() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {availableEvents.map((event) => (
+            {pagedAvailableEvents.map((event) => (
               <LiveEventCard
                 key={event.id}
                 event={event}
@@ -230,6 +247,25 @@ export function LiveEventsBoard() {
                 onEnroll={handleEnroll}
               />
             ))}
+            {totalAllEventsPages > 1 ? (
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                {Array.from({ length: totalAllEventsPages }).map((_, i) => {
+                  const page = i + 1;
+                  const isActive = page === allEventsPage;
+                  return (
+                    <Button
+                      key={`all-events-page-${page}`}
+                      size="sm"
+                      variant={isActive ? 'primary' : 'outline'}
+                      aria-current={isActive ? 'page' : undefined}
+                      onClick={() => setAllEventsPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
         )}
       </section>
@@ -257,6 +293,9 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
   const isCancelled = event.enrollmentStatus === 'CANCELLED';
   const isBusy = actionId === event.id;
   const isOngoing = event.isOngoing ?? (startMs <= nowMs && endMs > nowMs);
+  const isOver = endMs <= nowMs;
+  const isEvaluating =
+    event.type === 'PROBLEM_SPRINT' && isOver && !(event.hasPayout ?? false);
   const isFull = event.isFull ?? false;
   const localeCode = getLocaleCode(locale);
   const hour12 =
@@ -307,6 +346,16 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
                 {copy.statusFull}
               </span>
             ) : null}
+            {isEvaluating ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                <span className="inline-block h-2.5 w-2.5 animate-spin rounded-full border-2 border-amber-700/20 border-t-amber-700 dark:border-amber-400/20 dark:border-t-amber-400" />
+                {copy.statusEvaluating}
+              </span>
+            ) : isOver ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {copy.statusOver}
+              </span>
+            ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
             {event.type === 'EVENT' ? copy.eventTypeLiveEvent : copy.eventTypeProblemSprint}
@@ -345,6 +394,16 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
             <AlertCircle className="h-4 w-4 text-rose-500" />
             {copy.cancelledNotice}
           </div>
+        ) : isEvaluating ? (
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground" />
+            {copy.evaluatingNotice}
+          </div>
+        ) : isOver ? (
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-4 w-4" />
+            {copy.overNotice}
+          </div>
         ) : isOngoing ? (
           <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
             <AlertCircle className="h-4 w-4 text-sky-500" />
@@ -371,6 +430,14 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
           ) : isPending ? (
             <Button asChild size="sm" variant="secondary" disabled={isBusy}>
               <Link href="/notifications">{copy.completeRegistration}</Link>
+            </Button>
+          ) : isEvaluating ? (
+            <Button size="sm" variant="secondary" disabled>
+              {copy.evaluatingLabel}
+            </Button>
+          ) : isOver ? (
+            <Button size="sm" variant="secondary" disabled>
+              {copy.overLabel}
             </Button>
           ) : isOngoing ? (
             <Button size="sm" variant="secondary" disabled>
