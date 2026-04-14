@@ -20,7 +20,10 @@ function isDbUnreachable(error: unknown): boolean {
       ? String((error as any).code)
       : '';
 
+  // Prisma / driver codes
   if (code === 'P1001') return true;
+  // Postgres: too_many_connections
+  if (code === '53300') return true;
 
   const message =
     error instanceof Error
@@ -31,7 +34,16 @@ function isDbUnreachable(error: unknown): boolean {
 
   if (!message) return false;
   const lowered = message.toLowerCase();
-  return lowered.includes("can't reach database server") || lowered.includes('cannot reach database server');
+  return (
+    lowered.includes("can't reach database server") ||
+    lowered.includes('cannot reach database server') ||
+    lowered.includes('too many connections') ||
+    lowered.includes('too many clients already') ||
+    lowered.includes('remaining connection slots are reserved') ||
+    lowered.includes('connection terminated unexpectedly') ||
+    lowered.includes('econnrefused') ||
+    lowered.includes('etimedout')
+  );
 }
 
 const globalForSessionCache = globalThis as unknown as {

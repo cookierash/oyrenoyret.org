@@ -13,7 +13,12 @@ export async function GET(request: Request) {
     return NextResponse.json(body, { status, headers });
   }
 
-  const count = await getOnlineCount();
+  let count = 0;
+  try {
+    count = await getOnlineCount();
+  } catch (error) {
+    console.error('[online-users] Failed to read online count:', error);
+  }
   return NextResponse.json({ count }, { headers: getPrivateNoStoreHeaders() });
 }
 
@@ -30,6 +35,11 @@ export async function POST(request: Request) {
     return NextResponse.json(body, { status, headers });
   }
 
-  const count = await touchOnlineUser(userId);
+  let count = 0;
+  try {
+    count = await touchOnlineUser(userId);
+  } catch (error) {
+    console.error('[online-users] Failed to touch presence:', error);
+  }
   return NextResponse.json({ count }, { headers: getPrivateNoStoreHeaders() });
 }

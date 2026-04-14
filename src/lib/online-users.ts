@@ -49,10 +49,15 @@ async function cleanupRedis(redis: Redis, now: number) {
 export async function touchOnlineUser(userId: string, now = Date.now()): Promise<number> {
   const redis = getRedis();
   if (redis) {
-    await redis.zadd(ONLINE_ZSET_KEY, { score: now, member: userId });
-    await cleanupRedis(redis, now);
-    const count = await redis.zcard(ONLINE_ZSET_KEY);
-    return typeof count === 'number' ? count : Number(count ?? 0);
+    try {
+      await redis.zadd(ONLINE_ZSET_KEY, { score: now, member: userId });
+      await cleanupRedis(redis, now);
+      const count = await redis.zcard(ONLINE_ZSET_KEY);
+      return typeof count === 'number' ? count : Number(count ?? 0);
+    } catch (error) {
+      console.warn('[online-users] Upstash Redis failed; falling back to in-memory presence.', error);
+      globalForOnline.onlineUsersRedis = undefined;
+    }
   }
 
   cleanup(now);
@@ -63,9 +68,14 @@ export async function touchOnlineUser(userId: string, now = Date.now()): Promise
 export async function getOnlineCount(now = Date.now()): Promise<number> {
   const redis = getRedis();
   if (redis) {
-    await cleanupRedis(redis, now);
-    const count = await redis.zcard(ONLINE_ZSET_KEY);
-    return typeof count === 'number' ? count : Number(count ?? 0);
+    try {
+      await cleanupRedis(redis, now);
+      const count = await redis.zcard(ONLINE_ZSET_KEY);
+      return typeof count === 'number' ? count : Number(count ?? 0);
+    } catch (error) {
+      console.warn('[online-users] Upstash Redis failed; falling back to in-memory presence.', error);
+      globalForOnline.onlineUsersRedis = undefined;
+    }
   }
 
   cleanup(now);
