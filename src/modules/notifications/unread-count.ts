@@ -1,7 +1,7 @@
 import { prisma } from '@/src/db/client';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import type { MutedWindow } from './mute-windows';
-import { buildMutedCreatedAtNotFilters } from './mute-windows';
+import { buildMutedCreatedAtNotFilters, buildMutedDateNotFilters } from './mute-windows';
 
 export async function computeUnreadCount(params: {
   userId: string;
@@ -23,9 +23,10 @@ export async function computeUnreadCount(params: {
     params.creditsMutedWindows,
     params.creditsOpenMutedFrom,
   );
-  const sprintsNotFilters = buildMutedCreatedAtNotFilters(
+  const sprintsNotFilters = buildMutedDateNotFilters(
     params.sprintsMutedWindows,
     params.sprintsOpenMutedFrom,
+    'updatedAt',
   );
 
   const [replyCount, creditCount, sprintCount, moderationCount] = await Promise.all([
@@ -50,8 +51,8 @@ export async function computeUnreadCount(params: {
           where: {
             ...(sprintsNotFilters.length ? { AND: sprintsNotFilters } : {}),
             userId: params.userId,
-            createdAt: { gt: since },
-            status: { in: ['PENDING', 'CANCELLED'] },
+            updatedAt: { gt: since },
+            status: { in: ['PENDING', 'CONFIRMED', 'CANCELLED'] },
             liveEvent: { deletedAt: null, type: 'PROBLEM_SPRINT' },
           },
         });
@@ -67,4 +68,3 @@ export async function computeUnreadCount(params: {
 
   return replyCount + creditCount + sprintCount + moderationCount;
 }
-

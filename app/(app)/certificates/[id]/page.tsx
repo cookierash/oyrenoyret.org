@@ -66,7 +66,7 @@ export default async function CertificatePage({ params }: CertificatePageProps) 
                         <h1 className="text-3xl sm:text-4xl font-semibold font-comfortaa text-primary tracking-tight">
                             {copy.completionTitle}
                         </h1>
-                        <p className="text-muted-foreground uppercase tracking-widest text-sm font-medium">
+                        <p className="text-muted-foreground uppercase tracking-normal text-sm font-medium">
                             {copy.acknowledgesLabel}
                         </p>
                         <h2 className="text-2xl sm:text-3xl font-medium text-foreground">

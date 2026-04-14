@@ -113,8 +113,8 @@ export default async function SprintWorkspacePage({
     return (
       <div className="min-h-screen bg-muted/20">
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            Problem sprint workspace
+          <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+            Contest area
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-foreground">
             Complete registration to enter
@@ -135,6 +135,40 @@ export default async function SprintWorkspacePage({
 
   const eventDate = new Date(event.date);
   const allowPromptForClient = staff || Date.now() >= event.date.getTime();
+  const allowProblemsForClient = allowPromptForClient;
+
+  let problems: Array<{
+    id: string;
+    order: number;
+    type: 'MULTIPLE_CHOICE' | 'SHORT_ANSWER';
+    prompt: string;
+    options: Array<{ id: string; order: number; text: string; isCorrect?: boolean }>;
+  }> = [];
+  try {
+    problems = await prisma.liveEventProblem.findMany({
+      where: { liveEventId: event.id },
+      orderBy: { order: 'asc' },
+      select: {
+        id: true,
+        order: true,
+        type: true,
+        prompt: true,
+        options: {
+          orderBy: { order: 'asc' },
+          select: {
+            id: true,
+            order: true,
+            text: true,
+            ...(staff ? { isCorrect: true } : {}),
+          },
+        },
+      },
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+    problems = [];
+  }
+
   let mySubmission: { id: string; createdAt: Date } | null = null;
   let submissions: Array<{
     id: string;
@@ -147,6 +181,15 @@ export default async function SprintWorkspacePage({
       firstName: string | null;
       lastName: string | null;
     };
+    answers?: Array<{
+      id: string;
+      problemId: string;
+      type: 'MULTIPLE_CHOICE' | 'SHORT_ANSWER';
+      textAnswer: string | null;
+      selectedOptionId: string | null;
+      selectedOption?: { id: string; text: string } | null;
+      images?: Array<{ id: string; order: number; key: string }>;
+    }>;
   }> = [];
   try {
     [mySubmission, submissions] = await Promise.all([
@@ -162,6 +205,18 @@ export default async function SprintWorkspacePage({
               id: true,
               answer: true,
               createdAt: true,
+              answers: {
+                orderBy: { createdAt: 'asc' },
+                select: {
+                  id: true,
+                  problemId: true,
+                  type: true,
+                  textAnswer: true,
+                  selectedOptionId: true,
+                  selectedOption: { select: { id: true, text: true } },
+                  images: { orderBy: { order: 'asc' }, select: { id: true, order: true, key: true } },
+                },
+              },
               user: {
                 select: {
                   id: true,
@@ -177,21 +232,51 @@ export default async function SprintWorkspacePage({
     ]);
   } catch (error) {
     if (!isDbSchemaMismatch(error)) throw error;
-    mySubmission = null;
-    submissions = [];
+    try {
+      [mySubmission, submissions] = await Promise.all([
+        prisma.liveEventSubmission.findUnique({
+          where: { liveEventId_userId: { liveEventId: event.id, userId } },
+          select: { id: true, createdAt: true },
+        }),
+        staff
+          ? prisma.liveEventSubmission.findMany({
+              where: { liveEventId: event.id, deletedAt: null },
+              orderBy: { createdAt: 'asc' },
+              select: {
+                id: true,
+                answer: true,
+                createdAt: true,
+                user: {
+                  select: {
+                    id: true,
+                    publicId: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            })
+          : Promise.resolve([]),
+      ]);
+    } catch (fallbackError) {
+      if (!isDbSchemaMismatch(fallbackError)) throw fallbackError;
+      mySubmission = null;
+      submissions = [];
+    }
   }
 
   return (
     <div className="min-h-screen bg-muted/20">
-      <div className="mx-auto w-full max-w-5xl px-6 py-8">
+      <div className="mx-auto w-full max-w-5xl px-6 py-6">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-              Problem sprint CMS
+            <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+              Contest area
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-foreground">{event.topic}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Competition workspace for verified participants.
+              Competition area for verified participants.
             </p>
           </div>
           <Button size="sm" variant="ghost" asChild>
@@ -202,12 +287,14 @@ export default async function SprintWorkspacePage({
           </Button>
         </header>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
+        <div className="mt-5 grid gap-5 lg:grid-cols-[2fr_1fr]">
           <SprintCmsClient
             liveEventId={event.id}
             startsAt={event.date.toISOString()}
             durationMinutes={event.durationMinutes}
             initialPrompt={allowPromptForClient ? (event.prompt ?? null) : null}
+            initialProblems={allowProblemsForClient ? problems : null}
+            initialProblemsLocked={!allowProblemsForClient}
             initialMaxParticipants={event.maxParticipants ?? null}
             isStaff={staff}
             initialHasSubmitted={Boolean(mySubmission)}

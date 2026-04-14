@@ -712,6 +712,11 @@ enum LiveEventEnrollmentStatus {
   CANCELLED
 }
 
+enum LiveEventProblemType {
+  MULTIPLE_CHOICE
+  SHORT_ANSWER
+}
+
 model LiveEvent {
   id              String   @id @default(uuid())
   topic           String
@@ -726,6 +731,7 @@ model LiveEvent {
   createdById     String?
   createdBy       User?    @relation("LiveEventsCreated", fields: [createdById], references: [id], onDelete: SetNull)
   enrollments     LiveEventEnrollment[]
+  problems        LiveEventProblem[]
   submissions     LiveEventSubmission[]
 
   createdAt DateTime @default(now())
@@ -745,6 +751,7 @@ model LiveEventSubmission {
 
   liveEvent   LiveEvent @relation(fields: [liveEventId], references: [id], onDelete: Cascade)
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers     LiveEventSubmissionAnswer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -754,6 +761,79 @@ model LiveEventSubmission {
   @@index([liveEventId])
   @@index([userId])
   @@index([deletedAt])
+}
+
+model LiveEventProblem {
+  id          String               @id @default(uuid())
+  liveEventId String
+  order       Int
+  type        LiveEventProblemType
+  prompt      String               @db.Text
+
+  liveEvent   LiveEvent            @relation(fields: [liveEventId], references: [id], onDelete: Cascade)
+  options     LiveEventProblemOption[]
+  answers     LiveEventSubmissionAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([liveEventId, order])
+  @@index([liveEventId])
+  @@index([type])
+}
+
+model LiveEventProblemOption {
+  id        String          @id @default(uuid())
+  problemId String
+  order     Int
+  text      String          @db.Text
+  isCorrect Boolean         @default(false)
+
+  problem   LiveEventProblem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  selectedBy LiveEventSubmissionAnswer[] @relation("LiveEventSubmissionAnswerSelectedOption")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([problemId, order])
+  @@index([problemId])
+}
+
+model LiveEventSubmissionAnswer {
+  id               String               @id @default(uuid())
+  submissionId     String
+  problemId        String
+  type             LiveEventProblemType
+  textAnswer       String?              @db.Text
+  selectedOptionId String?
+
+  submission       LiveEventSubmission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  problem          LiveEventProblem     @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  selectedOption   LiveEventProblemOption? @relation("LiveEventSubmissionAnswerSelectedOption", fields: [selectedOptionId], references: [id], onDelete: SetNull)
+  images           LiveEventSubmissionAnswerImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([submissionId, problemId])
+  @@index([submissionId])
+  @@index([problemId])
+  @@index([selectedOptionId])
+}
+
+model LiveEventSubmissionAnswerImage {
+  id       String                 @id @default(uuid())
+  answerId String
+  order    Int
+  key      String                 @db.Text
+
+  answer   LiveEventSubmissionAnswer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([answerId, order])
+  @@index([answerId])
+  @@index([key])
 }
 
 model LiveEventEnrollment {

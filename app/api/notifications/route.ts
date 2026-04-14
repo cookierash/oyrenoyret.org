@@ -21,6 +21,7 @@ import {
   NOTIFY_SPRINTS_DISABLED_AT_COOKIE,
   NOTIFY_SPRINTS_MUTED_WINDOWS_COOKIE,
   buildMutedCreatedAtNotFilters,
+  buildMutedDateNotFilters,
   parseIsoOrNull,
   parseMutedWindows,
 } from '@/src/modules/notifications/mute-windows';
@@ -79,14 +80,15 @@ export async function GET(request: Request) {
       parseMutedWindows(creditsMutedWindowsRaw),
       parseIsoOrNull(creditsDisabledAtRaw),
     );
-    const sprintsNotFilters = buildMutedCreatedAtNotFilters(
+    const sprintsNotFilters = buildMutedDateNotFilters(
       parseMutedWindows(sprintsMutedWindowsRaw),
       parseIsoOrNull(sprintsDisabledAtRaw),
+      'updatedAt',
     );
 
     const now = new Date();
 
-    const [replyNotifications, transactions, pendingEnrollments, moderationNotices] = await Promise.all([
+    const [replyNotifications, transactions, sprintEnrollments, moderationNotices] = await Promise.all([
       prisma.discussionReply.findMany({
         where: {
           ...(repliesNotFilters.length ? { AND: repliesNotFilters } : {}),
@@ -143,18 +145,18 @@ export async function GET(request: Request) {
             where: {
               ...(sprintsNotFilters.length ? { AND: sprintsNotFilters } : {}),
               userId,
-              status: { in: ['PENDING', 'CANCELLED'] },
+              status: { in: ['PENDING', 'CONFIRMED', 'CANCELLED'] },
               liveEvent: {
                 deletedAt: null,
                 type: 'PROBLEM_SPRINT',
                 date: { gte: now },
               },
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { updatedAt: 'desc' },
             take: 50,
             select: {
               id: true,
-              createdAt: true,
+              updatedAt: true,
               status: true,
               liveEvent: {
                 select: {
@@ -213,7 +215,7 @@ export async function GET(request: Request) {
         createdAt: tx.createdAt.toISOString(),
         label: tx.type,
       })),
-      ...pendingEnrollments.map((enrollment) => ({
+      ...sprintEnrollments.map((enrollment) => ({
         type: 'sprint' as const,
         id: enrollment.id,
         liveEventId: enrollment.liveEvent.id,
@@ -222,7 +224,7 @@ export async function GET(request: Request) {
         creditCost: roundCredits(enrollment.liveEvent.creditCost),
         durationMinutes: enrollment.liveEvent.durationMinutes,
         status: enrollment.status,
-        createdAt: enrollment.createdAt.toISOString(),
+        createdAt: enrollment.updatedAt.toISOString(),
       })),
       ...moderationNotices.map((notice) => ({
         type: 'moderation' as const,

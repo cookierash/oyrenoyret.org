@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import Link from 'next/link';
-import { PiWarningCircle as AlertCircle, PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiChatCircle as MessageSquare, PiShieldCheck as ShieldCheck, PiArrowCircleUp as CreditUp, PiArrowCircleDown as CreditDown } from 'react-icons/pi';
+import { PiWarningCircle as AlertCircle, PiSparkle as Sparkle, PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiChatCircle as MessageSquare, PiShieldCheck as ShieldCheck, PiArrowCircleUp as CreditUp, PiArrowCircleDown as CreditDown } from 'react-icons/pi';
 import { toast } from 'sonner';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
@@ -160,6 +160,7 @@ function SprintEnrollmentRow({
   const [accepted, setAccepted] = useState(false);
   const [rulesRead, setRulesRead] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const isConfirmed = item.status === 'CONFIRMED';
   const isCancelled = item.status === 'CANCELLED';
   const eventDate = new Date(item.date);
   const createdTime = new Date(item.createdAt);
@@ -231,6 +232,49 @@ function SprintEnrollmentRow({
       setSubmitting(false);
     }
   };
+
+  if (isConfirmed) {
+    return (
+      <li>
+        <div className="flex items-start gap-4 px-4 py-3 transition-colors hover:bg-muted/20">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600">
+            <Sparkle className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="text-sm font-medium text-foreground">{copy.confirmedTitle}</p>
+            <p className="text-xs text-muted-foreground">{item.topic}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                <Calendar className="h-3 w-3" />
+                {dateFormatter.format(eventDate)}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                <Clock className="h-3 w-3" />
+                {timeFormatter.format(eventDate)}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                <Clock className="h-3 w-3" />
+                {t('notifications.sprint.durationLabel', { count: item.durationMinutes })}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                <Coins className="h-3 w-3" />
+                {t('notifications.sprint.creditsLabel', { count: Math.round(item.creditCost) })}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">{copy.confirmedHint}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <Button size="sm" variant="secondary-primary" asChild>
+              <Link href="/interactive-sessions">{copy.viewSprint}</Link>
+            </Button>
+            <p suppressHydrationWarning className="mt-1 text-[10px] text-muted-foreground">
+              {timeFormatter.format(createdTime)}
+            </p>
+          </div>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li>
@@ -341,11 +385,6 @@ function SprintEnrollmentRow({
                       {copy.rulesText}
                     </p>
                   </div>
-                  {!rulesRead ? (
-                    <p className="mt-2 text-[11px] text-muted-foreground">
-                      {copy.scrollHint}
-                    </p>
-                  ) : null}
                 </>
               )}
             </div>

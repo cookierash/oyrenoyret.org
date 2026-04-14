@@ -13,6 +13,7 @@ import { getLocaleCode } from '@/src/i18n';
 import { extractErrorMessage, formatErrorToast } from '@/src/lib/error-toast';
 import { useCurrentUser } from '@/src/modules/auth/components/current-user-context';
 import { getWriteRestrictionMessage } from '@/src/lib/write-restriction';
+import { dispatchNotificationsUnreadUpdated } from '@/src/lib/notifications-events';
 
 interface LiveEvent {
   id: string;
@@ -121,6 +122,17 @@ export function LiveEventsBoard() {
           ? copy.toastAlreadyEnrolled
           : copy.toastRegistrationStarted
       );
+      try {
+        const unreadRes = await fetch('/api/notifications/unread-count', { cache: 'no-store' });
+        if (unreadRes.ok) {
+          const unreadData = await unreadRes.json().catch(() => ({}));
+          const unreadCount =
+            typeof unreadData?.unreadCount === 'number' ? unreadData.unreadCount : 0;
+          dispatchNotificationsUnreadUpdated(unreadCount);
+        }
+      } catch {
+        /* ignore */
+      }
       fetchEvents();
     } catch (error) {
       toast.error(

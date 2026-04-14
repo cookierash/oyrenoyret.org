@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { PiCalendar as Calendar, PiClock as Clock, PiCoins as Coins, PiMagnifyingGlass as Search } from 'react-icons/pi';
 import {
@@ -32,6 +33,7 @@ interface LiveEvent {
   difficulty: MaterialDifficulty | null;
   creditCost: number;
   type: string;
+  hasPayout?: boolean | null;
 }
 
 interface LiveAnnouncement {
@@ -73,6 +75,15 @@ function toLocalInputValue(date: Date) {
   )}:${pad(date.getMinutes())}`;
 }
 
+function isLiveEventOver(
+  event: Pick<LiveEvent, 'date' | 'durationMinutes'>,
+  nowMs: number = Date.now(),
+) {
+  const startMs = new Date(event.date).getTime();
+  if (Number.isNaN(startMs)) return false;
+  return startMs + event.durationMinutes * 60_000 < nowMs;
+}
+
 interface LiveEventsAdminPanelProps {
   type: 'PROBLEM_SPRINT' | 'EVENT';
   labels: {
@@ -95,10 +106,12 @@ interface LiveEventsAdminPanelProps {
 
 function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelProps) {
   const { t, messages } = useI18n();
+  const router = useRouter();
   const difficultyCopy = messages.materials.difficulty;
   const adminCopy = messages.liveActivities.admin;
   const uiCopy = messages.liveActivities.admin.ui;
   const commonCopy = uiCopy.common;
+  const wizardCopy = type === 'PROBLEM_SPRINT' ? uiCopy.problemSprints.wizard : null;
   const initialForm = useMemo(
     () => ({
       topic: '',
@@ -107,7 +120,6 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       difficulty: defaults?.difficulty ?? 'BASIC',
       creditCost: defaults?.creditCost ?? '5',
       maxParticipants: '30',
-      prompt: '',
     }),
     [defaults?.creditCost, defaults?.difficulty, defaults?.durationMinutes],
   );
@@ -117,8 +129,10 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<EventSortKey>('soonest');
   const [page, setPage] = useState(1);
+  const [archivedPage, setArchivedPage] = useState(1);
   const [eventForm, setEventForm] = useState(initialForm);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [createStep, setCreateStep] = useState(1);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
@@ -136,6 +150,12 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
   const [payingOut, setPayingOut] = useState(false);
   const minDateTime = toLocalInputValue(new Date());
 
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  const [analysisTarget, setAnalysisTarget] = useState<LiveEvent | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [analysisProblems, setAnalysisProblems] = useState<any[]>([]);
+  const [analysisSubmissions, setAnalysisSubmissions] = useState<any[]>([]);
+
   const loadData = () => {
     setLoading(true);
     const params = new URLSearchParams();
@@ -152,6 +172,16 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
   useEffect(() => {
     loadData();
   }, [type]);
+
+  const resetCreateWizard = () => {
+    setCreateStep(1);
+    setEventForm(initialForm);
+  };
+
+  useEffect(() => {
+    if (!eventDialogOpen) resetCreateWizard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventDialogOpen]);
 
   const handleCreateEvent = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -212,7 +242,6 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
           creditCost,
           type,
           maxParticipants,
-          ...(type === 'PROBLEM_SPRINT' ? { prompt: eventForm.prompt } : {}),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -225,6 +254,10 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       toast.success(adminCopy.toasts.eventCreated);
       setEventForm(initialForm);
       setEventDialogOpen(false);
+      if (type === 'PROBLEM_SPRINT' && typeof (data as any)?.id === 'string') {
+        router.push(`/cms/sprint/${String((data as any).id)}`);
+        return;
+      }
       loadData();
     } catch (error) {
       toast.error(
@@ -235,6 +268,42 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
       );
     }
   };
+
+  const openAnalysis = (event: LiveEvent) => {
+    setAnalysisTarget(event);
+    setAnalysisDialogOpen(true);
+  };
+
+  useEffect(() => {
+    if (!analysisDialogOpen || !analysisTarget) return;
+    setAnalysisLoading(true);
+    Promise.all([
+      fetch(`/api/live-events/${encodeURIComponent(analysisTarget.id)}/problems`, { cache: 'no-store' })
+        .then((r) => r.json().then((j) => ({ ok: r.ok, json: j }))),
+      fetch(`/api/live-events/${encodeURIComponent(analysisTarget.id)}/submissions`, { cache: 'no-store' })
+        .then((r) => r.json().then((j) => ({ ok: r.ok, json: j }))),
+    ])
+      .then(([problemsRes, submissionsRes]) => {
+        if (problemsRes.ok) {
+          const list = Array.isArray((problemsRes.json as any)?.problems)
+            ? (problemsRes.json as any).problems
+            : [];
+          setAnalysisProblems(list);
+        } else {
+          setAnalysisProblems([]);
+        }
+        if (submissionsRes.ok) {
+          setAnalysisSubmissions(Array.isArray(submissionsRes.json) ? submissionsRes.json : []);
+        } else {
+          setAnalysisSubmissions([]);
+        }
+      })
+      .catch(() => {
+        setAnalysisProblems([]);
+        setAnalysisSubmissions([]);
+      })
+      .finally(() => setAnalysisLoading(false));
+  }, [analysisDialogOpen, analysisTarget]);
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
@@ -352,7 +421,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     }
   };
 
-  const filteredAndSorted = useMemo(() => {
+  const filteredAndSortedAll = useMemo(() => {
     const query = search.trim().toLowerCase();
     let list = events;
 
@@ -376,13 +445,41 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
     });
   }, [events, search, sort]);
 
+  const { scheduledEvents, archivedEvents } = useMemo(() => {
+    if (type !== 'PROBLEM_SPRINT') {
+      return { scheduledEvents: filteredAndSortedAll, archivedEvents: [] as LiveEvent[] };
+    }
+
+    const nowMs = Date.now();
+    const scheduled: LiveEvent[] = [];
+    const archived: LiveEvent[] = [];
+
+    for (const event of filteredAndSortedAll) {
+      const over = isLiveEventOver(event, nowMs);
+      const hasPayout = Boolean(event.hasPayout);
+      if (over && hasPayout) {
+        archived.push(event);
+      } else {
+        scheduled.push(event);
+      }
+    }
+
+    return { scheduledEvents: scheduled, archivedEvents: archived };
+  }, [filteredAndSortedAll, type]);
+
   useEffect(() => {
     setPage(1);
+    setArchivedPage(1);
   }, [search, sort, events.length]);
 
-  const visibleEvents = useMemo(
-    () => filteredAndSorted.slice(0, page * EVENT_PAGE_SIZE),
-    [filteredAndSorted, page],
+  const visibleScheduledEvents = useMemo(
+    () => scheduledEvents.slice(0, page * EVENT_PAGE_SIZE),
+    [scheduledEvents, page],
+  );
+
+  const visibleArchivedEvents = useMemo(
+    () => archivedEvents.slice(0, archivedPage * EVENT_PAGE_SIZE),
+    [archivedEvents, archivedPage],
   );
 
   return (
@@ -393,113 +490,440 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             <AlertDialogTitle>{labels.formTitle}</AlertDialogTitle>
             <AlertDialogDescription>{labels.formDescription}</AlertDialogDescription>
           </AlertDialogHeader>
-          <form className="mt-4 grid gap-4" onSubmit={handleCreateEvent}>
-            <div className="grid gap-2">
-              <Label htmlFor={`${type}-topic`}>{commonCopy.topicLabel}</Label>
-              <Input
-                id={`${type}-topic`}
-                value={eventForm.topic}
-                onChange={(e) => setEventForm((prev) => ({ ...prev, topic: e.target.value }))}
-                placeholder={commonCopy.topicPlaceholder}
-              />
-            </div>
-            {type === 'PROBLEM_SPRINT' ? (
-              <div className="grid gap-2">
-                <Label htmlFor={`${type}-prompt`}>{commonCopy.problemStatementLabel}</Label>
-                <textarea
-                  id={`${type}-prompt`}
-                  className="min-h-[120px] max-h-[420px] overflow-y-auto rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/15"
-                  value={eventForm.prompt}
-                  onChange={(e) =>
-                    setEventForm((prev) => ({ ...prev, prompt: e.target.value }))
-                  }
-                  placeholder={commonCopy.problemStatementPlaceholder}
-                />
+          {type === 'PROBLEM_SPRINT' && wizardCopy ? (
+            <div className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                    {wizardCopy.stepLabel
+                      .replace('{{current}}', String(createStep))
+                      .replace('{{total}}', '2')}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {Array.from({ length: 2 }, (_, i) => {
+                    const step = i + 1;
+                    const isCompleted = step < createStep;
+                    const isCurrent = step === createStep;
+                    return (
+                      <div
+                        key={step}
+                        className={[
+                          'h-1.5 flex-1 rounded-full transition-all duration-500 ease-out',
+                          isCompleted || isCurrent ? 'bg-primary' : 'bg-muted',
+                        ].join(' ')}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {createStep === 1
+                      ? wizardCopy.step1Title
+                      : wizardCopy.step2Title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {createStep === 1
+                      ? wizardCopy.step1Description
+                      : wizardCopy.step2Description}
+                  </p>
+                </div>
               </div>
-            ) : null}
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor={`${type}-date`}>{commonCopy.dateTimeLabel}</Label>
-                <Input
-                  id={`${type}-date`}
-                  type="datetime-local"
-                  value={eventForm.date}
-                  min={minDateTime}
-                  onChange={(e) => setEventForm((prev) => ({ ...prev, date: e.target.value }))}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${type}-duration`}>{commonCopy.durationLabel}</Label>
-                <Input
-                  id={`${type}-duration`}
-                  type="number"
-                  min={5}
-                  max={30}
-                  step={1}
-                  value={eventForm.durationMinutes}
-                  onChange={(e) =>
-                    setEventForm((prev) => ({ ...prev, durationMinutes: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor={`${type}-difficulty`}>{commonCopy.difficultyLabel}</Label>
-                <Select
-                  id={`${type}-difficulty`}
-                  value={eventForm.difficulty}
-                  onChange={(e) =>
-                    setEventForm((prev) => ({
-                      ...prev,
-                      difficulty: e.target.value as EventDifficultyValue,
-                    }))
-                  }
-                >
-                  <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
-                  <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
-                  <SelectItem value="ADVANCED">{difficultyCopy.ADVANCED}</SelectItem>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor={`${type}-credit`}>{commonCopy.creditsToJoinLabel}</Label>
-                <Input
-                  id={`${type}-credit`}
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={eventForm.creditCost}
-                  onChange={(e) =>
-                    setEventForm((prev) => ({ ...prev, creditCost: e.target.value }))
-                  }
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor={`${type}-maxParticipants`}>{commonCopy.maxParticipantsLabel}</Label>
-              <Input
-                id={`${type}-maxParticipants`}
-                type="number"
-                min={1}
-                max={500}
-                step={1}
-                value={eventForm.maxParticipants}
-                onChange={(e) =>
-                  setEventForm((prev) => ({ ...prev, maxParticipants: e.target.value }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                {commonCopy.maxParticipantsHint}
-              </p>
-            </div>
 
-            <AlertDialogFooter className="mt-2">
-              <AlertDialogCancel type="button" onClick={() => setEventDialogOpen(false)}>
-                {commonCopy.cancel}
-              </AlertDialogCancel>
-              <AlertDialogAction type="submit">{labels.formButton}</AlertDialogAction>
-            </AlertDialogFooter>
-          </form>
+              <form className="grid gap-4" onSubmit={handleCreateEvent}>
+                {createStep === 1 ? (
+                  <div className="grid gap-2">
+                    <Label htmlFor={`${type}-topic`}>{commonCopy.topicLabel}</Label>
+                    <Input
+                      id={`${type}-topic`}
+                      value={eventForm.topic}
+                      onChange={(e) => setEventForm((prev) => ({ ...prev, topic: e.target.value }))}
+                      placeholder={commonCopy.topicPlaceholder}
+                      autoFocus
+                    />
+                  </div>
+                ) : null}
+
+                {createStep === 2 ? (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor={`${type}-date`}>{commonCopy.dateTimeLabel}</Label>
+                        <Input
+                          id={`${type}-date`}
+                          type="datetime-local"
+                          value={eventForm.date}
+                          min={minDateTime}
+                          onChange={(e) => setEventForm((prev) => ({ ...prev, date: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor={`${type}-duration`}>{commonCopy.durationLabel}</Label>
+                        <Input
+                          id={`${type}-duration`}
+                          type="number"
+                          min={5}
+                          max={30}
+                          step={1}
+                          value={eventForm.durationMinutes}
+                          onChange={(e) =>
+                            setEventForm((prev) => ({ ...prev, durationMinutes: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor={`${type}-difficulty`}>{commonCopy.difficultyLabel}</Label>
+                        <Select
+                          id={`${type}-difficulty`}
+                          value={eventForm.difficulty}
+                          onChange={(e) =>
+                            setEventForm((prev) => ({
+                              ...prev,
+                              difficulty: e.target.value as EventDifficultyValue,
+                            }))
+                          }
+                        >
+                          <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
+                          <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
+                          <SelectItem value="ADVANCED">{difficultyCopy.ADVANCED}</SelectItem>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor={`${type}-credit`}>{commonCopy.creditsToJoinLabel}</Label>
+                        <Input
+                          id={`${type}-credit`}
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={eventForm.creditCost}
+                          onChange={(e) =>
+                            setEventForm((prev) => ({ ...prev, creditCost: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label htmlFor={`${type}-maxParticipants`}>{commonCopy.maxParticipantsLabel}</Label>
+                      <Input
+                        id={`${type}-maxParticipants`}
+                        type="number"
+                        min={1}
+                        max={500}
+                        step={1}
+                        value={eventForm.maxParticipants}
+                        onChange={(e) =>
+                          setEventForm((prev) => ({ ...prev, maxParticipants: e.target.value }))
+                        }
+                      />
+                      <p className="text-xs text-muted-foreground">{commonCopy.maxParticipantsHint}</p>
+                    </div>
+                  </>
+                ) : null}
+
+                <AlertDialogFooter className="mt-2">
+                  <AlertDialogCancel type="button" onClick={() => setEventDialogOpen(false)}>
+                    {commonCopy.cancel}
+                  </AlertDialogCancel>
+                  {createStep > 1 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCreateStep((s) => Math.max(1, s - 1))}
+                    >
+                      {commonCopy.back}
+                    </Button>
+                  ) : null}
+                  {createStep < 2 ? (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (createStep === 1 && !eventForm.topic.trim()) {
+                          toast.error(adminCopy.toasts.topicRequired);
+                          return;
+                        }
+                        setCreateStep((s) => Math.min(2, s + 1));
+                      }}
+                    >
+                      {commonCopy.next}
+                    </Button>
+                  ) : (
+                    <AlertDialogAction type="submit">{wizardCopy.publish}</AlertDialogAction>
+                  )}
+                </AlertDialogFooter>
+              </form>
+            </div>
+          ) : (
+            <form className="mt-4 grid gap-4" onSubmit={handleCreateEvent}>
+              <div className="grid gap-2">
+                <Label htmlFor={`${type}-topic`}>{commonCopy.topicLabel}</Label>
+                <Input
+                  id={`${type}-topic`}
+                  value={eventForm.topic}
+                  onChange={(e) => setEventForm((prev) => ({ ...prev, topic: e.target.value }))}
+                  placeholder={commonCopy.topicPlaceholder}
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor={`${type}-date`}>{commonCopy.dateTimeLabel}</Label>
+                  <Input
+                    id={`${type}-date`}
+                    type="datetime-local"
+                    value={eventForm.date}
+                    min={minDateTime}
+                    onChange={(e) => setEventForm((prev) => ({ ...prev, date: e.target.value }))}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor={`${type}-duration`}>{commonCopy.durationLabel}</Label>
+                  <Input
+                    id={`${type}-duration`}
+                    type="number"
+                    min={5}
+                    max={30}
+                    step={1}
+                    value={eventForm.durationMinutes}
+                    onChange={(e) =>
+                      setEventForm((prev) => ({ ...prev, durationMinutes: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor={`${type}-difficulty`}>{commonCopy.difficultyLabel}</Label>
+                  <Select
+                    id={`${type}-difficulty`}
+                    value={eventForm.difficulty}
+                    onChange={(e) =>
+                      setEventForm((prev) => ({
+                        ...prev,
+                        difficulty: e.target.value as EventDifficultyValue,
+                      }))
+                    }
+                  >
+                    <SelectItem value="BASIC">{difficultyCopy.BASIC}</SelectItem>
+                    <SelectItem value="INTERMEDIATE">{difficultyCopy.INTERMEDIATE}</SelectItem>
+                    <SelectItem value="ADVANCED">{difficultyCopy.ADVANCED}</SelectItem>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor={`${type}-credit`}>{commonCopy.creditsToJoinLabel}</Label>
+                  <Input
+                    id={`${type}-credit`}
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={eventForm.creditCost}
+                    onChange={(e) =>
+                      setEventForm((prev) => ({ ...prev, creditCost: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor={`${type}-maxParticipants`}>{commonCopy.maxParticipantsLabel}</Label>
+                <Input
+                  id={`${type}-maxParticipants`}
+                  type="number"
+                  min={1}
+                  max={500}
+                  step={1}
+                  value={eventForm.maxParticipants}
+                  onChange={(e) =>
+                    setEventForm((prev) => ({ ...prev, maxParticipants: e.target.value }))
+                  }
+                />
+                <p className="text-xs text-muted-foreground">{commonCopy.maxParticipantsHint}</p>
+              </div>
+
+              <AlertDialogFooter className="mt-2">
+                <AlertDialogCancel type="button" onClick={() => setEventDialogOpen(false)}>
+                  {commonCopy.cancel}
+                </AlertDialogCancel>
+                <AlertDialogAction type="submit">{labels.formButton}</AlertDialogAction>
+              </AlertDialogFooter>
+            </form>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={analysisDialogOpen}
+        onOpenChange={(open) => {
+          setAnalysisDialogOpen(open);
+          if (!open) {
+            setAnalysisTarget(null);
+            setAnalysisProblems([]);
+            setAnalysisSubmissions([]);
+            setAnalysisLoading(false);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-4xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {commonCopy.analysis}
+              {analysisTarget ? ` — ${analysisTarget.topic}` : ''}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {analysisTarget ? `${formatDate(new Date(analysisTarget.date))} • ${formatTime(new Date(analysisTarget.date))}` : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {analysisLoading ? (
+            <div className="space-y-2 mt-4">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ) : (
+            <div className="mt-4 space-y-6 max-h-[70vh] overflow-y-auto pr-1">
+              <section className="space-y-3">
+                <h3 className="text-sm font-medium text-foreground">{messages.liveActivities.cms.problemsTitle}</h3>
+                {analysisProblems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{messages.liveActivities.cms.noProblems}</p>
+                ) : (
+                  <div className="space-y-4">
+                    {analysisProblems.map((p: any) => {
+                      const submissions = Array.isArray(analysisSubmissions) ? analysisSubmissions : [];
+                      const answers = submissions
+                        .flatMap((s: any) => (Array.isArray(s.answers) ? s.answers : []))
+                        .filter((a: any) => a.problemId === p.id);
+
+                      return (
+                        <div key={p.id} className="rounded-md border border-border/70 bg-muted/10 px-4 py-4 space-y-2">
+                          <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                            {messages.liveActivities.cms.problemLabel.replace('{{n}}', String(p.order))}
+                          </p>
+                          <p className="text-sm text-foreground/90 whitespace-pre-wrap">{p.prompt}</p>
+
+                          {p.type === 'MULTIPLE_CHOICE' ? (
+                            <div className="mt-2 space-y-2">
+                              {(Array.isArray(p.options) ? p.options : []).map((opt: any) => {
+                                const count = answers.filter((a: any) => a.selectedOptionId === opt.id).length;
+                                const total = answers.length || 1;
+                                const pct = Math.round((count / total) * 100);
+                                return (
+                                  <div key={opt.id} className="flex items-start justify-between gap-3 text-sm">
+                                    <div className="min-w-0">
+                                      <p className="whitespace-pre-wrap">
+                                        {opt.text}
+                                        {opt.isCorrect ? (
+                                          <span className="ml-2 text-[11px] text-emerald-600">
+                                            {messages.liveActivities.cms.correctOptionLabel}
+                                          </span>
+                                        ) : null}
+                                      </p>
+                                    </div>
+                                    <div className="shrink-0 text-xs text-muted-foreground">
+                                      {count} ({pct}%)
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="mt-2 space-y-2">
+                              <p className="text-xs text-muted-foreground">
+                                {messages.liveActivities.cms.submissionsTitle.replace('{{count}}', String(answers.length))}
+                              </p>
+                              {answers.slice(0, 20).map((a: any) => (
+                                <pre key={a.id} className="rounded-md border border-border/70 bg-background px-3 py-2 text-xs whitespace-pre-wrap">
+                                  {a.textAnswer ?? ''}
+                                </pre>
+                              ))}
+                              {answers.length > 20 ? (
+                                <p className="text-[11px] text-muted-foreground">
+                                  +{answers.length - 20}
+                                </p>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-3">
+                <h3 className="text-sm font-medium text-foreground">
+                  {messages.liveActivities.cms.submissionsTitle.replace('{{count}}', String(analysisSubmissions.length))}
+                </h3>
+                {analysisSubmissions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{messages.liveActivities.cms.noSubmissions}</p>
+                ) : (
+                  <div className="space-y-3">
+                    {analysisSubmissions.map((row: any) => (
+                      <div key={row.id} className="rounded-md border border-border/70 bg-muted/10 px-4 py-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {row.user?.email ?? 'User'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {row.user?.publicId ? row.user.publicId : ''}
+                            </p>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            {row.createdAt ? new Date(row.createdAt).toLocaleString() : ''}
+                          </p>
+                        </div>
+                        {Array.isArray(row.answers) && row.answers.length > 0 ? (
+                          <div className="space-y-2">
+                            {row.answers.map((ans: any) => (
+                              <div key={ans.id} className="rounded-md border border-border/70 bg-background px-3 py-2">
+                                <p className="text-xs font-medium text-foreground">
+                                  {messages.liveActivities.cms.problemLabel.replace(
+                                    '{{n}}',
+                                    String(
+                                      analysisProblems.find((p: any) => p.id === ans.problemId)?.order ?? ans.problemId,
+                                    ),
+                                  )}
+                                </p>
+                                {ans.type === 'MULTIPLE_CHOICE' ? (
+                                  <p className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">
+                                    {ans.selectedOption?.text ?? messages.liveActivities.cms.noSelection}
+                                  </p>
+                                ) : (
+                                  <pre className="mt-1 text-sm text-foreground/90 whitespace-pre-wrap">
+                                    {ans.textAnswer ?? ''}
+                                  </pre>
+                                )}
+                                {Array.isArray(ans.images) && ans.images.length > 0 ? (
+                                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                    {ans.images.map((img: any) => (
+                                      <img
+                                        key={img.id}
+                                        src={`/api/uploads/sprint-submissions/file?key=${encodeURIComponent(img.key)}`}
+                                        alt=""
+                                        className="h-28 w-full rounded-md border border-border/70 object-cover"
+                                      />
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <pre className="whitespace-pre-wrap text-sm text-foreground/90">{row.answer}</pre>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          <AlertDialogFooter className="mt-2">
+            <AlertDialogCancel>{commonCopy.cancel}</AlertDialogCancel>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -609,7 +1033,9 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
               <Skeleton className="h-3 w-16" />
             ) : (
               <span className="text-xs text-muted-foreground">
-                {t('liveActivities.admin.ui.common.totalLabel', { count: events.length })}
+                {t('liveActivities.admin.ui.common.totalLabel', {
+                  count: type === 'PROBLEM_SPRINT' ? scheduledEvents.length : events.length,
+                })}
               </span>
             )}
             <Button size="sm" onClick={() => setEventDialogOpen(true)}>
@@ -680,13 +1106,234 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
             <p className="text-sm text-muted-foreground font-medium">{labels.emptyTitle}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">{labels.emptyDescription}</p>
           </div>
-        ) : filteredAndSorted.length === 0 ? (
+        ) : filteredAndSortedAll.length === 0 ? (
           <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
             <Search className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground font-medium">{uiCopy.noMatches}</p>
             <p className="text-xs text-muted-foreground/60 mt-1">
               {commonCopy.noMatchesHint}
             </p>
+          </div>
+        ) : type === 'PROBLEM_SPRINT' ? (
+          <div className="space-y-6">
+            {scheduledEvents.length === 0 ? (
+              <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
+                <Calendar className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground font-medium">{labels.emptyTitle}</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">{labels.emptyDescription}</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="overflow-x-auto pb-1">
+                  <table className="min-w-[1080px] w-max table-auto border-collapse text-left">
+                    <thead>
+                      <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                        <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
+                        <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
+                        <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
+                        <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.duration}</th>
+                        <th className="w-[150px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.difficulty}</th>
+                        <th className="w-[120px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.credits}</th>
+                        <th className="w-[160px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.status}</th>
+                        <th className="w-[240px] py-2 pr-2 text-right font-medium">{commonCopy.tableHeaders.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleScheduledEvents.map((liveEvent) => {
+                        const eventDate = new Date(liveEvent.date);
+                        const payoutRequired = isLiveEventOver(liveEvent) && !liveEvent.hasPayout;
+                        return (
+                          <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
+                            <td className="py-3 pr-4">
+                              <div className="font-medium truncate">{liveEvent.topic}</div>
+                            </td>
+                            <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                              {formatDate(eventDate)}
+                            </td>
+                            <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                              {formatTime(eventDate)}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span className="inline-flex items-center gap-1 text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5" />
+                                {liveEvent.durationMinutes} {commonCopy.minutesShort}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4">
+                              {liveEvent.difficulty ? (
+                                <DifficultyBars difficulty={liveEvent.difficulty} />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  {commonCopy.notAvailable}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1">
+                                <Coins className="h-3.5 w-3.5" />
+                                {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4">
+                              {payoutRequired ? (
+                                <span className="inline-flex items-center rounded-md bg-amber-500/15 px-2 py-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                  {commonCopy.statusPayoutRequired}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                                  {commonCopy.statusScheduled}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 pr-2">
+                              <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
+                                <Button asChild variant="outline" size="sm">
+                                  <Link href={`/cms/sprint/${liveEvent.id}`}>{commonCopy.openCms}</Link>
+                                </Button>
+                                <Button variant="outline" size="sm" onClick={() => openAnalysis(liveEvent)}>
+                                  {commonCopy.analysis}
+                                </Button>
+                                <Button
+                                  variant={payoutRequired ? 'primary' : 'outline'}
+                                  size="sm"
+                                  onClick={() => requestPayout(liveEvent)}
+                                >
+                                  {commonCopy.payoutWinners}
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  onClick={() => requestDelete(liveEvent)}
+                                >
+                                  {commonCopy.delete}
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {page * EVENT_PAGE_SIZE < scheduledEvents.length ? (
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((current) => current + 1)}
+                    >
+                      {uiCopy.loadMore}
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-foreground">{commonCopy.archivedListTitle}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">{commonCopy.archivedListDescription}</p>
+              </div>
+
+              {archivedEvents.length === 0 ? (
+                <div className="card-frame border-dashed bg-muted/20 px-5 py-12 text-center">
+                  <Calendar className="h-9 w-9 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground font-medium">{commonCopy.archivedEmptyTitle}</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">{commonCopy.archivedEmptyDescription}</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto pb-1">
+                    <table className="min-w-[1080px] w-max table-auto border-collapse text-left">
+                      <thead>
+                        <tr className="border-b border-border/70 text-left text-xs uppercase tracking-wide text-muted-foreground whitespace-nowrap">
+                          <th className="min-w-[320px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.topic}</th>
+                          <th className="w-[140px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.date}</th>
+                          <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.time}</th>
+                          <th className="w-[110px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.duration}</th>
+                          <th className="w-[150px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.difficulty}</th>
+                          <th className="w-[120px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.credits}</th>
+                          <th className="w-[160px] py-2 pr-4 font-medium">{commonCopy.tableHeaders.status}</th>
+                          <th className="w-[200px] py-2 pr-2 text-right font-medium">{commonCopy.tableHeaders.actions}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleArchivedEvents.map((liveEvent) => {
+                          const eventDate = new Date(liveEvent.date);
+                          return (
+                            <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
+                              <td className="py-3 pr-4">
+                                <div className="font-medium truncate">{liveEvent.topic}</div>
+                              </td>
+                              <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                                {formatDate(eventDate)}
+                              </td>
+                              <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                                {formatTime(eventDate)}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {liveEvent.durationMinutes} {commonCopy.minutesShort}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4">
+                                {liveEvent.difficulty ? (
+                                  <DifficultyBars difficulty={liveEvent.difficulty} />
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    {commonCopy.notAvailable}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1">
+                                  <Coins className="h-3.5 w-3.5" />
+                                  {Math.round(liveEvent.creditCost)} {commonCopy.creditsWord}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className="inline-flex items-center rounded-md bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                  {commonCopy.statusArchived}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-2">
+                                <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
+                                  <Button asChild variant="outline" size="sm">
+                                    <Link href={`/cms/sprint/${liveEvent.id}`}>{commonCopy.openCms}</Link>
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={() => openAnalysis(liveEvent)}>
+                                    {commonCopy.analysis}
+                                  </Button>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => requestDelete(liveEvent)}
+                                  >
+                                    {commonCopy.delete}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {archivedPage * EVENT_PAGE_SIZE < archivedEvents.length ? (
+                    <div className="flex justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setArchivedPage((current) => current + 1)}
+                      >
+                        {uiCopy.loadMore}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -704,7 +1351,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleEvents.map((liveEvent) => {
+                  {visibleScheduledEvents.map((liveEvent) => {
                     const eventDate = new Date(liveEvent.date);
                     return (
                       <tr key={liveEvent.id} className="border-b border-border/60 text-sm text-foreground">
@@ -740,20 +1387,6 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                         </td>
                         <td className="py-3 pr-2">
                           <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
-                            {type === 'PROBLEM_SPRINT' ? (
-                              <Button asChild variant="outline" size="sm">
-                                <Link href={`/cms/sprint/${liveEvent.id}`}>{commonCopy.openCms}</Link>
-                              </Button>
-                            ) : null}
-                            {type === 'PROBLEM_SPRINT' ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => requestPayout(liveEvent)}
-                              >
-                                {commonCopy.payoutWinners}
-                              </Button>
-                            ) : null}
                             <Button
                               variant="danger"
                               size="sm"
@@ -769,7 +1402,7 @@ function LiveEventsAdminPanel({ type, labels, defaults }: LiveEventsAdminPanelPr
                 </tbody>
               </table>
             </div>
-            {page * EVENT_PAGE_SIZE < filteredAndSorted.length ? (
+            {page * EVENT_PAGE_SIZE < scheduledEvents.length ? (
               <div className="flex justify-center">
                 <Button
                   variant="outline"

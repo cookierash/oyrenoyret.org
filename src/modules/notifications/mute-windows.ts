@@ -33,24 +33,33 @@ export function parseIsoOrNull(value: string | undefined): Date | null {
   return date;
 }
 
-export function buildMutedCreatedAtNotFilters(
+type DateRangeFilter = { gte: Date; lt: Date };
+
+export function buildMutedDateNotFilters<Field extends 'createdAt' | 'updatedAt'>(
   windows: MutedWindow[],
   openMutedFrom: Date | null,
-): Array<{ NOT: { createdAt: { gte: Date; lt: Date } } }> {
-  const notFilters: Array<{ NOT: { createdAt: { gte: Date; lt: Date } } }> = [];
+  field: Field,
+): Array<{ NOT: { [K in Field]: DateRangeFilter } }> {
+  const notFilters: Array<{ NOT: { [K in Field]: DateRangeFilter } }> = [];
   for (const window of windows) {
     const from = new Date(window.from);
     const to = new Date(window.to);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) continue;
     if (to.getTime() <= from.getTime()) continue;
-    notFilters.push({ NOT: { createdAt: { gte: from, lt: to } } });
+    notFilters.push({ NOT: { [field]: { gte: from, lt: to } } as any });
   }
   if (openMutedFrom) {
     const now = new Date();
     if (now.getTime() > openMutedFrom.getTime()) {
-      notFilters.push({ NOT: { createdAt: { gte: openMutedFrom, lt: now } } });
+      notFilters.push({ NOT: { [field]: { gte: openMutedFrom, lt: now } } as any });
     }
   }
   return notFilters;
 }
 
+export function buildMutedCreatedAtNotFilters(
+  windows: MutedWindow[],
+  openMutedFrom: Date | null,
+): Array<{ NOT: { createdAt: { gte: Date; lt: Date } } }> {
+  return buildMutedDateNotFilters(windows, openMutedFrom, 'createdAt');
+}

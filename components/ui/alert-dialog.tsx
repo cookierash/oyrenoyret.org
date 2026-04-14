@@ -122,6 +122,7 @@ const AlertDialogContent = React.forwardRef<
           className={cn(
             'fixed left-[50%] top-[50%] z-[51] w-full max-w-md -translate-x-1/2 -translate-y-1/2',
             'rounded-lg bg-background px-4 pt-8 pb-4 shadow-[0_18px_40px_rgba(0,0,0,0.18)]',
+            'max-h-[calc(100vh-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto',
             className
           )}
           {...props}
