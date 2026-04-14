@@ -130,7 +130,9 @@ function initPrismaPool(): Pool {
     new Pool({
       connectionString,
       ssl,
-      max: Number(process.env.PG_POOL_MAX ?? 10),
+      max: Number(
+        process.env.PG_POOL_MAX ?? (process.env.NODE_ENV === 'production' ? 1 : 10)
+      ),
       idleTimeoutMillis: Number(process.env.PG_POOL_IDLE ?? 10000),
       connectionTimeoutMillis: Number(
         process.env.PG_POOL_TIMEOUT ?? (process.env.NODE_ENV === 'production' ? 30000 : 10000)

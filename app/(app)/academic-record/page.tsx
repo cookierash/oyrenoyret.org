@@ -8,6 +8,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { prisma } from '@/src/db/client';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,16 +51,26 @@ export default async function AcademicRecordPage() {
   const { locale, messages } = await getI18n();
   const copy = messages.app.academicRecord;
 
-  const records: AcademicRecord[] = await prisma.academicRecord.findMany({
-    where: { userId, deletedAt: null },
-    orderBy: { createdAt: 'desc' },
-  });
+  let records: AcademicRecord[] = [];
+  try {
+    records = await prisma.academicRecord.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
 
   const progress = await getAcademicProgressSummary(userId);
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { publicId: true },
-  });
+  let user: { publicId: string | null } | null = null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { publicId: true },
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
 
   const numberFmt = new Intl.NumberFormat(getLocaleCode(locale), { maximumFractionDigits: 1 });
   const hoursFmt = new Intl.NumberFormat(getLocaleCode(locale), { maximumFractionDigits: 1 });

@@ -6,6 +6,7 @@
 
 import { notFound } from 'next/navigation';
 import { prisma } from '@/src/db/client';
+import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { PageHeader } from '@/src/components/ui/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { AcademicRecord } from '@prisma/client';
@@ -52,20 +53,31 @@ export default async function PublicRecordPage({ params }: PublicRecordPageProps
   const copy = messages.record.publicRecord;
   const recordCopy = messages.app.academicRecord;
 
-  const user = await prisma.user.findFirst({
-    where: { publicId, deletedAt: null },
-    select: { id: true, firstName: true, lastName: true, publicId: true },
-  });
+  let user:
+    | { id: string; firstName: string | null; lastName: string | null; publicId: string | null }
+    | null = null;
+  try {
+    user = await prisma.user.findFirst({
+      where: { publicId, deletedAt: null },
+      select: { id: true, firstName: true, lastName: true, publicId: true },
+    });
+  } catch (error) {
+    if (isDbSchemaMismatch(error)) return notFound();
+    throw error;
+  }
 
   if (!user) return notFound();
 
-  const [records, progress] = await Promise.all([
-    prisma.academicRecord.findMany({
+  let records: AcademicRecord[] = [];
+  const progress = await getAcademicProgressSummary(user.id);
+  try {
+    records = await prisma.academicRecord.findMany({
       where: { userId: user.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-    }),
-    getAcademicProgressSummary(user.id),
-  ]);
+    });
+  } catch (error) {
+    if (!isDbSchemaMismatch(error)) throw error;
+  }
 
   const numberFmt = new Intl.NumberFormat(getLocaleCode(locale), { maximumFractionDigits: 1 });
   const hoursFmt = new Intl.NumberFormat(getLocaleCode(locale), { maximumFractionDigits: 1 });
