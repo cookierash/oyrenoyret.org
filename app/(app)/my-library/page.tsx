@@ -12,6 +12,7 @@ import { useI18n } from '@/src/i18n/i18n-provider';
 import { getLocaleCode } from '@/src/i18n';
 import { StarRating } from '@/src/components/ui/star-rating';
 import { useCurriculum } from '@/src/modules/curriculum/use-curriculum';
+import { useSettings } from '@/src/components/settings/settings-provider';
 
 interface PurchasedMaterial {
     purchasedAt: string;
@@ -35,15 +36,30 @@ const DIFFICULTY_COLORS: Record<string, string> = {
     ADVANCED: 'text-destructive bg-destructive/10',
 };
 
+type RegisteredGuidedGroupSession = {
+    id: string;
+    title: string;
+    subjectId: string;
+    topicId: string;
+    scheduledAt: string;
+    durationMinutes: number;
+    status: string;
+    isOngoing: boolean;
+    facilitator: { id: string; name: string; avatarVariant: string | null };
+    enrollmentStatus: string | null;
+};
+
 export default function MyMaterialsPage() {
     const [materials, setMaterials] = useState<PurchasedMaterial[]>([]);
     const [loading, setLoading] = useState(true);
+    const [registeredSessions, setRegisteredSessions] = useState<RegisteredGuidedGroupSession[]>([]);
+    const [loadingSessions, setLoadingSessions] = useState(true);
     const [search, setSearch] = useState('');
     const [sort, setSort] = useState<SortOption>('newest');
     const { locale, t, messages } = useI18n();
+    const { timeFormat } = useSettings();
     const copy = messages.app.library;
-    const guidedCopy = messages.app.guidedGroupSessions;
-  const { subjectNameMap, subjectHrefMap, topicHrefMap } = useCurriculum();
+  const { subjectNameMap, topicNameMap, subjectHrefMap, topicHrefMap } = useCurriculum();
     const countLabel = (count: number) =>
         count === 1
             ? t('app.library.countSingle', { count })
@@ -59,6 +75,27 @@ export default function MyMaterialsPage() {
             .catch(() => setMaterials([]))
             .finally(() => setLoading(false));
     }, []);
+
+    useEffect(() => {
+        fetch('/api/guided-group-sessions/registered?take=3', { cache: 'no-store' })
+            .then((r) => (r.ok ? r.json() : []))
+            .then((data) => {
+                setRegisteredSessions(Array.isArray(data) ? (data as RegisteredGuidedGroupSession[]) : []);
+            })
+            .catch(() => setRegisteredSessions([]))
+            .finally(() => setLoadingSessions(false));
+    }, []);
+
+    const dateTimeFormatter = useMemo(() => {
+        const hour12 = timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
+        return new Intl.DateTimeFormat(getLocaleCode(locale), {
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            ...(hour12 === undefined ? {} : { hour12 }),
+        });
+    }, [locale, timeFormat]);
 
     const filtered = useMemo(() => {
         let list = [...materials];
@@ -94,17 +131,53 @@ export default function MyMaterialsPage() {
         />
 
         <main className="space-y-4 pt-2">
-            <Link
-                href="/my-library/guided-group-sessions"
-                className="card-frame bg-card p-4 block hover:border-primary/40 transition-colors"
-            >
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <p className="text-sm font-medium">{guidedCopy.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{guidedCopy.description}</p>
+            {!loadingSessions && registeredSessions.length > 0 ? (
+                <section className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-muted-foreground">
+                            {messages.app.guidedGroupSessions.title}
+                        </p>
+                        <Link
+                            href="/my-library/guided-group-sessions"
+                            className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            {messages.app.dashboard.viewAll}
+                        </Link>
                     </div>
-                </div>
-            </Link>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {registeredSessions.map((session) => {
+                            const when = new Date(session.scheduledAt);
+                            const subject = subjectNameMap.get(session.subjectId) ?? session.subjectId;
+                            const topic = topicNameMap.get(`${session.subjectId}:${session.topicId}`) ?? session.topicId;
+                            const badge = session.isOngoing ? (locale === 'az' ? 'Canlı' : 'Ongoing') : null;
+                            return (
+                                <Link
+                                    key={session.id}
+                                    href={`/my-library/guided-group-sessions/${session.id}`}
+                                    className="group card-frame bg-card p-3 transition-all duration-200 flex flex-col gap-2"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <h3 className="font-medium text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                                            {session.title}
+                                        </h3>
+                                        {badge ? (
+                                            <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300">
+                                                {badge}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground line-clamp-1">
+                                        {topic} · {subject}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {dateTimeFormatter.format(when)} · {session.durationMinutes} min
+                                    </p>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </section>
+            ) : null}
             {loading ? (
                 <>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

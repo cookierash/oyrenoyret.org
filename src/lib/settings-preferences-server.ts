@@ -7,9 +7,11 @@ import {
   NOTIFY_REPLIES_COOKIE,
   NOTIFY_CREDITS_COOKIE,
   NOTIFY_SPRINTS_COOKIE,
+  NOTIFY_GUIDED_GROUP_SESSIONS_COOKIE,
   normalizeNotifyReplies,
   normalizeNotifyCredits,
   normalizeNotifySprints,
+  normalizeNotifyGuidedGroupSessions,
 } from '@/src/lib/settings-preferences';
 
 export async function getSettingsPreferences() {
@@ -32,6 +34,7 @@ export async function getSettingsPreferences() {
       replies: normalizeNotifyReplies(getCookie?.(NOTIFY_REPLIES_COOKIE)?.value),
       credits: normalizeNotifyCredits(getCookie?.(NOTIFY_CREDITS_COOKIE)?.value),
       sprints: normalizeNotifySprints(getCookie?.(NOTIFY_SPRINTS_COOKIE)?.value),
+      guidedGroupSessions: normalizeNotifyGuidedGroupSessions(getCookie?.(NOTIFY_GUIDED_GROUP_SESSIONS_COOKIE)?.value),
     },
   };
 }

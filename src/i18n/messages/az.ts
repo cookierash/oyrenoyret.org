@@ -31,7 +31,7 @@ export const AZ_MESSAGES = {
     dashboard: 'İdarəetmə paneli',
     catalog: 'Kataloq',
     library: 'Mənim kitabxanam',
-    liveActivities: 'İnteraktiv sessiyalar',
+    liveActivities: 'Tədbirlər',
     discussions: 'Müzakirələr',
     learning: 'Öyrənmə',
     studio: 'Studio',
@@ -147,6 +147,8 @@ export const AZ_MESSAGES = {
       creditsDescription: 'Bildirişlərdə kredit əməliyyatlarını göstər.',
       sprintsTitle: 'Sprint bildirişləri',
       sprintsDescription: 'Bildirişlərdə sprintlə bağlı bildirişləri göstər.',
+      guidedGroupSessionsTitle: 'Bələdçili qrup sessiyaları',
+      guidedGroupSessionsDescription: 'Bildirişlərdə bələdçili qrup sessiyası bildirişlərini göstər.',
       moderationTitle: 'Moderasiya yenilikləri',
       moderationDescription: 'Bildirişlərdə moderasiya və hesab statusu yeniliklərini göstər.',
       scopeHint: 'Bu tənzimləmə yalnız bu brauzerdə Bildirişlərə təsir edir.',
@@ -363,14 +365,14 @@ export const AZ_MESSAGES = {
     catalog: 'Kataloq',
     library: 'Mənim kitabxanam',
     guidedGroupSessions: 'Bələdçili qrup sessiyaları',
-    liveActivities: 'İnteraktiv sessiyalar',
+    liveActivities: 'Tədbirlər',
     discussions: 'Müzakirələr',
     notifications: 'Bildirişlər',
     recentActivities: 'Bildirişlər',
     academicRecord: 'Akademik qeyd',
     adminDashboard: 'Admin paneli',
     adminHome: 'Admin',
-    manageLive: 'İnteraktiv sessiyaların idarəsi',
+    manageLive: 'Tədbirlərin idarəsi',
     contactMessages: 'Əlaqə mesajları',
     curriculum: 'Fənlər və mövzular',
     reports: 'İstifadəçi şikayətləri',
@@ -387,10 +389,10 @@ export const AZ_MESSAGES = {
     catalog: 'Kataloq',
     library: 'Mənim kitabxanam',
     guidedGroupSessions: 'Bələdçili qrup sessiyaları',
-    liveActivities: 'İnteraktiv sessiyalar',
+    liveActivities: 'Tədbirlər',
     admin: 'Admin',
     adminDashboard: 'Admin paneli',
-    manageLiveActivities: 'İnteraktiv sessiyaların idarəsi',
+    manageLiveActivities: 'Tədbirlərin idarəsi',
     contactMessages: 'Əlaqə mesajları',
     curriculum: 'Fənlər və mövzular',
     reports: 'İstifadəçi şikayətləri',
@@ -852,7 +854,7 @@ export const AZ_MESSAGES = {
 	        'Təkmilləşdirmə:\n' +
 	        '- Daha sürətli kəşf üçün full-text axtarış indeksləri əlavə edildi.\n' +
 	        '- Auth və sessiya təhlükəsizliyi gücləndirildi (tokenlərin hash-lənməsi daxil).\n' +
-	        '- Kurikulum, interaktiv sessiyalar, hesabatlar və mesajlar üçün admin bölmələri genişləndirildi.\n' +
+	        '- Kurikulum, tədbirlər, hesabatlar və mesajlar üçün admin bölmələri genişləndirildi.\n' +
 	        '- Avatar variantları və ictimai istifadəçi kartları zənginləşdirildi.\n' +
 	        '- Bələdçi qrup sessiyaları təkmilləşdirildi: yalnız qarşıdakı sessiyaların siyahılanması, heç kim qeydiyyatdan keçmədikdə fasilitatora bildiriş, və 2 mərhələli daha sadə planlama axını.\n' +
 	        '- Müzakirələr və kataloq qaydalarına uyğun bələdçi qrup sessiyaları üçün slug axtarışı (#fənn / #mövzu) əlavə edildi.\n' +
@@ -1733,14 +1735,14 @@ export const AZ_MESSAGES = {
       materials: 'material',
     },
     liveActivities: {
-      title: 'İnteraktiv sessiyalar',
+      title: 'Tədbirlər',
       description: 'Problem sprintlərinə və canlı tədbirlərə yazılın, qeydiyyatlarınızı izləyin.',
     },
     guidedGroupSessions: {
       title: 'Bələdçili qrup sessiyaları',
       description: 'Kiçik, müəllim rəhbərliyi ilə qrupda birlikdə öyrənin.',
       body: 'Burada cədvəl, mövzular və yaxın qrup sessiyalarına qoşulma qaydaları olacaq.',
-      ctaBrowse: 'İnteraktiv sessiyalara bax',
+      ctaBrowse: 'Tədbirlərə bax',
       ctaDiscuss: 'Müzakirələrdə soruş',
       facilitatorApplication: {
         title: 'Bələdçi şagird müraciəti',
@@ -1881,10 +1883,10 @@ export const AZ_MESSAGES = {
       today: 'Bu gün',
       dayLabel: { singular: 'gün', plural: 'gün' },
       bestStreak: 'Ən yaxşı ardıcıllıq',
-      upcoming: 'Yaxınlaşan interaktiv sessiyalar',
+      upcoming: 'Yaxınlaşan tədbirlər',
       viewAll: 'Hamısına bax',
-      noLive: 'Hələ interaktiv sessiya yoxdur',
-      noLiveHint: 'Yeni sessiyalar planlaşdırıldıqdan sonra burada görünəcək.',
+      noLive: 'Hələ tədbir yoxdur',
+      noLiveHint: 'Yeni tədbirlər planlaşdırıldıqdan sonra burada görünəcək.',
       recentMaterials: 'Son satın alınan materiallar',
       allMaterials: 'Bütün materiallar',
       noMaterials: 'Hələ material yoxdur',
@@ -2022,7 +2024,7 @@ export const AZ_MESSAGES = {
       pendingTitle: 'Sprint qeydiyyatını tamamlayın',
       confirmedTitle: 'Təbriklər! Sprint üçün yeriniz təsdiqləndi',
       cancelledHint:
-        'Bu qeydiyyat ləğv edilib. Yenidən qeydiyyat üçün Canlı fəaliyyətlərə qayıdın.',
+        'Bu qeydiyyat ləğv edilib. Yenidən qeydiyyat üçün Tədbirlərə qayıdın.',
       pendingHint: 'Kreditlərin çıxılmasından əvvəl təsdiq tələb olunur.',
       confirmedHint: 'Qeydiyyatınız təsdiqlənib. Sprintdə görüşərik!',
       viewDetails: 'Təfərrüatlara bax',
@@ -2035,7 +2037,7 @@ export const AZ_MESSAGES = {
       summaryLine: '{{topic}} · {{date}} · {{time}}',
       creditsRequired: 'Tələb olunan kredit: {{count}} (geri qaytarılmır)',
       cancelledSummary:
-        'Bu sorğu ləğv edilib və təsdiqlənə bilməz. Yenidən qeydiyyat üçün Canlı fəaliyyətlərə keçin.',
+        'Bu sorğu ləğv edilib və təsdiqlənə bilməz. Yenidən qeydiyyat üçün Tədbirlərə keçin.',
       rulesText: `Sprint qaydalarını təsdiqləmədən əvvəl nəzərdən keçirin:\n\n1. Yeriniz yalnız təsdiqdən sonra rezerv olunur.\n2. Kreditlər təsdiqdən dərhal sonra çıxılır.\n3. Sprint təsdiqləndikdən sonra kreditlər geri qaytarılmır.\n4. Vaxtında qoşulun; buraxılan sessiyalar geri qaytarılmır.\n5. Ünsiyyəti nəzakətli və fokuslu saxlayın.\n6. Sabit internet və işlək cihaz üçün məsuliyyət sizə aiddir.\n`,
       agreeTitle: 'Sprint qaydalarını və siyasətlərini oxudum və razıyam',
       agreeHint: 'Kreditlər dərhal çıxılacaq və geri qaytarılmır.',
@@ -2046,7 +2048,7 @@ export const AZ_MESSAGES = {
       completing: 'Tamamlanır...',
       confirmAction: 'Qeydiyyatı tamamla',
       cancelledToast:
-        'Bu qeydiyyat ləğv edilib. Yenidən qeydiyyat üçün İnteraktiv sessiyalara keçin.',
+        'Bu qeydiyyat ləğv edilib. Yenidən qeydiyyat üçün Tədbirlərə keçin.',
       acceptRulesToast: 'Davam etmək üçün sprint qaydalarını qəbul edin.',
       missingInfoToast: 'Sprint məlumatı yoxdur. Səhifəni yeniləyin.',
       insufficientCreditsToast: 'Qeydiyyatı tamamlamaq üçün kredit kifayət deyil.',
@@ -2111,7 +2113,7 @@ export const AZ_MESSAGES = {
           'Materialları öyrənin, canlı sessiyalara qoşulun və nailiyyətlərinizi izləyin.',
         highlights: {
           liveActivities: {
-            title: 'İnteraktiv sessiyalar',
+            title: 'Tədbirlər',
             description: 'Təqvimdən problem sprintlərinə və canlı tədbirlərə qoşulun.',
           },
           academicRecord: {
@@ -2147,17 +2149,17 @@ export const AZ_MESSAGES = {
   },
   liveActivities: {
     board: {
-      myEventsTitle: 'Sessiyalarım',
-      myEventsSubtitle: 'Yaxınlaşan sessiyalarınız üçün təsdiqlənmiş qeydiyyatlar.',
+      myEventsTitle: 'Tədbirlərim',
+      myEventsSubtitle: 'Yaxınlaşan tədbirləriniz üçün təsdiqlənmiş qeydiyyatlar.',
       enrolledCount: '{{count}} qeydiyyatlı',
-      allEventsTitle: 'Bütün sessiyalar',
-      allEventsSubtitle: 'Növbəti 10–15 dəqiqədə qoşula biləcəyiniz interaktiv sessiyalar.',
-      noLiveScheduled: 'Planlaşdırılmış interaktiv sessiya yoxdur.',
-      noConfirmedEvents: 'Hələ təsdiqlənmiş sessiya yoxdur.',
+      allEventsTitle: 'Bütün tədbirlər',
+      allEventsSubtitle: 'Növbəti 10–15 dəqiqədə qoşula biləcəyiniz tədbirlər.',
+      noLiveScheduled: 'Planlaşdırılmış tədbir yoxdur.',
+      noConfirmedEvents: 'Hələ təsdiqlənmiş tədbir yoxdur.',
       noEventsHint: 'Tezliklə yenidən yoxlayın və ya elanlar panelinə baxın.',
-      noConfirmedHint: 'Burada görünməsi üçün Bütün sessiyalar bölməsindən qeydiyyat edin.',
-      allEnrolled: 'Mövcud bütün sessiyalar üçün artıq qeydiyyatlısınız.',
-      allEnrolledHint: 'Tezliklə yeni sessiyalar əlavə olunacaq.',
+      noConfirmedHint: 'Burada görünməsi üçün Bütün tədbirlər bölməsindən qeydiyyat edin.',
+      allEnrolled: 'Mövcud bütün tədbirlər üçün artıq qeydiyyatlısınız.',
+      allEnrolledHint: 'Tezliklə yeni tədbirlər əlavə olunacaq.',
       statusEnrolled: 'Qeydiyyatlı',
       statusVerification: 'Təsdiq tələb olunur',
       statusCancelled: 'Qeydiyyat ləğv edildi',
@@ -2169,8 +2171,8 @@ export const AZ_MESSAGES = {
       creditsLabel: '{{count}} kredit',
       pendingNotice: 'Təsdiq sorğusu son fəaliyyətlər qutunuza göndərildi.',
       cancelledNotice: 'Bu qeydiyyat ləğv edilib. Yenidən qeydiyyatdan keçə bilərsiniz.',
-      ongoingNotice: 'Bu sessiya başlayıb və artıq qeydiyyat qəbul etmir.',
-      fullNotice: 'Bu sessiyanın yerləri dolub və artıq qeydiyyat qəbul etmir.',
+      ongoingNotice: 'Bu tədbir başlayıb və artıq qeydiyyat qəbul etmir.',
+      fullNotice: 'Bu tədbirin yerləri dolub və artıq qeydiyyat qəbul etmir.',
       readyNotice: 'Hazır olduqda başlayın.',
       enterSprint: 'Sprintə daxil ol',
       enrolledLabel: 'Qeydiyyatlı',
@@ -2181,7 +2183,7 @@ export const AZ_MESSAGES = {
       register: 'Qeydiyyat',
       toastInsufficientCredits: 'Qeydiyyat üçün kredit kifayət deyil.',
       toastFailedRegister: 'Qeydiyyat etmək mümkün olmadı.',
-      toastAlreadyEnrolled: 'Bu sessiya üçün artıq qeydiyyatınız var.',
+      toastAlreadyEnrolled: 'Bu tədbir üçün artıq qeydiyyatınız var.',
       toastRegistrationStarted: 'Qeydiyyat başladı. Tamamlamaq üçün son fəaliyyətlərə baxın.',
     },
     announcements: {
@@ -2209,7 +2211,7 @@ export const AZ_MESSAGES = {
           totalLabel: 'Cəmi: {{count}}',
           removeEventTitle: 'Tədbiri silmək?',
           removeEventDescription:
-            '{{date}} tarixində {{time}} vaxtına olan {{topic}} tədbiri interaktiv sessiyalar siyahısından silinəcək. Bu əməliyyat geri qaytarıla bilməz.',
+            '{{date}} tarixində {{time}} vaxtına olan {{topic}} tədbiri tədbirlər siyahısından silinəcək. Bu əməliyyat geri qaytarıla bilməz.',
           removeEventFallback: 'Bu əməliyyat geri qaytarıla bilməz.',
           removeEventConfirm: 'Tədbiri sil',
           removing: 'Silinir...',
@@ -2266,7 +2268,7 @@ export const AZ_MESSAGES = {
         problemSprints: {
           formTitle: 'Problem sprinti yarat',
           formDescription:
-            'Yeni zamanlı sprint qurun və interaktiv sessiyalar səhifəsində yayımlayın.',
+            'Yeni zamanlı sprint qurun və tədbirlər səhifəsində yayımlayın.',
           formButton: 'Sprinti yayımla',
           addButton: 'Sprint əlavə et',
           wizard: {
@@ -2370,7 +2372,7 @@ export const AZ_MESSAGES = {
       workspaceGateTitle: 'Daxil olmaq üçün qeydiyyatı tamamlayın',
       workspaceGateDescription:
         'Bu sprintdə müsabiqə otağına daxil olmaq üçün təsdiqlənmiş qeydiyyat tələb olunur.',
-      workspaceBack: 'İnteraktiv sessiyalara qayıt',
+      workspaceBack: 'Tədbirlərə qayıt',
       promptTitle: 'Müsabiqə təsviri',
       countdownTitle: 'Geri sayım',
       countdownStartsIn: 'Başlamağa {{time}} qalıb',

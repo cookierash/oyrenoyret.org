@@ -10,9 +10,11 @@ import {
   NOTIFY_REPLIES_COOKIE,
   NOTIFY_CREDITS_COOKIE,
   NOTIFY_SPRINTS_COOKIE,
+  NOTIFY_GUIDED_GROUP_SESSIONS_COOKIE,
   normalizeNotifyReplies,
   normalizeNotifyCredits,
   normalizeNotifySprints,
+  normalizeNotifyGuidedGroupSessions,
   type SettingsLanguage,
   type TimeFormat,
 } from '@/src/lib/settings-preferences';
@@ -20,6 +22,8 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 import {
   NOTIFY_CREDITS_DISABLED_AT_COOKIE,
   NOTIFY_CREDITS_MUTED_WINDOWS_COOKIE,
+  NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE,
+  NOTIFY_GUIDED_GROUP_SESSIONS_MUTED_WINDOWS_COOKIE,
   NOTIFY_REPLIES_DISABLED_AT_COOKIE,
   NOTIFY_REPLIES_MUTED_WINDOWS_COOKIE,
   NOTIFY_SPRINTS_DISABLED_AT_COOKIE,
@@ -34,6 +38,7 @@ interface PreferencesPayload {
   notifyReplies?: boolean;
   notifyCredits?: boolean;
   notifySprints?: boolean;
+  notifyGuidedGroupSessions?: boolean;
 }
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
@@ -186,6 +191,44 @@ export async function POST(request: Request) {
           maxAge: ONE_YEAR_SECONDS,
         });
         response.cookies.delete(NOTIFY_SPRINTS_DISABLED_AT_COOKIE);
+      }
+    }
+  }
+
+  if (body.notifyGuidedGroupSessions !== undefined) {
+    response.cookies.set(
+      NOTIFY_GUIDED_GROUP_SESSIONS_COOKIE,
+      normalizeNotifyGuidedGroupSessions(String(body.notifyGuidedGroupSessions)) ? '1' : '0',
+      {
+        path: '/',
+        sameSite: 'lax',
+        maxAge: ONE_YEAR_SECONDS,
+      },
+    );
+
+    const existingDisabledAt = normalizeIso(
+      await getCookieValue(NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE),
+    );
+    const windows = parseMutedWindows(
+      await getCookieValue(NOTIFY_GUIDED_GROUP_SESSIONS_MUTED_WINDOWS_COOKIE),
+    );
+    if (body.notifyGuidedGroupSessions === false) {
+      if (!existingDisabledAt) {
+        response.cookies.set(NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE, nowIso, {
+          path: '/',
+          sameSite: 'lax',
+          maxAge: ONE_YEAR_SECONDS,
+        });
+      }
+    } else if (body.notifyGuidedGroupSessions === true) {
+      if (existingDisabledAt) {
+        const next = [...windows, { from: existingDisabledAt, to: nowIso }].slice(-10);
+        response.cookies.set(NOTIFY_GUIDED_GROUP_SESSIONS_MUTED_WINDOWS_COOKIE, JSON.stringify(next), {
+          path: '/',
+          sameSite: 'lax',
+          maxAge: ONE_YEAR_SECONDS,
+        });
+        response.cookies.delete(NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE);
       }
     }
   }

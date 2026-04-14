@@ -54,7 +54,7 @@ export function LoginForm() {
       if (result.success) {
         toast.success(copy.success);
         const destination =
-          result.role && isStaff(result.role) ? '/admin/interactive-sessions' : '/dashboard';
+          result.role && isStaff(result.role) ? '/admin/events' : '/dashboard';
         router.push(destination);
         router.refresh();
       } else {

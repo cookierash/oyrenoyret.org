@@ -2,8 +2,8 @@
  * Legacy Problem Sprints Admin Page
  */
 
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
-export default async function ProblemSprintsAdminPage() {
-  redirect('/admin/interactive-sessions?tab=sprints');
+export default function LegacyInteractiveSessionsProblemSprintsAdminPage() {
+  permanentRedirect('/admin/events?tab=sprints');
 }

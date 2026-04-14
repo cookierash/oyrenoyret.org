@@ -60,7 +60,7 @@ export function AdminUserModerationPanel({
   const description = useMemo(() => {
     switch (action) {
       case 'SUSPEND':
-        return 'Suspended accounts can browse but cannot create materials, post, or join interactive sessions. Requires a reason.';
+        return 'Suspended accounts can browse but cannot create materials, post, or join events. Requires a reason.';
       case 'UNSUSPEND':
         return 'Lift the suspension early. Requires a reason.';
       case 'BAN':

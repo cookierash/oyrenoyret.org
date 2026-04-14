@@ -57,6 +57,77 @@ export async function GET(request: Request) {
 
     const now = new Date();
     const nowMs = now.getTime();
+    const recentWindowStart = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+    // Notify participants when the scheduled start time arrives.
+    // This is idempotent via `startingNotifiedAt`.
+    try {
+      const notifyCandidates = await prisma.guidedGroupSession.findMany({
+        where: {
+          deletedAt: null,
+          startingNotifiedAt: null,
+          status: { in: ['SCHEDULED', 'LIVE'] },
+          scheduledAt: { lte: now, gte: recentWindowStart },
+        },
+        orderBy: { scheduledAt: 'asc' },
+        take: 200,
+        select: {
+          id: true,
+          title: true,
+          facilitatorId: true,
+          scheduledAt: true,
+          durationMinutes: true,
+        },
+      });
+
+      for (const session of notifyCandidates) {
+        try {
+          const approvedCount = await prisma.guidedGroupSessionEnrollment.count({
+            where: { sessionId: session.id, status: 'APPROVED' },
+          });
+          if (approvedCount < 2) continue;
+
+          const acquired = await prisma.guidedGroupSession.updateMany({
+            where: { id: session.id, startingNotifiedAt: null },
+            data: { startingNotifiedAt: now },
+          });
+          if (!acquired.count) continue;
+
+          const enrollments = await prisma.guidedGroupSessionEnrollment.findMany({
+            where: { sessionId: session.id, status: 'APPROVED' },
+            select: { userId: true },
+          });
+
+          const linkUrl = `/my-library/guided-group-sessions/${session.id}`;
+          await prisma.moderationNotice.createMany({
+            data: [
+              {
+                userId: session.facilitatorId,
+                type: 'GUIDED_GROUP_SESSION_STARTING' as const,
+                title: 'Guided group session starting',
+                body: `"${session.title}" is starting now.`,
+                linkUrl,
+              },
+              ...enrollments.map((e) => ({
+                userId: e.userId,
+                type: 'GUIDED_GROUP_SESSION_STARTING' as const,
+                title: 'Guided group session starting',
+                body: `"${session.title}" is starting now.`,
+                linkUrl,
+              })),
+            ],
+          });
+        } catch (error) {
+          if (!isDbSchemaMismatch(error)) {
+            console.error('Error notifying guided group session start:', error);
+          }
+        }
+      }
+    } catch (error) {
+      if (!isDbSchemaMismatch(error)) {
+        console.error('Error fetching guided group session start notifications:', error);
+      }
+    }
 
     const candidates = await prisma.guidedGroupSession.findMany({
       where: {

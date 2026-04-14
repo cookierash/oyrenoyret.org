@@ -8,7 +8,7 @@ import {
   AnnouncementsAdminPanel,
   EventsAdminPanel,
   ProblemSprintsAdminPanel,
-} from '@/src/modules/interactive-sessions/admin-panel';
+} from '@/src/modules/events/admin-panel';
 
 type TabKey = 'sprints' | 'announcements' | 'events';
 
@@ -17,7 +17,7 @@ function normalizeTab(value: string | null): TabKey {
   return 'sprints';
 }
 
-export function InteractiveSessionsAdminHub() {
+export function EventsAdminHub() {
   const { messages } = useI18n();
   const uiCopy = messages.liveActivities.admin.ui;
   const router = useRouter();
@@ -38,7 +38,7 @@ export function InteractiveSessionsAdminHub() {
         setTab(next);
         const params = new URLSearchParams(searchParams.toString());
         params.set('tab', next);
-        router.replace(`/admin/interactive-sessions?${params.toString()}`);
+        router.replace(`/admin/events?${params.toString()}`);
       }}
       className="space-y-4"
     >

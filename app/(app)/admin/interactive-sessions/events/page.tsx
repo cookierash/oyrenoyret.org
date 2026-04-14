@@ -2,8 +2,8 @@
  * Legacy Events Admin Page
  */
 
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
-export default async function EventsAdminPage() {
-  redirect('/admin/interactive-sessions?tab=events');
+export default function LegacyInteractiveSessionsEventsAdminPage() {
+  permanentRedirect('/admin/events?tab=events');
 }

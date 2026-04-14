@@ -52,13 +52,13 @@ export default async function AdminPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="secondary-primary" asChild>
-                <Link href="/admin/interactive-sessions">{adminCopy.open}</Link>
+                <Link href="/admin/events">{adminCopy.open}</Link>
               </Button>
               <Button size="sm" variant="outline" asChild>
-                <Link href="/admin/interactive-sessions?tab=sprints">{adminCopy.sprints}</Link>
+                <Link href="/admin/events?tab=sprints">{adminCopy.sprints}</Link>
               </Button>
               <Button size="sm" variant="outline" asChild>
-                <Link href="/admin/interactive-sessions?tab=announcements">
+                <Link href="/admin/events?tab=announcements">
                   {adminCopy.announcements}
                 </Link>
               </Button>

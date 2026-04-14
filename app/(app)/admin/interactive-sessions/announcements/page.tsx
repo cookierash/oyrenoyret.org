@@ -2,8 +2,8 @@
  * Legacy Announcements Admin Page
  */
 
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
-export default async function AnnouncementsAdminPage() {
-  redirect('/admin/interactive-sessions?tab=announcements');
+export default function LegacyInteractiveSessionsAnnouncementsAdminPage() {
+  permanentRedirect('/admin/events?tab=announcements');
 }

@@ -3,10 +3,12 @@ export type MutedWindow = { from: string; to: string };
 export const NOTIFY_REPLIES_DISABLED_AT_COOKIE = 'oy_notify_replies_disabled_at';
 export const NOTIFY_CREDITS_DISABLED_AT_COOKIE = 'oy_notify_credits_disabled_at';
 export const NOTIFY_SPRINTS_DISABLED_AT_COOKIE = 'oy_notify_sprints_disabled_at';
+export const NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE = 'oy_notify_guided_group_sessions_disabled_at';
 
 export const NOTIFY_REPLIES_MUTED_WINDOWS_COOKIE = 'oy_notify_replies_muted_windows';
 export const NOTIFY_CREDITS_MUTED_WINDOWS_COOKIE = 'oy_notify_credits_muted_windows';
 export const NOTIFY_SPRINTS_MUTED_WINDOWS_COOKIE = 'oy_notify_sprints_muted_windows';
+export const NOTIFY_GUIDED_GROUP_SESSIONS_MUTED_WINDOWS_COOKIE = 'oy_notify_guided_group_sessions_muted_windows';
 
 export function parseMutedWindows(raw: string | undefined): MutedWindow[] {
   if (!raw) return [];

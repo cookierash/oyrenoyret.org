@@ -9,7 +9,7 @@ import { AccountTitle } from '@/src/components/layout/account-title';
 import { DiscussionsRightSidebar } from '@/src/components/layout/discussions-right-sidebar';
 import { LiveActivitiesRightSidebar } from '@/src/components/layout/live-activities-right-sidebar';
 import { TrendingDiscussions } from '@/src/modules/discussions/trending-discussions';
-import { LiveAnnouncementsList } from '@/src/modules/interactive-sessions/live-announcements-list';
+import { LiveAnnouncementsList } from '@/src/modules/events/live-announcements-list';
 import { Logo } from '@/src/components/ui/logo';
 import { WelcomeTour } from '@/src/modules/onboarding/welcome-tour';
 import { OnlinePresence } from '@/src/components/presence/online-presence';
@@ -59,9 +59,8 @@ export function AppShell({
   });
   const tutorialCompleteRef = useRef(false);
   const isDiscussionsRoute = pathname === '/discussions' || pathname.startsWith('/discussions/');
-  const isInteractiveSessionsRoute =
-    pathname === '/interactive-sessions' || pathname.startsWith('/interactive-sessions/');
-  const showRight = isDiscussionsRoute || isInteractiveSessionsRoute;
+  const isEventsRoute = pathname === '/events' || pathname.startsWith('/events/');
+  const showRight = isDiscussionsRoute || isEventsRoute;
   const removeMainPaddingY = isDiscussionsRoute && pathname !== '/discussions';
   const gridColumns = showRight
     ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,3fr)_minmax(0,1fr)]'
@@ -171,7 +170,7 @@ export function AppShell({
             </main>
             {isDiscussionsRoute ? (
               <DiscussionsRightSidebar className="hidden lg:flex" />
-            ) : isInteractiveSessionsRoute ? (
+            ) : isEventsRoute ? (
               <LiveActivitiesRightSidebar className="hidden lg:flex" />
             ) : null}
           </div>

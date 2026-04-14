@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 export default function LegacyAdminEventsPage() {
-  redirect('/admin/interactive-sessions/events');
+  permanentRedirect('/admin/events/events');
 }
 

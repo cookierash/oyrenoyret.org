@@ -1,6 +1,6 @@
 'use client';
 
-import { LiveAnnouncementsList } from '@/src/modules/interactive-sessions/live-announcements-list';
+import { LiveAnnouncementsList } from '@/src/modules/events/live-announcements-list';
 import { PiMegaphone as Megaphone } from 'react-icons/pi';
 import { cn } from '@/src/lib/utils';
 import { useI18n } from '@/src/i18n/i18n-provider';

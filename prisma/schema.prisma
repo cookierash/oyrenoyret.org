@@ -83,6 +83,7 @@ enum ModerationNoticeType {
   GUIDED_GROUP_SESSION_CANCELLED
   GUIDED_GROUP_SESSION_AUTO_CANCELLED
   GUIDED_GROUP_SESSION_NO_SHOW
+  GUIDED_GROUP_SESSION_STARTING
   GUIDED_GROUP_SESSION_ENROLLMENT_APPROVED
   GUIDED_GROUP_SESSION_ENROLLMENT_REJECTED
 }
@@ -321,6 +322,7 @@ model GuidedGroupSession {
   ratingCount           Int                      @default(0)
   whiteboardData        Json?
   activeMaterialId      String?
+  startingNotifiedAt    DateTime?
   settledAt             DateTime?
   facilitatorPayoutTxId String?
 
@@ -339,6 +341,7 @@ model GuidedGroupSession {
   @@index([facilitatorId, scheduledAt])
   @@index([subjectId, topicId, scheduledAt])
   @@index([status])
+  @@index([startingNotifiedAt])
   @@index([deletedAt])
 }
 

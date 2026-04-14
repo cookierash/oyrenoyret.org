@@ -67,7 +67,8 @@ export async function GET(request: Request) {
         where: {
           deletedAt: null,
           OR: [
-            { status: 'SCHEDULED', scheduledAt: { gt: now } },
+            // Include upcoming sessions + sessions that have started by time but may not be marked LIVE yet.
+            { status: 'SCHEDULED', scheduledAt: { gte: recentWindowStart } },
             { status: 'LIVE', scheduledAt: { gte: recentWindowStart } },
           ],
         },
@@ -102,7 +103,7 @@ export async function GET(request: Request) {
       if (!Number.isFinite(startMs)) return false;
       const endMs = startMs + durationMinutes * 60_000;
 
-      if (s.status === 'SCHEDULED') return startMs > nowMs;
+      if (s.status === 'SCHEDULED') return nowMs < endMs;
       if (s.status === 'LIVE') return nowMs < endMs;
       return false;
     });
@@ -149,6 +150,10 @@ export async function GET(request: Request) {
       const facilitatorName =
         [s.facilitator?.firstName, s.facilitator?.lastName].filter(Boolean).join(' ') ||
         (s.facilitator?.email ? s.facilitator.email.split('@')[0] : '');
+      const startMs = s?.scheduledAt instanceof Date ? s.scheduledAt.getTime() : NaN;
+      const durationMinutes = typeof s?.durationMinutes === 'number' ? s.durationMinutes : 0;
+      const endMs = startMs + durationMinutes * 60_000;
+      const isOngoing = Number.isFinite(startMs) && nowMs >= startMs && nowMs < endMs;
       return {
         id: s.id,
         title: s.title,
@@ -158,6 +163,7 @@ export async function GET(request: Request) {
         durationMinutes: s.durationMinutes,
         learnerCapacity: s.learnerCapacity,
         status: s.status,
+        isOngoing,
         createdAt: s.createdAt ? s.createdAt.toISOString() : null,
         ratingAvg: typeof s.ratingAvg === 'number' ? s.ratingAvg : 0,
         ratingCount: typeof s.ratingCount === 'number' ? s.ratingCount : 0,

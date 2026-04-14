@@ -31,7 +31,7 @@ export const EN_MESSAGES = {
     dashboard: 'Dashboard',
     catalog: 'Catalog',
     library: 'My library',
-    liveActivities: 'Interactive sessions',
+    liveActivities: 'Events',
     discussions: 'Discussions',
     learning: 'Learning',
     studio: 'Studio',
@@ -147,6 +147,8 @@ export const EN_MESSAGES = {
       creditsDescription: 'Show credit transactions in Notifications.',
       sprintsTitle: 'Sprint notifications',
       sprintsDescription: 'Show sprint-related notifications in Notifications.',
+      guidedGroupSessionsTitle: 'Guided group sessions',
+      guidedGroupSessionsDescription: 'Show guided group session notifications in Notifications.',
       moderationTitle: 'Moderation updates',
       moderationDescription: 'Show moderation and account status updates in Notifications.',
       scopeHint: 'These settings only affect what you see in Notifications on this browser.',
@@ -363,14 +365,14 @@ export const EN_MESSAGES = {
     catalog: 'Catalog',
     library: 'My library',
     guidedGroupSessions: 'Guided group sessions',
-    liveActivities: 'Interactive sessions',
+    liveActivities: 'Events',
     discussions: 'Discussions',
     notifications: 'Notifications',
     recentActivities: 'Notifications',
     academicRecord: 'Academic record',
     adminDashboard: 'Dashboard',
     adminHome: 'Admin',
-    manageLive: 'Manage interactive sessions',
+    manageLive: 'Manage events',
     contactMessages: 'Contact messages',
     curriculum: 'Subjects & topics',
     reports: 'User reports',
@@ -387,10 +389,10 @@ export const EN_MESSAGES = {
     catalog: 'Catalog',
     library: 'My library',
     guidedGroupSessions: 'Guided group sessions',
-    liveActivities: 'Interactive sessions',
+    liveActivities: 'Events',
     admin: 'Admin',
     adminDashboard: 'Admin Dashboard',
-    manageLiveActivities: 'Manage Interactive Sessions',
+    manageLiveActivities: 'Manage Events',
     contactMessages: 'Contact messages',
     curriculum: 'Subjects & topics',
     reports: 'User reports',
@@ -849,7 +851,7 @@ export const EN_MESSAGES = {
         'Improvement:\n' +
         '- Added full-text search indexes for faster discovery.\n' +
         '- Hardened auth and session security (including token hashing).\n' +
-        '- Expanded admin areas for curriculum, interactive sessions, reports, and messages.\n' +
+        '- Expanded admin areas for curriculum, events, reports, and messages.\n' +
         '- Added avatar variants and richer public user cards.\n' +
         '- Improved guided group sessions: upcoming-only listing, facilitator notifications when no one registers, and a streamlined 2-step scheduling flow.\n' +
         '- Added guided group sessions slug search (#subject / #topic) aligned with discussions & catalog conventions.\n' +
@@ -1727,14 +1729,14 @@ export const EN_MESSAGES = {
       materials: 'materials',
     },
     liveActivities: {
-      title: 'Interactive sessions',
-      description: 'Register for problem sprints and live events, and track your enrollments.',
+      title: 'Events',
+      description: 'Register for problem sprints and live events, and track your registrations.',
     },
     guidedGroupSessions: {
       title: 'Guided group sessions',
       description: 'Learn together in a small, instructor-guided group.',
       body: 'This space will include schedules, topics, and how to join upcoming group sessions.',
-      ctaBrowse: 'Browse interactive sessions',
+      ctaBrowse: 'Browse events',
       ctaDiscuss: 'Ask in discussions',
       facilitatorApplication: {
         title: 'Facilitator application',
@@ -1874,10 +1876,10 @@ export const EN_MESSAGES = {
       today: 'Today',
       dayLabel: { singular: 'day', plural: 'days' },
       bestStreak: 'Best streak',
-      upcoming: 'Upcoming interactive sessions',
+      upcoming: 'Upcoming events',
       viewAll: 'View all',
-      noLive: 'No interactive sessions yet',
-      noLiveHint: 'New sessions will appear here once scheduled.',
+      noLive: 'No events yet',
+      noLiveHint: 'New events will appear here once scheduled.',
       recentMaterials: 'Recently purchased materials',
       allMaterials: 'All materials',
       noMaterials: 'No materials yet',
@@ -2015,7 +2017,7 @@ export const EN_MESSAGES = {
       pendingTitle: 'Complete your sprint registration',
       confirmedTitle: "You're in! Sprint spot secured",
       cancelledHint:
-        'This registration was cancelled. Return to Interactive sessions to register again.',
+        'This registration was cancelled. Return to Events to register again.',
       pendingHint: 'A confirmation is required before credits are deducted.',
       confirmedHint: 'Your registration is confirmed. See you at the sprint!',
       viewDetails: 'View details',
@@ -2027,7 +2029,7 @@ export const EN_MESSAGES = {
       summaryLine: '{{topic}} on {{date}} at {{time}}',
       creditsRequired: 'Credits required: {{count}} (no refunds)',
       cancelledSummary:
-        'This request was cancelled and cannot be confirmed. Visit Interactive sessions to register again.',
+        'This request was cancelled and cannot be confirmed. Visit Events to register again.',
       rulesText: `Please review the sprint procedures and policies before confirming:\n\n1. Your spot is reserved only after confirmation.\n2. Credits are deducted immediately after confirmation.\n3. Credits are non-refundable once the sprint is confirmed.\n4. Join on time; missed sessions are not refunded.\n5. Keep communication respectful and focused.\n6. You are responsible for stable internet and a working device.\n`,
       agreeTitle: 'I have read and agree to the sprint rules and policies',
       agreeHint: 'Credits will be deducted immediately and are non-refundable.',
@@ -2038,7 +2040,7 @@ export const EN_MESSAGES = {
       completing: 'Completing...',
       confirmAction: 'Complete registration',
       cancelledToast:
-        'This registration was cancelled. Please register again from Interactive sessions.',
+        'This registration was cancelled. Please register again from Events.',
       acceptRulesToast: 'Please accept the sprint rules to continue.',
       missingInfoToast: 'Missing sprint information. Please refresh the page.',
       insufficientCreditsToast: 'Insufficient credits to complete registration.',
@@ -2103,7 +2105,7 @@ export const EN_MESSAGES = {
           'Study materials, join live sessions, and keep an eye on your achievements.',
         highlights: {
           liveActivities: {
-            title: 'Interactive sessions',
+            title: 'Events',
             description: 'Join problem sprints and live events from the calendar.',
           },
           academicRecord: {
@@ -2138,17 +2140,17 @@ export const EN_MESSAGES = {
   },
   liveActivities: {
     board: {
-      myEventsTitle: 'My sessions',
-      myEventsSubtitle: 'Confirmed registrations for your upcoming sessions.',
+      myEventsTitle: 'My events',
+      myEventsSubtitle: 'Confirmed registrations for your upcoming events.',
       enrolledCount: '{{count}} enrolled',
-      allEventsTitle: 'All sessions',
-      allEventsSubtitle: 'Interactive sessions you can join in the next 10–15 minutes.',
-      noLiveScheduled: 'No interactive sessions scheduled.',
-      noConfirmedEvents: 'No confirmed sessions yet.',
+      allEventsTitle: 'All events',
+      allEventsSubtitle: 'Events you can join in the next 10–15 minutes.',
+      noLiveScheduled: 'No events scheduled.',
+      noConfirmedEvents: 'No confirmed events yet.',
       noEventsHint: 'Check back soon or watch the announcements sidebar.',
-      noConfirmedHint: 'Register in All sessions to see it here.',
-      allEnrolled: 'You are enrolled in all current sessions.',
-      allEnrolledHint: 'We will post new sessions soon.',
+      noConfirmedHint: 'Register in All events to see it here.',
+      allEnrolled: 'You are enrolled in all current events.',
+      allEnrolledHint: 'We will post new events soon.',
       statusEnrolled: 'Enrolled',
       statusVerification: 'Verification needed',
       statusCancelled: 'Registration cancelled',
@@ -2160,8 +2162,8 @@ export const EN_MESSAGES = {
       creditsLabel: '{{count}} credits',
       pendingNotice: 'A confirmation request was sent to your notifications inbox.',
       cancelledNotice: 'This registration was cancelled. You can register again.',
-      ongoingNotice: 'This session has started and is no longer accepting registrations.',
-      fullNotice: 'This session is full and is no longer accepting registrations.',
+      ongoingNotice: 'This event has started and is no longer accepting registrations.',
+      fullNotice: 'This event is full and is no longer accepting registrations.',
       readyNotice: 'Ready when you are.',
       enterSprint: 'Enter sprint',
       enrolledLabel: 'Enrolled',
@@ -2172,7 +2174,7 @@ export const EN_MESSAGES = {
       register: 'Register',
       toastInsufficientCredits: 'Insufficient credits to register.',
       toastFailedRegister: 'Failed to register.',
-      toastAlreadyEnrolled: 'You are already enrolled in this session.',
+      toastAlreadyEnrolled: 'You are already enrolled in this event.',
       toastRegistrationStarted: 'Registration started. Check your notifications to complete.',
     },
     announcements: {
@@ -2200,7 +2202,7 @@ export const EN_MESSAGES = {
           totalLabel: '{{count}} total',
           removeEventTitle: 'Remove event?',
           removeEventDescription:
-            'This will remove {{topic}} on {{date}} at {{time}} from the interactive sessions list. This action cannot be undone.',
+            'This will remove {{topic}} on {{date}} at {{time}} from the events list. This action cannot be undone.',
           removeEventFallback: 'This action cannot be undone.',
           removeEventConfirm: 'Remove event',
           removing: 'Removing...',
@@ -2257,7 +2259,7 @@ export const EN_MESSAGES = {
         problemSprints: {
           formTitle: 'Create a problem sprint',
           formDescription:
-            'Set up a new timed sprint and publish it to the interactive sessions page.',
+            'Set up a new timed sprint and publish it to the events page.',
           formButton: 'Publish sprint',
           addButton: 'Add sprint',
           wizard: {
@@ -2277,7 +2279,7 @@ export const EN_MESSAGES = {
         },
         events: {
           formTitle: 'Create a live event',
-          formDescription: 'Schedule a new event for the interactive sessions calendar.',
+          formDescription: 'Schedule a new event for the events calendar.',
           formButton: 'Publish event',
           addButton: 'Add event',
           listTitle: 'Scheduled events',
@@ -2288,7 +2290,7 @@ export const EN_MESSAGES = {
         },
         announcements: {
           dialogTitle: 'Create an announcement',
-          dialogDescription: 'Post updates that appear in the interactive sessions sidebar.',
+          dialogDescription: 'Post updates that appear in the events sidebar.',
           titleLabel: 'Title',
           titlePlaceholder: 'Update title',
           bannerLabel: 'Banner image (optional)',
@@ -2359,7 +2361,7 @@ export const EN_MESSAGES = {
       workspaceGateTitle: 'Complete registration to enter',
       workspaceGateDescription:
         'This sprint requires a verified registration before you can access the contest room.',
-      workspaceBack: 'Back to interactive sessions',
+      workspaceBack: 'Back to events',
       promptTitle: 'Contest description',
       countdownTitle: 'Countdown',
       countdownStartsIn: 'Starts in {{time}}',

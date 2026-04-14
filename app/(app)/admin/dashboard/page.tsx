@@ -3,11 +3,11 @@
  *
  * Legacy route (stats removed).
  *
- * Redirects to /admin/interactive-sessions.
+ * Redirects to /admin/events.
  */
 
 import { redirect } from 'next/navigation';
 
 export default async function AdminDashboardPage() {
-  redirect('/admin/interactive-sessions');
+  redirect('/admin/events');
 }

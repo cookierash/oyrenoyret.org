@@ -1,12 +1,12 @@
 /**
  * Legacy Live Activities Route
  *
- * Redirects to /interactive-sessions.
+ * Redirects to /events.
  */
 
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 export default function LegacyLiveActivitiesPage() {
-  redirect('/interactive-sessions');
+  permanentRedirect('/events');
 }
 

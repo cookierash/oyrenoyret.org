@@ -75,6 +75,7 @@ type GuidedGroupSessionRow = {
   durationMinutes: number;
   learnerCapacity: number;
   status: string;
+  isOngoing?: boolean;
   ratingAvg: number;
   ratingCount: number;
   facilitator: { id: string; name: string; avatarVariant: string | null };
@@ -146,6 +147,7 @@ export function GuidedGroupSessionsClient({
   const [browseFocused, setBrowseFocused] = useState(false);
   const browseInputRef = useRef<HTMLInputElement>(null);
   const browseBlurTimer = useRef<NodeJS.Timeout | null>(null);
+  const autoEnrollAttemptedRef = useRef(false);
 
   const localeCode = getLocaleCode(locale);
   const hour12 = timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -326,10 +328,8 @@ export function GuidedGroupSessionsClient({
     return sessions.filter((s) => {
       const startMs = new Date(s.scheduledAt).getTime();
       const endMs = startMs + (s.durationMinutes ?? 0) * 60_000;
-
-      if (s.status === 'SCHEDULED') return startMs > nowMs;
-      if (s.status === 'LIVE') return nowMs < endMs;
-      return false;
+      if (!Number.isFinite(startMs)) return false;
+      return nowMs < endMs;
     });
   }, [sessions, nowMs]);
 
@@ -347,9 +347,14 @@ export function GuidedGroupSessionsClient({
 
   const liveNowSessions = useMemo(() => {
     return [...filteredSessions]
-      .filter((s) => s.status === 'LIVE')
+      .filter((s) => {
+        if (s.status === 'LIVE') return true;
+        const startMs = new Date(s.scheduledAt).getTime();
+        const endMs = startMs + (s.durationMinutes ?? 0) * 60_000;
+        return Boolean(s.isOngoing) || (nowMs >= startMs && nowMs < endMs);
+      })
       .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
-  }, [filteredSessions]);
+  }, [filteredSessions, nowMs]);
 
   const mostRecentSessions = useMemo(() => {
     return [...filteredSessions]
@@ -378,6 +383,22 @@ export function GuidedGroupSessionsClient({
       .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
       .slice(0, 12);
   }, [filteredSessions]);
+
+  const myRegisteredSessions = useMemo(() => {
+    return [...visibleSessions]
+      .filter((s) => s.enrollmentStatus === 'APPROVED')
+      .sort((a, b) => {
+        const aStartMs = new Date(a.scheduledAt).getTime();
+        const bStartMs = new Date(b.scheduledAt).getTime();
+        const aEndMs = aStartMs + (a.durationMinutes ?? 0) * 60_000;
+        const bEndMs = bStartMs + (b.durationMinutes ?? 0) * 60_000;
+        const aOngoing = Boolean(a.isOngoing) || (nowMs >= aStartMs && nowMs < aEndMs);
+        const bOngoing = Boolean(b.isOngoing) || (nowMs >= bStartMs && nowMs < bEndMs);
+        if (aOngoing !== bOngoing) return aOngoing ? -1 : 1;
+        return aStartMs - bStartMs;
+      })
+      .slice(0, 6);
+  }, [nowMs, visibleSessions]);
 
   const load = async () => {
     setLoading(true);
@@ -424,8 +445,10 @@ export function GuidedGroupSessionsClient({
       const nextApplication =
         appData && typeof appData === 'object' && appData.application ? appData.application : null;
 
+      const nextSessions = Array.isArray(sessionsData) ? (sessionsData as GuidedGroupSessionRow[]) : [];
+
       setSubjects(curriculumSubjects);
-      setSessions(Array.isArray(sessionsData) ? (sessionsData as GuidedGroupSessionRow[]) : []);
+      setSessions(nextSessions);
       setApplication(nextApplication);
       setVerifiedSubjectIds(Array.isArray(appData?.verifiedSubjectIds) ? appData.verifiedSubjectIds : []);
 
@@ -436,6 +459,43 @@ export function GuidedGroupSessionsClient({
         setSelectedSubjectIds(
           Array.isArray(nextApplication.subjects) ? nextApplication.subjects.map((s) => s.subjectId).filter(Boolean) : [],
         );
+      }
+
+      // Auto-register the learner for the next available session (first-come, first-served).
+      // Keep this idempotent per page view to avoid accidental loops.
+      if (!autoEnrollAttemptedRef.current) {
+        autoEnrollAttemptedRef.current = true;
+
+        const isAlreadyRegistered = nextSessions.some((s) => {
+          const status = s.enrollmentStatus;
+          if (status !== 'APPROVED') return false;
+          const startMs = new Date(s.scheduledAt).getTime();
+          const endMs = startMs + (s.durationMinutes ?? 0) * 60_000;
+          return Number.isFinite(startMs) && nowMs < endMs;
+        });
+
+        if (!isAlreadyRegistered && canWrite && user?.id) {
+          const candidate = [...nextSessions]
+            .filter((s) => {
+              const startMs = new Date(s.scheduledAt).getTime();
+              if (!Number.isFinite(startMs)) return false;
+              const seatsLeft = Math.max(0, (s.learnerCapacity ?? 0) - (s.approvedCount ?? 0));
+              const isOwnSession = s.facilitator?.id === user.id;
+              const status = s.enrollmentStatus;
+              return (
+                s.status === 'SCHEDULED' &&
+                !isOwnSession &&
+                startMs > nowMs &&
+                seatsLeft > 0 &&
+                (!status || status === 'CANCELLED' || status === 'REJECTED')
+              );
+            })
+            .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())[0];
+
+          if (candidate?.id) {
+            void requestToJoin(candidate.id, { silentToast: true });
+          }
+        }
       }
     } catch {
       setSubjects([]);
@@ -657,7 +717,7 @@ export function GuidedGroupSessionsClient({
     }
   };
 
-  const requestToJoin = async (sessionId: string) => {
+  const requestToJoin = async (sessionId: string, opts?: { silentToast?: boolean }) => {
     if (busySessionId) return;
     if (!canWrite) {
       toast.error(getWriteRestrictionMessage(writeRestriction, messages.auth.errors.emailNotVerified));
@@ -673,15 +733,23 @@ export function GuidedGroupSessionsClient({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(typeof data?.error === 'string' && data.error ? data.error : (locale === 'az' ? 'İstək göndərmək mümkün olmadı.' : 'Failed to request.'));
+        toast.error(
+          typeof data?.error === 'string' && data.error
+            ? data.error
+            : locale === 'az'
+              ? 'Qeydiyyatdan keçmək mümkün olmadı.'
+              : 'Failed to register.',
+        );
         return;
       }
-      const nextStatus = typeof data?.status === 'string' ? data.status : 'PENDING';
+      const nextStatus = typeof data?.status === 'string' ? data.status : 'APPROVED';
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, enrollmentStatus: nextStatus } : s)));
-      toast.success(nextStatus === 'PENDING' ? (locale === 'az' ? 'İstək göndərildi.' : 'Request sent.') : (locale === 'az' ? 'Yeniləndi.' : 'Updated.'));
+      if (!opts?.silentToast) {
+        toast.success(locale === 'az' ? 'Qeydiyyat tamamlandı.' : 'Registered.');
+      }
       await load();
     } catch {
-      toast.error(locale === 'az' ? 'İstək göndərmək mümkün olmadı.' : 'Failed to request.');
+      toast.error(locale === 'az' ? 'Qeydiyyatdan keçmək mümkün olmadı.' : 'Failed to register.');
     } finally {
       setBusySessionId(null);
     }
@@ -703,13 +771,19 @@ export function GuidedGroupSessionsClient({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error(typeof data?.error === 'string' && data.error ? data.error : (locale === 'az' ? 'İstəyi ləğv etmək mümkün olmadı.' : 'Failed to cancel request.'));
+        toast.error(
+          typeof data?.error === 'string' && data.error
+            ? data.error
+            : locale === 'az'
+              ? 'Qeydiyyatı ləğv etmək mümkün olmadı.'
+              : 'Failed to cancel registration.',
+        );
         return;
       }
-      toast.success(locale === 'az' ? 'İstək ləğv edildi.' : 'Request cancelled.');
+      toast.success(locale === 'az' ? 'Qeydiyyat ləğv edildi.' : 'Registration cancelled.');
       await load();
     } catch {
-      toast.error(locale === 'az' ? 'İstəyi ləğv etmək mümkün olmadı.' : 'Failed to cancel request.');
+      toast.error(locale === 'az' ? 'Qeydiyyatı ləğv etmək mümkün olmadı.' : 'Failed to cancel registration.');
     } finally {
       setBusySessionId(null);
     }
@@ -747,14 +821,17 @@ export function GuidedGroupSessionsClient({
           const isOwnSession = session.facilitator?.id === user.id;
           const isBusy = busySessionId === session.id;
           const status = session.enrollmentStatus;
-          const canRequest =
+          const endMs = startMs + (session.durationMinutes ?? 0) * 60_000;
+          const isOngoing = Boolean(session.isOngoing) || (nowMs >= startMs && nowMs < endMs);
+          const isApproved = status === 'APPROVED';
+          const canEnterRoom = isOngoing && (isOwnSession || isApproved);
+          const canRegister =
             session.status === 'SCHEDULED' &&
             !isOwnSession &&
             startMs > nowMs &&
             seatsLeft > 0 &&
-            (!status || status === 'CANCELLED');
-          const isApproved = status === 'APPROVED';
-          const canJoinLive = isApproved && session.status === 'LIVE';
+            (!status || status === 'CANCELLED' || status === 'REJECTED');
+          const canCancelRegistration = (status === 'APPROVED' || status === 'PENDING') && startMs > nowMs;
 
           return (
             <li key={session.id}>
@@ -783,6 +860,11 @@ export function GuidedGroupSessionsClient({
                     <span className="rounded-full bg-background/50 px-2 py-0.5 text-foreground shadow-sm ring-1 ring-border/50">
                       {approvedCount}/{session.learnerCapacity}
                     </span>
+                    {isOngoing ? (
+                      <span className="rounded-full bg-rose-500/10 px-2 py-0.5 font-medium text-rose-700 shadow-sm ring-1 ring-rose-500/15 dark:text-rose-300">
+                        {locale === 'az' ? 'Canlı' : 'Ongoing'}
+                      </span>
+                    ) : null}
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {guideStudentLabel}: {session.facilitator?.name ?? '—'}
@@ -793,60 +875,60 @@ export function GuidedGroupSessionsClient({
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={isBusy || isOwnSession || (!canRequest && !canJoinLive)}
+                    disabled={isBusy || (!canRegister && !canEnterRoom)}
                     onClick={() => {
-                      if (canJoinLive) {
+                      if (canEnterRoom) {
                         router.push(`/my-library/guided-group-sessions/${session.id}`);
                         return;
                       }
-                      if (canRequest) {
+                      if (canRegister) {
                         void requestToJoin(session.id);
                       }
                     }}
                   >
-                    {isOwnSession
-                      ? locale === 'az'
-                        ? 'Sizin sessiya'
-                        : 'Your session'
-                      : canJoinLive
+                    {canEnterRoom
+                      ? isOwnSession
                         ? locale === 'az'
-                          ? 'Canlıya qoşul'
-                          : 'Join live'
+                          ? 'Otağı aç'
+                          : 'Open room'
+                        : locale === 'az'
+                          ? 'Qoşul'
+                          : 'Join'
+                      : isOwnSession
+                        ? locale === 'az'
+                          ? 'Sizin sessiya'
+                          : 'Your session'
                         : status
-                          ? status === 'PENDING'
+                          ? status === 'APPROVED'
                             ? locale === 'az'
-                              ? 'İstək göndərildi'
-                              : 'Requested'
-                            : status === 'APPROVED'
+                              ? 'Qeydiyyat var'
+                              : 'Registered'
+                            : status === 'REJECTED'
                               ? locale === 'az'
-                                ? 'Təsdiq'
-                                : 'Approved'
-                              : status === 'REJECTED'
+                                ? 'Rədd'
+                                : 'Rejected'
+                              : status === 'CANCELLED'
                                 ? locale === 'az'
-                                  ? 'Rədd'
-                                  : 'Rejected'
-                                : status === 'CANCELLED'
+                                  ? 'Yenidən qeydiyyat'
+                                  : 'Register again'
+                                : status === 'PENDING'
                                   ? locale === 'az'
-                                    ? 'Yenidən istə'
-                                    : 'Request again'
+                                    ? 'Gözləyir'
+                                    : 'Pending'
                                   : status
-                          : session.status === 'LIVE'
+                          : seatsLeft === 0
                             ? locale === 'az'
-                              ? 'Canlı'
-                              : 'Live'
-                            : seatsLeft === 0
+                              ? 'Doludur'
+                              : 'Full'
+                            : startMs <= nowMs
                               ? locale === 'az'
-                                ? 'Doludur'
-                                : 'Full'
-                              : startMs <= nowMs
-                                ? locale === 'az'
-                                  ? 'Başlayıb'
-                                  : 'Started'
-                                : locale === 'az'
-                                  ? 'Qoşulma istəyi'
-                                  : 'Request to join'}
+                                ? 'Başlayıb'
+                                : 'Started'
+                              : locale === 'az'
+                                ? 'Qeydiyyat'
+                                : 'Register'}
                   </Button>
-                  {status === 'PENDING' ? (
+                  {canCancelRegistration ? (
                     <div className="mt-2">
                       <Button
                         size="sm"
@@ -855,7 +937,7 @@ export function GuidedGroupSessionsClient({
                         disabled={isBusy}
                         onClick={() => void cancelEnrollment(session.id)}
                       >
-                        {locale === 'az' ? 'İstəyi ləğv et' : 'Cancel request'}
+                        {locale === 'az' ? 'Qeydiyyatı ləğv et' : 'Cancel registration'}
                       </Button>
                     </div>
                   ) : null}
@@ -1365,60 +1447,77 @@ export function GuidedGroupSessionsClient({
       <div className="space-y-6">
         {loading ? (
           <p className="text-sm text-muted-foreground">{locale === 'az' ? 'Yüklənir…' : 'Loading…'}</p>
-        ) : filteredSessions.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border bg-muted/10 px-5 py-10 text-center">
-            <p className="text-sm font-medium text-muted-foreground">{locale === 'az' ? 'Sessiya tapılmadı.' : 'No sessions found.'}</p>
-            <p className="mt-1 text-xs text-muted-foreground/70">{locale === 'az' ? 'Filtrləri dəyişin.' : 'Try adjusting your filters.'}</p>
-          </div>
         ) : (
           <>
-            {liveNowSessions.length > 0 ? (
+            {myRegisteredSessions.length > 0 ? (
               <section className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.15)]" />
-                    {locale === 'az' ? 'İndi canlı' : 'Live now'}
+                    <span className="h-2 w-2 rounded-full bg-sky-500 shadow-[0_0_0_3px_rgba(14,165,233,0.15)]" />
+                    {locale === 'az' ? 'Mənim qeydiyyat sessiyalarım' : 'My registered sessions'}
                   </h2>
-                  <p className="text-[11px] text-muted-foreground">{liveNowSessions.length}</p>
+                  <p className="text-[11px] text-muted-foreground">{myRegisteredSessions.length}</p>
                 </div>
-                {renderSessionList(liveNowSessions, 'live')}
+                {renderSessionList(myRegisteredSessions, 'soon')}
               </section>
             ) : null}
 
-            <section className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                  <span className="h-2 w-2 rounded-full bg-violet-500 shadow-[0_0_0_3px_rgba(139,92,246,0.15)]" />
-                  {locale === 'az' ? 'Ən yeni əlavə olunanlar' : 'Most recently added'}
-                </h2>
-                <p className="text-[11px] text-muted-foreground">{mostRecentSessions.length}</p>
+            {filteredSessions.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border bg-muted/10 px-5 py-10 text-center">
+                <p className="text-sm font-medium text-muted-foreground">{locale === 'az' ? 'Sessiya tapılmadı.' : 'No sessions found.'}</p>
+                <p className="mt-1 text-xs text-muted-foreground/70">{locale === 'az' ? 'Filtrləri dəyişin.' : 'Try adjusting your filters.'}</p>
               </div>
-              {renderSessionList(mostRecentSessions, 'new')}
-            </section>
+            ) : (
+              <>
+                {liveNowSessions.length > 0 ? (
+                  <section className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.15)]" />
+                        {locale === 'az' ? 'İndi canlı' : 'Live now'}
+                      </h2>
+                      <p className="text-[11px] text-muted-foreground">{liveNowSessions.length}</p>
+                    </div>
+                    {renderSessionList(liveNowSessions, 'live')}
+                  </section>
+                ) : null}
 
-            {topRatedGuideSessions.length > 0 ? (
-              <section className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" />
-                    {locale === 'az' ? `Ən yüksək reytinqli ${guideStudentLabel}lər` : 'Top rated facilitators'}
-                  </h2>
-                  <p className="text-[11px] text-muted-foreground">{topRatedGuideSessions.length}</p>
-                </div>
-                {renderSessionList(topRatedGuideSessions, 'top')}
-              </section>
-            ) : null}
+                <section className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="h-2 w-2 rounded-full bg-violet-500 shadow-[0_0_0_3px_rgba(139,92,246,0.15)]" />
+                      {locale === 'az' ? 'Ən yeni əlavə olunanlar' : 'Most recently added'}
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground">{mostRecentSessions.length}</p>
+                  </div>
+                  {renderSessionList(mostRecentSessions, 'new')}
+                </section>
 
-            <section className="space-y-2">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" />
-                  {locale === 'az' ? 'Tezliklə başlayır' : 'Starting soon'}
-                </h2>
-                <p className="text-[11px] text-muted-foreground">{startingSoonSessions.length}</p>
-              </div>
-              {renderSessionList(startingSoonSessions, 'soon')}
-            </section>
+                {topRatedGuideSessions.length > 0 ? (
+                  <section className="space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]" />
+                        {locale === 'az' ? `Ən yüksək reytinqli ${guideStudentLabel}lər` : 'Top rated facilitators'}
+                      </h2>
+                      <p className="text-[11px] text-muted-foreground">{topRatedGuideSessions.length}</p>
+                    </div>
+                    {renderSessionList(topRatedGuideSessions, 'top')}
+                  </section>
+                ) : null}
+
+                <section className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]" />
+                      {locale === 'az' ? 'Tezliklə başlayır' : 'Starting soon'}
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground">{startingSoonSessions.length}</p>
+                  </div>
+                  {renderSessionList(startingSoonSessions, 'soon')}
+                </section>
+              </>
+            )}
           </>
         )}
       </div>

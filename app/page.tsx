@@ -96,7 +96,7 @@ export default async function HomePage() {
     if (!user) {
       redirect('/login');
     }
-    redirect(isStaff(user.role) ? '/admin/interactive-sessions' : '/dashboard');
+    redirect(isStaff(user.role) ? '/admin/events' : '/dashboard');
   }
 
   const partnerLogos = getPartnerLogos();

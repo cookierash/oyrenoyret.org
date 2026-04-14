@@ -1,6 +1,6 @@
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 export default function LegacyAdminProblemSprintsPage() {
-  redirect('/admin/interactive-sessions/problem-sprints');
+  permanentRedirect('/admin/events/problem-sprints');
 }
 

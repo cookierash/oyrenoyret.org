@@ -1,12 +1,12 @@
 /**
  * Legacy Admin Live Activities Route
  *
- * Redirects to /admin/interactive-sessions.
+ * Redirects to /admin/events.
  */
 
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 export default function LegacyAdminLiveActivitiesPage() {
-  redirect('/admin/interactive-sessions');
+  permanentRedirect('/admin/events');
 }
 

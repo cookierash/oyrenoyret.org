@@ -13,9 +13,12 @@ import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { cookies } from 'next/headers';
+import type { ModerationNoticeType } from '@prisma/client';
 import {
   NOTIFY_CREDITS_DISABLED_AT_COOKIE,
   NOTIFY_CREDITS_MUTED_WINDOWS_COOKIE,
+  NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE,
+  NOTIFY_GUIDED_GROUP_SESSIONS_MUTED_WINDOWS_COOKIE,
   NOTIFY_REPLIES_DISABLED_AT_COOKIE,
   NOTIFY_REPLIES_MUTED_WINDOWS_COOKIE,
   NOTIFY_SPRINTS_DISABLED_AT_COOKIE,
@@ -60,16 +63,20 @@ export async function GET(request: Request) {
       repliesMutedWindowsRaw,
       creditsMutedWindowsRaw,
       sprintsMutedWindowsRaw,
+      guidedMutedWindowsRaw,
       repliesDisabledAtRaw,
       creditsDisabledAtRaw,
       sprintsDisabledAtRaw,
+      guidedDisabledAtRaw,
     ] = await Promise.all([
       getCookieValue(NOTIFY_REPLIES_MUTED_WINDOWS_COOKIE),
       getCookieValue(NOTIFY_CREDITS_MUTED_WINDOWS_COOKIE),
       getCookieValue(NOTIFY_SPRINTS_MUTED_WINDOWS_COOKIE),
+      getCookieValue(NOTIFY_GUIDED_GROUP_SESSIONS_MUTED_WINDOWS_COOKIE),
       getCookieValue(NOTIFY_REPLIES_DISABLED_AT_COOKIE),
       getCookieValue(NOTIFY_CREDITS_DISABLED_AT_COOKIE),
       getCookieValue(NOTIFY_SPRINTS_DISABLED_AT_COOKIE),
+      getCookieValue(NOTIFY_GUIDED_GROUP_SESSIONS_DISABLED_AT_COOKIE),
     ]);
 
     const repliesNotFilters = buildMutedCreatedAtNotFilters(
@@ -85,6 +92,19 @@ export async function GET(request: Request) {
       parseIsoOrNull(sprintsDisabledAtRaw),
       'updatedAt',
     );
+    const guidedNotFilters = buildMutedCreatedAtNotFilters(
+      parseMutedWindows(guidedMutedWindowsRaw),
+      parseIsoOrNull(guidedDisabledAtRaw),
+    );
+
+    const guidedNoticeTypes: ModerationNoticeType[] = [
+      'GUIDED_GROUP_SESSION_CANCELLED',
+      'GUIDED_GROUP_SESSION_AUTO_CANCELLED',
+      'GUIDED_GROUP_SESSION_NO_SHOW',
+      'GUIDED_GROUP_SESSION_STARTING',
+      'GUIDED_GROUP_SESSION_ENROLLMENT_APPROVED',
+      'GUIDED_GROUP_SESSION_ENROLLMENT_REJECTED',
+    ];
 
     const [replyNotifications, transactions, sprintEnrollments, moderationNotices] = await Promise.all([
       prisma.discussionReply.findMany({
@@ -172,7 +192,21 @@ export async function GET(request: Request) {
         }
       })(),
       prisma.moderationNotice.findMany({
-        where: { userId },
+        where: {
+          userId,
+          ...(guidedNotFilters.length
+            ? {
+                AND: [
+                  {
+                    OR: [
+                      { type: { notIn: guidedNoticeTypes } },
+                      { AND: [{ type: { in: guidedNoticeTypes } }, ...guidedNotFilters] },
+                    ],
+                  },
+                ],
+              }
+            : {}),
+        },
         orderBy: { createdAt: 'desc' },
         take: 100,
         select: {

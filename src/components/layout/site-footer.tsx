@@ -129,7 +129,7 @@ export function SiteFooter() {
                 </li>
                 <li>
                   <Link
-                    href="/interactive-sessions"
+                    href="/events"
                     className="transition-colors hover:text-foreground"
                   >
                     {t('footer.liveActivities')}

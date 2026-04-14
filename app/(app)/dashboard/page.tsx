@@ -4,7 +4,7 @@
  * Compact, friendly student dashboard with:
  * - Greeting and daily focus
  * - Micro progress tiles
- * - Upcoming interactive sessions
+ * - Upcoming events
  * - Recent materials
  * - Quick actions
  */
@@ -17,7 +17,7 @@ import { DashboardShell } from '@/src/components/ui/dashboard-shell';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { STREAK_OFFSET_HOURS, toDayNumber } from '@/src/lib/streak';
 import { recordDailyVisit } from '@/src/modules/visits';
-import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiMegaphone as Megaphone, PiVideoCamera as Video } from 'react-icons/pi';
+import { PiBookOpen as BookOpen, PiCheck as Check, PiCaretRight as ChevronRight, PiClock as Clock, PiMegaphone as Megaphone, PiUsersThree as Users, PiVideoCamera as Video } from 'react-icons/pi';
 import { getSettingsPreferences } from '@/src/lib/settings-preferences-server';
 import { getI18n } from '@/src/i18n/server';
 import { getLocaleCode } from '@/src/i18n';
@@ -218,7 +218,7 @@ export default async function DashboardPage() {
   await recordDailyVisit(userId, now);
 
   // Fetch user info + upcoming activities + recent purchases in parallel
-  const [user, upcomingActivities, recentPurchases, dailyVisits, liveAnnouncements] = await Promise.all([
+  const [user, upcomingActivities, upcomingGuidedSessions, recentPurchases, dailyVisits, liveAnnouncements] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { firstName: true, lastName: true, role: true },
@@ -231,6 +231,59 @@ export default async function DashboardPage() {
       orderBy: { date: 'asc' },
       take: 4,
     }),
+    (async () => {
+      try {
+        const recentWindowStart = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+        const rows = await prisma.guidedGroupSession.findMany({
+          where: {
+            deletedAt: null,
+            status: { in: ['SCHEDULED', 'LIVE'] },
+            scheduledAt: { gte: recentWindowStart },
+            OR: [
+              { facilitatorId: userId },
+              { enrollments: { some: { userId, status: 'APPROVED' } } },
+            ],
+          },
+          orderBy: { scheduledAt: 'asc' },
+          take: 3,
+          select: {
+            id: true,
+            title: true,
+            subjectId: true,
+            topicId: true,
+            scheduledAt: true,
+            durationMinutes: true,
+            facilitatorId: true,
+            facilitator: { select: { firstName: true, lastName: true, email: true } },
+          },
+        });
+
+        const nowMs = now.getTime();
+        return rows
+          .map((s) => {
+            const startMs = s.scheduledAt.getTime();
+            const endMs = startMs + s.durationMinutes * 60_000;
+            if (nowMs >= endMs) return null;
+            const facilitatorName =
+              [s.facilitator?.firstName, s.facilitator?.lastName].filter(Boolean).join(' ') ||
+              (s.facilitator?.email ? s.facilitator.email.split('@')[0] : '');
+            return {
+              id: s.id,
+              title: s.title,
+              subjectId: s.subjectId,
+              topicId: s.topicId,
+              scheduledAt: s.scheduledAt,
+              durationMinutes: s.durationMinutes,
+              isOngoing: nowMs >= startMs && nowMs < endMs,
+              facilitator: { id: s.facilitatorId, name: facilitatorName },
+            };
+          })
+          .filter(Boolean);
+      } catch (error) {
+        if (isDbSchemaMismatch(error)) return [];
+        throw error;
+      }
+    })(),
     prisma.materialAccess.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -258,7 +311,7 @@ export default async function DashboardPage() {
   ]);
 
   if (user?.role === 'ADMIN' || user?.role === 'TEACHER') {
-    redirect('/admin/interactive-sessions');
+    redirect('/admin/events');
   }
 
   const displayName = user?.firstName || copy.fallbackName;
@@ -407,7 +460,7 @@ export default async function DashboardPage() {
               <h2 className="text-sm font-medium">{copy.upcoming}</h2>
             </div>
             <Link
-              href="/interactive-sessions"
+              href="/events"
               className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
             >
               {copy.viewAll}
@@ -478,6 +531,91 @@ export default async function DashboardPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-sm font-medium">
+                {locale === 'az' ? 'Yaxınlaşan bələdçili qrup sessiyaları' : 'Upcoming guided group sessions'}
+              </h2>
+            </div>
+            <Link
+              href="/my-library/guided-group-sessions"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              {copy.viewAll}
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          {upcomingGuidedSessions.length === 0 ? (
+            <div className="card-frame border-dashed bg-muted/20 px-5 py-10 text-center">
+              <Users className="mx-auto mb-2 h-7 w-7 text-muted-foreground/60" />
+              <p className="text-sm font-medium text-muted-foreground">
+                {locale === 'az' ? 'Qeydiyyat sessiyanız yoxdur' : 'No registered sessions yet'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground/70">
+                {locale === 'az'
+                  ? 'Sessiya olduqda avtomatik qeydiyyat olunacaqsınız.'
+                  : 'When a session is available, you will be registered automatically.'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {upcomingGuidedSessions.map((session: any) => (
+                <Link
+                  key={session.id}
+                  href={`/my-library/guided-group-sessions/${session.id}`}
+                  className="card-frame border-dashed bg-muted/20 px-4 py-3 block hover:border-primary/30 transition-colors"
+                >
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex h-14 w-14 flex-col items-center justify-center rounded-xl bg-muted/60 text-center">
+                      <span className="text-[11px] font-medium uppercase text-muted-foreground">
+                        {session.scheduledAt.toLocaleDateString(getLocaleCode(locale), { month: 'short' })}
+                      </span>
+                      <span className="text-lg font-medium text-foreground">
+                        {session.scheduledAt.toLocaleDateString(getLocaleCode(locale), { day: '2-digit' })}
+                      </span>
+                    </div>
+                    <div className="min-w-[200px] flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-foreground line-clamp-1">
+                          {session.title}
+                        </p>
+                        {session.isOngoing ? (
+                          <span className="inline-flex text-[10px] font-medium px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-300">
+                            {locale === 'az' ? 'Canlı' : 'Ongoing'}
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {session.facilitator?.name ?? '—'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                          <Clock className="h-3 w-3" />
+                          {session.scheduledAt.toLocaleTimeString(getLocaleCode(locale), {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12:
+                              timeFormat === 'auto'
+                                ? undefined
+                                : timeFormat === '12-hour',
+                          })}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-foreground">
+                          <Clock className="h-3 w-3" />
+                          {session.durationMinutes} {copy.minLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
         </section>

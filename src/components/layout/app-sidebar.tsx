@@ -84,7 +84,7 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
     { href: '/catalog', label: t('sidebar.catalog'), icon: BookOpen },
     { href: '/my-library', label: t('sidebar.library'), icon: Library },
     { href: '/my-library/guided-group-sessions', label: t('sidebar.guidedGroupSessions'), icon: UsersThree },
-    { href: '/interactive-sessions', label: t('sidebar.liveActivities'), icon: CalendarDays },
+    { href: '/events', label: t('sidebar.liveActivities'), icon: CalendarDays },
     { href: '/discussions', label: t('sidebar.discussions'), icon: MessageSquare },
     { href: '/notifications', label: t('sidebar.notifications'), icon: Bell },
     { href: '/academic-record', label: t('sidebar.academicRecord'), icon: GraduationCap },
@@ -380,10 +380,10 @@ export function AppSidebar({ user, className, onClose }: AppSidebarProps) {
                   {t('sidebar.adminHome')}
                 </Link>
                 <Link
-                  href="/admin/interactive-sessions"
+                  href="/admin/events"
                   className={cn(
                     'flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors',
-                    pathname.startsWith('/admin/interactive-sessions')
+                    pathname.startsWith('/admin/events')
                       ? 'bg-muted text-foreground font-medium'
                       : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
                   )}

@@ -266,7 +266,7 @@ function SprintEnrollmentRow({
           </div>
           <div className="shrink-0 text-right">
             <Button size="sm" variant="secondary-primary" asChild>
-              <Link href="/interactive-sessions">{copy.viewSprint}</Link>
+              <Link href="/events">{copy.viewSprint}</Link>
             </Button>
             <p suppressHydrationWarning className="mt-1 text-[10px] text-muted-foreground">
               {timeFormatter.format(createdTime)}

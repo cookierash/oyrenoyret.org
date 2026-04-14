@@ -12,7 +12,7 @@ import { prisma } from '@/src/db/client';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
-import { SprintCmsClient } from '@/src/modules/interactive-sessions/sprint-cms-client';
+import { SprintCmsClient } from '@/src/modules/events/sprint-cms-client';
 import { Button } from '@/components/ui/button';
 import { getI18n } from '@/src/i18n/server';
 
@@ -86,7 +86,7 @@ export default async function SprintWorkspacePage({
   }
 
   if (!event || event.type !== 'PROBLEM_SPRINT') {
-    redirect('/interactive-sessions');
+    redirect('/events');
   }
 
   let enrollment: { status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' } | null = null;
@@ -120,7 +120,7 @@ export default async function SprintWorkspacePage({
             {copy.workspaceGateDescription}
           </p>
           <Button size="sm" variant="ghost" asChild>
-            <Link href="/interactive-sessions" className="inline-flex items-center gap-1">
+            <Link href="/events" className="inline-flex items-center gap-1">
               <ArrowLeft className="h-3.5 w-3.5" />
               {copy.workspaceBack}
             </Link>
@@ -205,7 +205,7 @@ export default async function SprintWorkspacePage({
             </p>
           </div>
           <Button size="sm" variant="ghost" asChild>
-            <Link href="/interactive-sessions" className="inline-flex items-center gap-1">
+            <Link href="/events" className="inline-flex items-center gap-1">
               <ArrowLeft className="h-3.5 w-3.5" />
               {copy.workspaceBack}
             </Link>
