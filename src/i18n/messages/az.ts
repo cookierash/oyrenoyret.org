@@ -2376,6 +2376,7 @@ export const AZ_MESSAGES = {
       removeOption: 'Seçimi sil',
       optionPlaceholder: 'Seçim {{n}}',
       correctOptionLabel: 'Doğru',
+      answeredCountLabel: 'Cavablandı: {{n}} / {{max}}',
       submitTitle: 'Həllini göndər',
       submitHint: 'Sprint müddətində yalnız bir dəfə göndərə bilərsiniz.',
       submittedBanner: 'Həlliniz göndərildi.',

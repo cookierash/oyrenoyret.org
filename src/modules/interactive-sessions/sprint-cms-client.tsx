@@ -432,7 +432,7 @@ export function SprintCmsClient(props: {
             type: p.type,
             textAnswer: p.type === 'SHORT_ANSWER' ? row.textAnswer.trim() : null,
             selectedOptionId: p.type === 'MULTIPLE_CHOICE' ? row.selectedOptionId : null,
-            imageKeys: row.images.map((img) => img.key),
+            imageKeys: p.type === 'SHORT_ANSWER' ? row.images.map((img) => img.key) : [],
           };
         }),
       };
@@ -455,15 +455,28 @@ export function SprintCmsClient(props: {
       toast.error(
         formatErrorToast(copy.toasts.submitFailed, error instanceof Error ? error.message : null),
       );
-    } finally {
-      setSubmitting(false);
-    }
-  };
+      } finally {
+        setSubmitting(false);
+      }
+    };
 
   const showPrompt = props.isStaff || hasStarted;
   const displayPrompt = showPrompt && prompt.trim().length > 0 ? prompt : null;
   const showProblems = props.isStaff || hasStarted;
   const displayProblems = showProblems && problems.length > 0 ? problems : null;
+
+  const participantProgress = useMemo(() => {
+    if (!displayProblems) return null;
+    const answered = displayProblems.reduce((acc, p) => {
+      const row = structuredAnswers[p.id];
+      if (!row) return acc;
+      if (p.type === 'MULTIPLE_CHOICE') return acc + (row.selectedOptionId ? 1 : 0);
+      return acc + (row.textAnswer.trim() ? 1 : 0);
+    }, 0);
+    return { answered, total: displayProblems.length };
+  }, [displayProblems, structuredAnswers]);
+
+  const canSubmitStructured = participantProgress ? participantProgress.answered === participantProgress.total : true;
 
   return (
     <div className="space-y-5">
@@ -534,9 +547,14 @@ export function SprintCmsClient(props: {
                     const row = structuredAnswers[problem.id] ?? { textAnswer: '', selectedOptionId: '', images: [] };
                     return (
                       <div key={problem.id} className="rounded-md border border-border/70 bg-muted/10 px-4 py-3">
-                        <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-                          {copy.problemLabel.replace('{{n}}', String(problem.order))}
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                            {copy.problemLabel.replace('{{n}}', String(problem.order))}
+                          </p>
+                          <span className="text-[11px] text-muted-foreground">
+                            {problem.type === 'MULTIPLE_CHOICE' ? copy.problemTypeMultiple : copy.problemTypeShort}
+                          </span>
+                        </div>
                         <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
                           {problem.prompt}
                         </p>
@@ -544,7 +562,15 @@ export function SprintCmsClient(props: {
                         {problem.type === 'MULTIPLE_CHOICE' ? (
                           <div className="mt-3 space-y-2">
                             {problem.options.map((opt) => (
-                              <label key={opt.id} className="flex items-start gap-2 text-sm text-foreground/90">
+                              <label
+                                key={opt.id}
+                                className={[
+                                  'flex items-start gap-2 rounded-md border px-3 py-2 text-sm transition-colors cursor-pointer',
+                                  row.selectedOptionId === opt.id
+                                    ? 'border-primary/50 bg-primary/5'
+                                    : 'border-border/60 bg-background/40 hover:bg-muted/30',
+                                ].join(' ')}
+                              >
                                 <input
                                   type="radio"
                                   name={`mcq-${problem.id}`}
@@ -559,7 +585,7 @@ export function SprintCmsClient(props: {
                                       },
                                     }))
                                   }
-                                  className="mt-1"
+                                  className="mt-0.5"
                                 />
                                 <span className="whitespace-pre-wrap">{opt.text}</span>
                               </label>
@@ -584,59 +610,66 @@ export function SprintCmsClient(props: {
                           </div>
                         )}
 
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <label className="text-xs text-muted-foreground">
-                              {copy.attachImagesLabel}
-                              <input
-                                type="file"
-                                accept="image/jpeg,image/png,image/webp"
-                                multiple
-                                className="sr-only"
-                                onChange={(e) => {
-                                  const files = e.currentTarget.files;
-                                  e.currentTarget.value = '';
-                                  void onAttachImages(problem.id, files);
-                                }}
-                              />
-                            </label>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={submitting || totalImagesCount >= MAX_SPRINT_SUBMISSION_IMAGES_TOTAL}
-                              onClick={(e) => {
-                                const input = (e.currentTarget.parentElement?.querySelector(
-                                  'input[type="file"]',
-                                ) ?? null) as HTMLInputElement | null;
-                                input?.click();
-                              }}
-                            >
-                              {copy.addImage}
-                            </Button>
-                            <span className="text-[11px] text-muted-foreground">
-                              {copy.imagesCount
-                                .replace('{{n}}', String(row.images.length))
-                                .replace('{{max}}', String(MAX_SPRINT_SUBMISSION_IMAGES_PER_ANSWER))}
-                            </span>
-                          </div>
-                        </div>
-
-                        {row.images.length > 0 ? (
-                          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                            {row.images.map((img) => (
-                              <div key={img.key} className="relative overflow-hidden rounded-md border border-border/70 bg-background">
-                                <img src={img.proxyUrl} alt="" className="h-28 w-full object-cover" />
-                                <button
+                        {problem.type === 'SHORT_ANSWER' ? (
+                          <>
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <label className="text-xs text-muted-foreground">
+                                  {copy.attachImagesLabel}
+                                  <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    multiple
+                                    className="sr-only"
+                                    onChange={(e) => {
+                                      const files = e.currentTarget.files;
+                                      e.currentTarget.value = '';
+                                      void onAttachImages(problem.id, files);
+                                    }}
+                                  />
+                                </label>
+                                <Button
                                   type="button"
-                                  className="absolute right-1 top-1 rounded bg-background/80 px-2 py-1 text-[11px] text-foreground"
-                                  onClick={() => removeAttachedImage(problem.id, img.key)}
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={submitting || totalImagesCount >= MAX_SPRINT_SUBMISSION_IMAGES_TOTAL}
+                                  onClick={(e) => {
+                                    const input = (e.currentTarget.parentElement?.querySelector(
+                                      'input[type="file"]',
+                                    ) ?? null) as HTMLInputElement | null;
+                                    input?.click();
+                                  }}
                                 >
-                                  {copy.removeImage}
-                                </button>
+                                  {copy.addImage}
+                                </Button>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {copy.imagesCount
+                                    .replace('{{n}}', String(row.images.length))
+                                    .replace('{{max}}', String(MAX_SPRINT_SUBMISSION_IMAGES_PER_ANSWER))}
+                                </span>
                               </div>
-                            ))}
-                          </div>
+                            </div>
+
+                            {row.images.length > 0 ? (
+                              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {row.images.map((img) => (
+                                  <div
+                                    key={img.key}
+                                    className="relative overflow-hidden rounded-md border border-border/70 bg-background"
+                                  >
+                                    <img src={img.proxyUrl} alt="" className="h-28 w-full object-cover" />
+                                    <button
+                                      type="button"
+                                      className="absolute right-1 top-1 rounded bg-background/80 px-2 py-1 text-[11px] text-foreground"
+                                      onClick={() => removeAttachedImage(problem.id, img.key)}
+                                    >
+                                      {copy.removeImage}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </>
                         ) : null}
                       </div>
                     );
@@ -653,15 +686,29 @@ export function SprintCmsClient(props: {
                 </div>
               )}
 
-              <Button onClick={displayProblems ? submitStructuredAnswers : submitAnswer} disabled={submitting}>
+              {displayProblems ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-[11px] text-muted-foreground">
+                    {copy.answeredCountLabel
+                      .replace('{{n}}', String(participantProgress?.answered ?? 0))
+                      .replace('{{max}}', String(participantProgress?.total ?? 0))}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {copy.imagesTotalCount
+                      .replace('{{n}}', String(totalImagesCount))
+                      .replace('{{max}}', String(MAX_SPRINT_SUBMISSION_IMAGES_TOTAL))}
+                  </p>
+                </div>
+              ) : null}
+
+              <Button
+                onClick={displayProblems ? submitStructuredAnswers : submitAnswer}
+                disabled={submitting || (displayProblems ? !canSubmitStructured : false)}
+              >
                 {submitting ? copy.submitting : copy.submitOnce}
               </Button>
               {displayProblems ? (
-                <p className="text-[11px] text-muted-foreground">
-                  {copy.imagesTotalCount
-                    .replace('{{n}}', String(totalImagesCount))
-                    .replace('{{max}}', String(MAX_SPRINT_SUBMISSION_IMAGES_TOTAL))}
-                </p>
+                <p className="text-[11px] text-muted-foreground">{copy.submitHint}</p>
               ) : null}
             </div>
           )}

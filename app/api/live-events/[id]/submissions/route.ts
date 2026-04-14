@@ -229,6 +229,12 @@ export async function POST(
         if (!allowed.has(ans.selectedOptionId)) {
           return NextResponse.json({ error: 'Invalid selected option.' }, { status: 400 });
         }
+        if (ans.imageKeys.length > 0) {
+          return NextResponse.json(
+            { error: 'Images are not allowed for multiple choice answers.' },
+            { status: 400 },
+          );
+        }
       } else {
         if (!ans.textAnswer.trim()) {
           return NextResponse.json({ error: 'Short answer text is required.' }, { status: 400 });

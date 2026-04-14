@@ -2373,6 +2373,7 @@ export const EN_MESSAGES = {
       removeOption: 'Remove option',
       optionPlaceholder: 'Option {{n}}',
       correctOptionLabel: 'Correct',
+      answeredCountLabel: 'Answered {{n}} / {{max}}',
       submitTitle: 'Submit your solution',
       submitHint: 'You can submit only once during the sprint window.',
       submittedBanner: 'Your solution is submitted.',
