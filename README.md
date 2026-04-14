@@ -154,9 +154,18 @@ Rate limiting is implemented server-side. In production, configure Upstash Redis
 ## 🚀 Deployment
 
 1. Set production environment variables
-2. Run database migrations
+2. Run database migrations (`npx prisma migrate deploy`)
 3. Build the application: `npm run build`
 4. Start the server: `npm start`
+
+### Vercel
+
+This repo includes a Vercel-specific build script (`npm run vercel-build`) and a `vercel.json` that sets it as the build command. The script:
+
+- runs `prisma migrate deploy` with retries for transient database connection errors
+- continues the build in production if migrations fail due to a temporary Postgres connection limit (`FATAL: too many connections...`)
+
+If your Vercel Project Settings override the build command, set **Build Command** to `npm run vercel-build` (and remove any `npx prisma migrate deploy && ...` build command).
 
 ## 🖼️ User Uploads (Cloudflare R2)
 

@@ -25,15 +25,21 @@ async function main() {
       ? { ...process.env, DATABASE_URL: migrationDatabaseUrl }
       : process.env;
 
-    const isTooManyConnectionsError = (err) => {
+    const isRetryableMigrationError = (err) => {
       const message = err instanceof Error ? err.message : String(err ?? '');
-      return /too many connections/i.test(message);
+      return (
+        /too many connections/i.test(message) ||
+        /terminat(ed|ing) connection/i.test(message) ||
+        /Connection terminated unexpectedly/i.test(message) ||
+        /ECONNRESET|ETIMEDOUT|EAI_AGAIN/i.test(message)
+      );
     };
 
     const maxAttempts = Number(
-      process.env.PRISMA_MIGRATE_DEPLOY_RETRIES ?? (isProduction ? 6 : 2)
+      process.env.PRISMA_MIGRATE_DEPLOY_RETRIES ?? (isProduction ? 10 : 2)
     );
     const baseDelayMs = Number(process.env.PRISMA_MIGRATE_DEPLOY_DELAY_MS ?? 2000);
+    const maxDelayMs = Number(process.env.PRISMA_MIGRATE_DEPLOY_MAX_DELAY_MS ?? 60000);
     let migrated = false;
     let lastError;
 
@@ -44,10 +50,12 @@ async function main() {
         break;
       } catch (error) {
         lastError = error;
-        if (!isTooManyConnectionsError(error) || attempt === maxAttempts) break;
-        const waitMs = baseDelayMs * attempt;
+        if (!isRetryableMigrationError(error) || attempt === maxAttempts) break;
+        const exponential = baseDelayMs * 2 ** (attempt - 1);
+        const jitter = Math.floor(Math.random() * 250);
+        const waitMs = Math.min(exponential + jitter, maxDelayMs);
         console.warn(
-          `[vercel-build] prisma migrate deploy failed (too many connections). Retrying in ${waitMs}ms (attempt ${attempt}/${maxAttempts})...`
+          `[vercel-build] prisma migrate deploy failed; retrying in ${waitMs}ms (attempt ${attempt}/${maxAttempts})...`
         );
         // eslint-disable-next-line no-await-in-loop
         await delay(waitMs);
@@ -57,7 +65,10 @@ async function main() {
     if (!migrated) {
       const ignoreInProdWhenTooManyConnections =
         isProduction &&
-        isTooManyConnectionsError(lastError) &&
+        lastError &&
+        /too many connections/i.test(
+          lastError instanceof Error ? lastError.message : String(lastError ?? '')
+        ) &&
         process.env.FAIL_ON_MIGRATION_CONNECTIONS !== '1';
 
       if (requireMigrations && !ignoreInProdWhenTooManyConnections) {
