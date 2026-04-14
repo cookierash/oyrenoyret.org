@@ -24,6 +24,10 @@ interface LiveEvent {
   creditCost: number;
   type: string;
   enrollmentStatus: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | null;
+  maxParticipants?: number | null;
+  slotsTaken?: number;
+  isOngoing?: boolean;
+  isFull?: boolean;
 }
 
 function EventCardSkeleton() {
@@ -246,10 +250,15 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
   const copy = messages.liveActivities.board;
   const { canWrite } = useCurrentUser();
   const eventDate = new Date(event.date);
+  const nowMs = Date.now();
+  const startMs = eventDate.getTime();
+  const endMs = startMs + event.durationMinutes * 60_000;
   const isPending = event.enrollmentStatus === 'PENDING';
   const isConfirmed = event.enrollmentStatus === 'CONFIRMED';
   const isCancelled = event.enrollmentStatus === 'CANCELLED';
   const isBusy = actionId === event.id;
+  const isOngoing = event.isOngoing ?? (startMs <= nowMs && endMs > nowMs);
+  const isFull = event.isFull ?? false;
   const localeCode = getLocaleCode(locale);
   const hour12 =
     timeFormat === '12-hour' ? true : timeFormat === '24-hour' ? false : undefined;
@@ -286,9 +295,17 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600">
                 {copy.statusVerification}
               </span>
+            ) : isOngoing ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-medium text-sky-600">
+                {copy.statusOngoing}
+              </span>
             ) : isCancelled ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-600">
                 {copy.statusCancelled}
+              </span>
+            ) : isFull ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-600">
+                {copy.statusFull}
               </span>
             ) : null}
           </div>
@@ -329,6 +346,16 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
             <AlertCircle className="h-4 w-4 text-rose-500" />
             {copy.cancelledNotice}
           </div>
+        ) : isOngoing ? (
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-4 w-4 text-sky-500" />
+            {copy.ongoingNotice}
+          </div>
+        ) : isFull ? (
+          <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+            <AlertCircle className="h-4 w-4 text-rose-500" />
+            {copy.fullNotice}
+          </div>
         ) : (
           <span className="text-xs text-muted-foreground">{copy.readyNotice}</span>
         )}
@@ -345,6 +372,14 @@ function LiveEventCard({ event, actionId, onEnroll }: LiveEventCardProps) {
           ) : isPending ? (
             <Button asChild size="sm" variant="secondary" disabled={isBusy}>
               <Link href="/notifications">{copy.completeRegistration}</Link>
+            </Button>
+          ) : isOngoing ? (
+            <Button size="sm" variant="secondary" disabled>
+              {copy.ongoingLabel}
+            </Button>
+          ) : isFull ? (
+            <Button size="sm" variant="secondary" disabled>
+              {copy.fullLabel}
             </Button>
           ) : (
             <Button size="sm" onClick={() => onEnroll(event.id)} disabled={isBusy || !canWrite}>

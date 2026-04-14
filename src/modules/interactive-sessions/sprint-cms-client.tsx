@@ -91,11 +91,19 @@ export function SprintCmsClient(props: {
   };
 
   const remainingToStartMs = Math.max(0, startsAtMs - now);
+  const remainingToEndMs = Math.max(0, endsAtMs - now);
   const startsInLabel =
     !hasStarted && Number.isFinite(startsAtMs)
       ? (copy.countdownStartsIn ?? 'Starts in {{time}}').replace(
           '{{time}}',
           formatCountdown(remainingToStartMs),
+        )
+      : null;
+  const endsInLabel =
+    hasStarted && !isOver && Number.isFinite(endsAtMs)
+      ? (copy.countdownEndsIn ?? 'Ends in {{time}}').replace(
+          '{{time}}',
+          formatCountdown(remainingToEndMs),
         )
       : null;
 
@@ -482,36 +490,83 @@ export function SprintCmsClient(props: {
     <div className="space-y-5">
       {!props.isStaff ? (
         <>
-          <section className="card-frame bg-card p-5">
-            <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-medium text-foreground">{copy.contestTitleEditorLabel}</h2>
+          <section className="card-frame border border-primary/15 bg-gradient-to-r from-primary/10 to-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {copy.countdownTitle}
+                </p>
+                {!hasStarted ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{startsInLabel ?? copy.notStarted}</p>
+                ) : isOver ? (
+                  <p className="mt-1 text-sm text-muted-foreground">{copy.ended}</p>
+                ) : (
+                  <p className="mt-1 text-sm text-emerald-700">{endsInLabel ?? copy.inProgress}</p>
+                )}
+              </div>
+              <div className="text-right text-xs text-muted-foreground">
+                <p>
+                  {copy.startsAtLabel}:{' '}
+                  {Number.isFinite(startsAtMs) ? new Date(startsAtMs).toLocaleString() : '—'}
+                </p>
+                <p>
+                  {copy.endsAtLabel}:{' '}
+                  {Number.isFinite(endsAtMs) ? new Date(endsAtMs).toLocaleString() : '—'}
+                </p>
+              </div>
             </div>
-            <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
-              <p className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">{topic}</p>
+
+            <div className="mt-4 flex items-baseline justify-between gap-4">
+              <p className="font-mono text-3xl font-semibold tracking-tight text-foreground">
+                {!hasStarted ? formatCountdown(remainingToStartMs) : isOver ? '00:00:00' : formatCountdown(remainingToEndMs)}
+              </p>
+              {!hasStarted ? (
+                <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-foreground">
+                  {copy.notStarted}
+                </span>
+              ) : isOver ? (
+                <span className="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-foreground">
+                  {copy.ended}
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  {copy.inProgress}
+                </span>
+              )}
             </div>
           </section>
 
           <section className="card-frame bg-card p-5">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-medium text-foreground">{copy.promptTitle}</h2>
-              {!hasStarted ? (
-                <span className="text-xs text-muted-foreground">{startsInLabel ?? copy.notStarted}</span>
-              ) : isOver ? (
-                <span className="text-xs text-muted-foreground">{copy.ended}</span>
-              ) : (
-                <span className="text-xs text-emerald-600">{copy.inProgress}</span>
-              )}
+              <h2 className="text-sm font-medium text-foreground">{copy.contestOverviewTitle}</h2>
             </div>
-            <div className="mt-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
-              {displayPrompt ? (
-                <pre className="whitespace-pre-wrap text-sm text-foreground/90 leading-relaxed">
-                  {displayPrompt}
-                </pre>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {showPrompt ? copy.noPrompt : copy.promptLocked}
+
+            <div className="mt-3 space-y-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {copy.contestTitleEditorLabel}
                 </p>
-              )}
+                <div className="mt-1 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{topic}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  {copy.promptTitle}
+                </p>
+                <div className="mt-1 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
+                  {displayPrompt ? (
+                    <pre className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+                      {displayPrompt}
+                    </pre>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {showPrompt ? copy.noPrompt : copy.promptLocked}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           </section>
         </>

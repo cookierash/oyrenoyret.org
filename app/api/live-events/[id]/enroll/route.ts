@@ -108,10 +108,10 @@ export async function POST(
     }
 
     if (event.maxParticipants !== null && event.maxParticipants !== undefined) {
-      const confirmedCount = await prisma.liveEventEnrollment.count({
-        where: { liveEventId: event.id, status: 'CONFIRMED' },
+      const reservedCount = await prisma.liveEventEnrollment.count({
+        where: { liveEventId: event.id, status: { in: ['PENDING', 'CONFIRMED'] } },
       });
-      if (confirmedCount >= event.maxParticipants) {
+      if (reservedCount >= event.maxParticipants) {
         return NextResponse.json(
           { error: 'This event is full. Please try another session.' },
           { status: 409 },

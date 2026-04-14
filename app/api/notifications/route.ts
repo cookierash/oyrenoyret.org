@@ -86,8 +86,6 @@ export async function GET(request: Request) {
       'updatedAt',
     );
 
-    const now = new Date();
-
     const [replyNotifications, transactions, sprintEnrollments, moderationNotices] = await Promise.all([
       prisma.discussionReply.findMany({
         where: {
@@ -149,7 +147,6 @@ export async function GET(request: Request) {
               liveEvent: {
                 deletedAt: null,
                 type: 'PROBLEM_SPRINT',
-                date: { gte: now },
               },
             },
             orderBy: { updatedAt: 'desc' },

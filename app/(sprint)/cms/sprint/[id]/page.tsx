@@ -14,6 +14,7 @@ import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { isStaff } from '@/src/lib/permissions';
 import { SprintCmsClient } from '@/src/modules/interactive-sessions/sprint-cms-client';
 import { Button } from '@/components/ui/button';
+import { getI18n } from '@/src/i18n/server';
 
 export default async function SprintWorkspacePage({
   params,
@@ -104,28 +105,33 @@ export default async function SprintWorkspacePage({
   }
 
   if (!enrollment || enrollment.status !== 'CONFIRMED') {
+    const { messages } = await getI18n();
+    const copy = messages.liveActivities.cms;
     return (
       <div className="min-h-screen bg-muted/20">
         <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-6 text-center">
           <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-            Contest area
+            {copy.workspaceBadge}
           </p>
           <h1 className="mt-2 text-2xl font-semibold text-foreground">
-            Complete registration to enter
+            {copy.workspaceGateTitle}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This sprint requires a verified registration before you can access the contest room.
+            {copy.workspaceGateDescription}
           </p>
           <Button size="sm" variant="ghost" asChild>
             <Link href="/interactive-sessions" className="inline-flex items-center gap-1">
               <ArrowLeft className="h-3.5 w-3.5" />
-              Back to interactive sessions
+              {copy.workspaceBack}
             </Link>
           </Button>
         </div>
       </div>
     );
   }
+
+  const { messages } = await getI18n();
+  const copy = messages.liveActivities.cms;
 
   const allowPromptForClient = staff || Date.now() >= event.date.getTime();
   const allowProblemsForClient = allowPromptForClient;
@@ -191,17 +197,17 @@ export default async function SprintWorkspacePage({
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase text-muted-foreground">
-              Contest area
+              {copy.workspaceBadge}
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-foreground">{event.topic}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Competition area for verified participants.
+              {copy.workspaceDescription}
             </p>
           </div>
           <Button size="sm" variant="ghost" asChild>
             <Link href="/interactive-sessions" className="inline-flex items-center gap-1">
               <ArrowLeft className="h-3.5 w-3.5" />
-              Back to interactive sessions
+              {copy.workspaceBack}
             </Link>
           </Button>
         </header>

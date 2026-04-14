@@ -38,6 +38,7 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
 
     const userId = await getCurrentSession();
     const now = new Date();
+    const ongoingLookback = new Date(now.getTime() - 8 * 60 * 60 * 1000);
 
     let includePast = false;
     if (includePastRequested && userId) {
@@ -60,13 +61,14 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
       difficulty: any;
       creditCost: number;
       type: string;
+      maxParticipants?: number | null;
     }> = [];
     try {
       events = await prisma.liveEvent.findMany({
         where: {
           deletedAt: null,
           ...(type ? { type } : {}),
-          ...(includePast ? {} : { date: { gte: now } }),
+          ...(includePast ? {} : { date: { gte: ongoingLookback } }),
         },
         orderBy: { date: 'asc' },
         take,
@@ -78,6 +80,7 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
           difficulty: true,
           creditCost: true,
           type: true,
+          maxParticipants: true,
         },
       });
     } catch (error) {
@@ -86,7 +89,7 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
         events = await prisma.liveEvent.findMany({
           where: {
             ...(type ? { type } : {}),
-            ...(includePast ? {} : { date: { gte: now } }),
+            ...(includePast ? {} : { date: { gte: ongoingLookback } }),
           },
           orderBy: { date: 'asc' },
           take,
@@ -100,6 +103,9 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
             type: true,
           },
         });
+        for (const event of events as any[]) {
+          event.maxParticipants = null;
+        }
       } catch {
         events = [];
       }
@@ -120,6 +126,22 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
     }
 
     const enrollmentMap = new Map(enrollments.map((item) => [item.liveEventId, item.status]));
+
+    const slotsTakenMap = new Map<string, number>();
+    if (eventIds.length) {
+      try {
+        const grouped = await prisma.liveEventEnrollment.groupBy({
+          by: ['liveEventId'],
+          where: { liveEventId: { in: eventIds }, status: { in: ['PENDING', 'CONFIRMED'] } },
+          _count: { _all: true },
+        });
+        for (const row of grouped) {
+          slotsTakenMap.set(row.liveEventId, row._count._all);
+        }
+      } catch (error) {
+        if (!isDbSchemaMismatch(error)) throw error;
+      }
+    }
 
     const payoutReferenceIds: string[] = [];
     for (const event of events) {
@@ -147,11 +169,34 @@ import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
       }
     }
 
-    const result = events.map((event) => ({
-      ...event,
-      enrollmentStatus: enrollmentMap.get(event.id) ?? null,
-      hasPayout: event.type === 'PROBLEM_SPRINT' ? paidOutSprintIds.has(event.id) : null,
-    }));
+    const nowMs = now.getTime();
+    const visible = includePast
+      ? events
+      : events.filter((event) => {
+          const startMs = event.date.getTime();
+          const endMs = startMs + event.durationMinutes * 60_000;
+          return startMs >= nowMs || endMs > nowMs;
+        });
+
+    const result = visible.map((event) => {
+      const startMs = event.date.getTime();
+      const endMs = startMs + event.durationMinutes * 60_000;
+      const isOngoing = startMs <= nowMs && endMs > nowMs;
+      const slotsTaken = slotsTakenMap.get(event.id) ?? 0;
+      const maxParticipants =
+        event.maxParticipants === undefined ? null : (event.maxParticipants ?? null);
+      const isFull =
+        maxParticipants === null ? false : Number.isFinite(maxParticipants) ? slotsTaken >= maxParticipants : false;
+      return {
+        ...event,
+        maxParticipants,
+        slotsTaken,
+        isOngoing,
+        isFull,
+        enrollmentStatus: enrollmentMap.get(event.id) ?? null,
+        hasPayout: event.type === 'PROBLEM_SPRINT' ? paidOutSprintIds.has(event.id) : null,
+      };
+    });
 
     return NextResponse.json(result, { headers: getPrivateNoStoreHeaders() });
   } catch (error) {
