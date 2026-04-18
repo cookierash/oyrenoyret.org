@@ -1,6 +1,14 @@
-# Oyrenoyret.org - NGO EdTech Platform
+# Oyrenoyret.org
 
-A production-grade, security-first EdTech platform designed for minors, built with Next.js, TypeScript, and PostgreSQL.
+A production-grade, security-first learning platform I’m building for students, teachers, and parents — built with Next.js, TypeScript, and PostgreSQL.
+
+## What it includes (today)
+
+- Curriculum and learning materials (text + practice tests)
+- Events (guided sessions, sprints, contests) with registration, countdowns, and winners
+- Discussions, notifications, and moderation tools
+- Roles and admin workspace, plus consent tracking for minors
+- Credits/points and progress tracking
 
 ## 🏗️ Architecture
 
@@ -20,7 +28,7 @@ This platform follows a **modular, domain-driven design** with clear separation 
 
 - **Next.js 16** (App Router)
 - **TypeScript** (strict mode)
-- **Tailwind CSS** (professional blue design system)
+- **Tailwind CSS** (design system)
 - **PostgreSQL** (via Prisma ORM)
 - **shadcn/ui** (component library)
 
@@ -44,29 +52,26 @@ This platform follows a **modular, domain-driven design** with clear separation 
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    npm install
    ```
 
-3. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and fill in your database URL and secrets.
+2. Create a `.env` file and set at minimum:
+   - `DATABASE_URL`
+   - `NEXTAUTH_SECRET` (32+ chars)
 
-4. Set up the database:
+3. Set up the database:
    ```bash
    npm run db:migrate
    ```
 
-5. Generate Prisma client:
+4. Generate Prisma client:
    ```bash
    npm run db:generate
    ```
 
-6. Run the development server:
+5. Run the development server:
    ```bash
    npm run dev
    ```
@@ -121,10 +126,7 @@ The platform uses Prisma ORM with PostgreSQL. Key models:
 
 ## 🎨 Design System
 
-The platform uses a professional blue color palette:
-- **Primary**: Blue shades (50-950)
-- **Neutral**: Balanced white & black tones
-- **Design tone**: Academic, trustworthy, calm, NGO-appropriate
+Design aims for an academic, calm, and trustworthy experience.
 
 ## 🔐 Security Best Practices
 
@@ -198,12 +200,4 @@ Optional:
 
 ## 📄 License
 
-[Add your license here]
-
-## 🤝 Contributing
-
-[Add contribution guidelines here]
-
----
-
-**Note**: This is a foundational scaffold. Business logic and features will be implemented incrementally.
+This repository does not currently publish a license file.

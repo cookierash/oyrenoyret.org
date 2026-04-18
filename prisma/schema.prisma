@@ -966,7 +966,7 @@ model Material {
   status        MaterialStatus @default(DRAFT)
   publishedAt   DateTime?
   publishCreditsGrantedAt DateTime?  // Set when we grant 0.5 for first publish (idempotency)
-  alignmentScore Float?         // AI rating [0.5, 1.0] for credit formulas; default 0.75
+  alignmentScore Float?         // Alignment score [0.5, 1.0] used for credit formulas; default 0.75
   difficulty    MaterialDifficulty? // basic=1 bar green, intermediate=2 bars yellow, advanced=3 bars red
   ratingAvg     Float          @default(0)
   ratingCount   Int            @default(0)
