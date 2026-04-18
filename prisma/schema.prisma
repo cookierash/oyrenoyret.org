@@ -1,5 +1,5 @@
 // Prisma Schema
-// Database schema for the NGO EdTech platform
+// Database schema for the Oyrenoyret.org platform
 // All models use UUID primary keys and include soft-delete support
 
 generator client {

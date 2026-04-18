@@ -3,9 +3,9 @@ import type { Config } from 'tailwindcss';
 /**
  * Tailwind CSS Configuration
  * 
- * Professional design system for the NGO EdTech platform.
+ * Design system for the Oyrenoyret.org platform.
  * Color palette: Blue primary with neutral tones.
- * Design tone: Academic, trustworthy, calm, NGO-appropriate.
+ * Design tone: Academic, trustworthy, calm.
  */
 
 const config: Config = {
