@@ -58,7 +58,7 @@ This platform follows a **modular, domain-driven design** with clear separation 
    npm install
    ```
 
-2. Create a `.env` file and set at minimum:
+2. Create a `.env` file (see `.env.example`) and set at minimum:
    - `DATABASE_URL`
    - `NEXTAUTH_SECRET` (32+ chars)
 
@@ -169,6 +169,11 @@ This repo includes a Vercel-specific build script (`npm run vercel-build`) and a
 - continues the build in production if migrations fail due to a temporary Postgres connection limit (`FATAL: too many connections...`)
 
 If your Vercel Project Settings override the build command, set **Build Command** to `npm run vercel-build` (and remove any `npx prisma migrate deploy && ...` build command).
+
+Security note:
+- Mark secrets (DB URLs, API keys, tokens) as **Sensitive** in Vercel so their values are not visible in the dashboard.
+- Rotate at the source if a value may have been shared (create a new DB password/user, new API key, new R2 key, etc), then update Vercel to the new value.
+- Never store secrets in `NEXT_PUBLIC_*` variables (those are exposed to the browser bundle).
 
 ## 🖼️ User Uploads (Cloudflare R2)
 

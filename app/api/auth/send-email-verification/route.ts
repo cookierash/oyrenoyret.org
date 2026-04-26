@@ -12,6 +12,7 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 import { getPrivateNoStoreHeaders } from '@/src/lib/http-cache';
 import { hashEmailVerificationToken, issueEmailVerificationToken } from '@/src/modules/auth/utils/email-verification';
 import { sendAccountVerificationEmail } from '@/src/modules/auth/services/email';
+import { getPublicErrorMessage } from '@/src/security/public-error';
 
 function getAppOrigin(request: Request): string {
   const configured = process.env.NEXTAUTH_URL?.trim();
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error sending email verification:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to send verification email' },
+      { success: false, error: getPublicErrorMessage(error, 'Failed to send verification email') },
       { status: 500, headers: getPrivateNoStoreHeaders() }
     );
   }

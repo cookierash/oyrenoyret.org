@@ -14,6 +14,7 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 import { hashPassword, validatePasswordStrength, verifyPassword } from '@/src/modules/auth/utils/password';
 import { requireVerifiedEmailForWrite } from '@/src/modules/auth/utils/write-access';
 import { sendPasswordChangedEmail } from '@/src/modules/auth/services/email';
+import { getPublicErrorMessage } from '@/src/security/public-error';
 
 const schema = z.object({
   currentPassword: z.string().min(1).max(72),
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error updating password:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update password' },
+      { success: false, error: getPublicErrorMessage(error, 'Failed to update password') },
       { status: 500, headers: getPrivateNoStoreHeaders() },
     );
   }

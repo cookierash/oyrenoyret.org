@@ -12,6 +12,7 @@ import { RATE_LIMITS } from '@/src/config/constants';
 import { getCurrentSession } from '@/src/modules/auth/utils/session';
 import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '@/src/security/rateLimiter';
 import { AVATAR_VARIANTS } from '@/src/lib/avatar';
+import { getPublicErrorMessage } from '@/src/security/public-error';
 
 const schema = z.object({
   firstName: z
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error updating profile:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update profile' },
+      { success: false, error: getPublicErrorMessage(error, 'Failed to update profile') },
       { status: 500, headers: getPrivateNoStoreHeaders() },
     );
   }

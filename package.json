@@ -19,7 +19,8 @@
     "db:push": "prisma db push",
     "db:reset-email-verification": "node scripts/reset-email-verification.mjs",
     "admin:create": "node scripts/create-admin.mjs",
-    "admin:doctor": "node scripts/admin-doctor.mjs"
+    "admin:doctor": "node scripts/admin-doctor.mjs",
+    "security:scan": "node scripts/security-scan.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

@@ -15,6 +15,7 @@ import { buildRateLimitResponse, checkRateLimit, getRateLimitIdentifier } from '
 import { verifyPassword } from '@/src/modules/auth/utils/password';
 import { issueEmailVerificationToken } from '@/src/modules/auth/utils/email-verification';
 import { sendAccountVerificationEmail } from '@/src/modules/auth/services/email';
+import { getPublicErrorMessage } from '@/src/security/public-error';
 
 function getAppOrigin(request: Request): string {
   const configured = process.env.NEXTAUTH_URL?.trim();
@@ -148,7 +149,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error updating email:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to update email' },
+      { success: false, error: getPublicErrorMessage(error, 'Failed to update email') },
       { status: 500, headers: getPrivateNoStoreHeaders() },
     );
   }

@@ -7,6 +7,7 @@
 
 import { NextResponse } from 'next/server';
 import { isDbSchemaMismatch } from '@/src/db/schema-mismatch';
+import { getPublicErrorMessage } from '@/src/security/public-error';
 // NOTE: Keep heavy dependencies inside handlers to avoid module-init crashes.
 
 export const runtime = 'nodejs';
@@ -499,10 +500,9 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('Error creating discussion:', error);
-    const message = error instanceof Error ? error.message : 'Internal server error';
     return NextResponse.json(
       {
-        error: message || 'Internal server error',
+        error: getPublicErrorMessage(error, 'Internal server error'),
         code: 'DISCUSSION_CREATE_FAILED',
       },
       { status: 500 }
