@@ -1,6 +1,6 @@
 /**
  * Application Constants
- * 
+ *
  * Centralized constants and configuration values.
  * Environment-specific values should use environment variables.
  */

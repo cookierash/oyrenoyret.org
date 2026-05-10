@@ -1,4 +1,5 @@
 # oyrenoyret.org
+<!-- latest repository refresh -->
 
 A production-grade, security-first learning platform I’m building for students, teachers, and parents - built with Next.js, TypeScript, and PostgreSQL.
 (Note:) This project has been built as a social responsibility project for HZT (Haji Zeynalabdin Taghiyev) Competition. However, we are independently running this project to promote education in Azerbaijan and diverge the educational gap between priviliged and underpriviliged classes.

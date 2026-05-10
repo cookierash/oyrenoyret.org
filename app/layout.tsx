@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+
 import { ThemeProvider } from '@/src/components/theme-provider';
 import { SettingsProvider } from '@/src/components/settings/settings-provider';
 import { I18nProvider } from '@/src/i18n/i18n-provider';

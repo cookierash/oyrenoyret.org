@@ -4,7 +4,7 @@ import * as React from 'react';
 import { cn } from '@/src/lib/utils';
 
 /**
- * Button variants – use semantically:
+ * Button variants - use semantically:
  *
  * - primary:   Main CTAs (submit, sign up, continue, primary actions)
  * - secondary: Secondary actions (view more, less prominent)

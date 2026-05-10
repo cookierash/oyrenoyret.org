@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 /**
  * Next.js Configuration
- * 
+ *
  * Security headers and production-ready configuration.
  * All security headers are configured here to protect against common attacks.
  */

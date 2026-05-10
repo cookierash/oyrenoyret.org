@@ -2,7 +2,7 @@ import type { Config } from 'tailwindcss';
 
 /**
  * Tailwind CSS Configuration
- * 
+ *
  * Design system for the Oyrenoyret.org platform.
  * Color palette: Blue primary with neutral tones.
  * Design tone: Academic, trustworthy, calm.

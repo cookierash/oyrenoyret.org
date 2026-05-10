@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 
+// Runs the production build steps used by Vercel.
 const run = (command, options = {}) => {
   execSync(command, { stdio: 'inherit', ...options });
 };
